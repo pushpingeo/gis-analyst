@@ -42,6 +42,14 @@
    "category": "C"
   },
   {
+   "project_number": "37673",
+   "ps5": false,
+   "ps6": true,
+   "ps7": false,
+   "ps8": true,
+   "category": "A"
+  },
+  {
    "project_number": "35701",
    "ps5": false,
    "ps6": true,
@@ -52,10 +60,10 @@
   {
    "project_number": "36313",
    "ps5": false,
-   "ps6": false,
+   "ps6": true,
    "ps7": false,
    "ps8": false,
-   "category": "C"
+   "category": "B"
   },
   {
    "project_number": "31627",
@@ -98,10 +106,58 @@
    "category": "A"
   },
   {
+   "project_number": "40101",
+   "ps5": false,
+   "ps6": true,
+   "ps7": false,
+   "ps8": true,
+   "category": "A"
+  },
+  {
+   "project_number": "34785",
+   "ps5": false,
+   "ps6": true,
+   "ps7": false,
+   "ps8": false,
+   "category": "B"
+  },
+  {
+   "project_number": "36754",
+   "ps5": false,
+   "ps6": false,
+   "ps7": false,
+   "ps8": false,
+   "category": "A"
+  },
+  {
+   "project_number": "36008",
+   "ps5": false,
+   "ps6": true,
+   "ps7": false,
+   "ps8": false,
+   "category": "A"
+  },
+  {
    "project_number": "31383",
    "ps5": false,
    "ps6": true,
    "ps7": true,
+   "ps8": true,
+   "category": "A"
+  },
+  {
+   "project_number": "42750",
+   "ps5": false,
+   "ps6": false,
+   "ps7": false,
+   "ps8": false,
+   "category": "C"
+  },
+  {
+   "project_number": "34079",
+   "ps5": true,
+   "ps6": true,
+   "ps7": false,
    "ps8": true,
    "category": "A"
   },
@@ -146,6 +202,14 @@
    "category": "C"
   },
   {
+   "project_number": "34588",
+   "ps5": false,
+   "ps6": true,
+   "ps7": false,
+   "ps8": true,
+   "category": "A"
+  },
+  {
    "project_number": "45668",
    "ps5": false,
    "ps6": true,
@@ -162,6 +226,22 @@
    "category": "A"
   },
   {
+   "project_number": "35175",
+   "ps5": false,
+   "ps6": true,
+   "ps7": false,
+   "ps8": true,
+   "category": "A"
+  },
+  {
+   "project_number": "38207",
+   "ps5": true,
+   "ps6": false,
+   "ps7": false,
+   "ps8": true,
+   "category": "A"
+  },
+  {
    "project_number": "41172",
    "ps5": true,
    "ps6": true,
@@ -170,12 +250,20 @@
    "category": "A"
   },
   {
+   "project_number": "33435",
+   "ps5": false,
+   "ps6": true,
+   "ps7": false,
+   "ps8": true,
+   "category": "A"
+  },
+  {
    "project_number": "39879",
    "ps5": false,
-   "ps6": false,
+   "ps6": true,
    "ps7": false,
    "ps8": false,
-   "category": "C"
+   "category": "B"
   },
   {
    "project_number": "36787",
@@ -194,6 +282,14 @@
    "category": "A"
   },
   {
+   "project_number": "37808",
+   "ps5": false,
+   "ps6": false,
+   "ps7": false,
+   "ps8": false,
+   "category": "C"
+  },
+  {
    "project_number": "34603",
    "ps5": false,
    "ps6": true,
@@ -210,7 +306,23 @@
    "category": "B"
   },
   {
+   "project_number": "35413",
+   "ps5": false,
+   "ps6": false,
+   "ps7": false,
+   "ps8": false,
+   "category": "C"
+  },
+  {
    "project_number": "36877",
+   "ps5": true,
+   "ps6": false,
+   "ps7": false,
+   "ps8": false,
+   "category": "B"
+  },
+  {
+   "project_number": "35479",
    "ps5": true,
    "ps6": false,
    "ps7": false,
@@ -220,10 +332,10 @@
   {
    "project_number": "48399",
    "ps5": false,
-   "ps6": false,
+   "ps6": true,
    "ps7": false,
    "ps8": false,
-   "category": "C"
+   "category": "B"
   }
  ]
 }

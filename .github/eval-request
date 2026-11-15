@@ -1,0 +1,2 @@
+--label=smoke --arms=rules,off,on,web --sites=41172,35701 --concurrency=2
+# smoke test: two sites, every arm

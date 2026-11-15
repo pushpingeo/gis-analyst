@@ -193,3 +193,29 @@ export async function runAgent({ site, footprintKm, skillOn, skillText, deskRese
   onEvent({ type: "done", result, usage });
   return { result, text: finalText, history, usage };
 }
+
+// ---- Leak check ---------------------------------------------------------------
+// Did the agent's web searches or search results name the project? Matches the distinctive part of the
+// name as a phrase ("upper trishuli"), not single words, because rivers and villages share names.
+const GENERIC = new Set(["solar", "wind", "hydro", "power", "plant", "project", "ipp", "gold", "copper", "lithium", "terminal",
+  "expansion", "phase", "corporation", "refi", "lng", "wpp", "hpp", "the", "and", "energy"]);
+
+export function leakPhrase(projectName) {
+  return projectName.toLowerCase().replace(/[()]/g, " ").split(/[\s\-]+/).filter((w) => w.length > 3 && !GENERIC.has(w)).join(" ");
+}
+
+export function findLeak(projectName, events) {
+  const phrase = leakPhrase(projectName);
+  if (!phrase) return null;
+  const norm = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[-_]+/g, " ");
+  for (const e of events) {
+    if (e.type !== "response") continue;
+    for (const b of e.content) {
+      const texts = b.type === "server_tool_use" ? [b.input?.query]
+        : b.type === "web_search_tool_result" && Array.isArray(b.content) ? b.content.flatMap((r) => [r.title, r.url]) : [];
+      const hit = texts.find((t) => norm(t).includes(phrase));
+      if (hit) return { phrase, where: hit };
+    }
+  }
+  return null;
+}

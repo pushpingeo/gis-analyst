@@ -74,7 +74,10 @@ export async function fetchOverpass(query, endpoint = OVERPASS_ENDPOINTS[0], fet
     clearTimeout(timer);
   }
   if (!res.ok) throw new Error(`Overpass ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return res.json();
+  const json = await res.json();
+  // Overpass can answer 200 with a partial result and a "remark" when a query times out or runs out of memory.
+  if (json.remark && /error|timeout|timed out|out of memory|capacity/i.test(json.remark)) throw new Error(`Overpass: ${json.remark.slice(0, 200)}`);
+  return json;
 }
 
 // ---- Geometry -------------------------------------------------------------
