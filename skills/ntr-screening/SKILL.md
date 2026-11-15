@@ -88,6 +88,7 @@ Concepts: World Heritage site (cultural or mixed), heritage site, historic featu
 
 ### PS4: Community health, safety and security (context, not scored)
 Concepts: settlements, schools, hospitals and roads within 5 km; existing energy infrastructure. Report as context: who lives near the site, and what traffic and safety exposure there is.
+- **Schools are sensitive receptors.** Communities react strongly to anything that affects children: construction traffic past a school, dust, noise, blasting, emissions, flood or dam-break risk. Always check for schools and name any within 1 km of the footprint, or close to the likely access road. Treat them like settlements for PS4 and as a sign of community sensitivity, and say so in the summary. Hospitals and clinics get the same treatment.
 
 ### PS1–PS3
 PS1 (management systems), PS2 (labour) and PS3 (pollution and resource efficiency) apply to almost every real project. Mention them, but don't score them; spatial data says little about them.
