@@ -7,7 +7,7 @@
 // and adds the label to eval/index.json for the results page.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { runAgent, prepareData, findLeak } from "../js/agent.js";
+import { runAgent, prepareData, findLeak, parseResult } from "../js/agent.js";
 import { FOOTPRINT_KM, screen, summarise, summariseGbif } from "../js/tools.js";
 import { rules } from "../js/rules.js";
 
@@ -68,7 +68,11 @@ function slimEvents(events) {
 
 async function runOne(s, arm, rep) {
   const out = `eval/runs/${label}/${arm}/r${rep}/${s.id}.json`;
-  if (existsSync(out)) return readJson(out); // resumable
+  if (existsSync(out)) { // resumable; --reparse re-reads saved answers with the current parser (no API calls)
+    const rec = readJson(out);
+    if (process.argv.includes("--reparse") && rec.text) { rec.result = parseResult(rec.text); writeFileSync(out, JSON.stringify(rec)); }
+    return rec;
+  }
   const { r, data, versions } = siteInputs(s);
   const base = { site_id: s.id, arm, repeat: rep, label, skill_sha: skillSha, catalogue_version: catalogue.version, data_versions: versions, started: new Date().toISOString() };
   let rec;
@@ -91,7 +95,7 @@ async function runOne(s, arm, rep) {
   writeFileSync(out, JSON.stringify(rec));
   const res = rec.result;
   console.log(`${arm.padEnd(5)} r${rep} ${s.id} ${s.name.slice(0, 24).padEnd(25)} ` +
-    (res ? ["ps5", "ps6", "ps7", "ps8"].map((k) => (res[k] === s.ifc[k] ? "✓" : "✗")).join("") + ` ${res.category}${s.ifc.category}` : `ERROR ${rec.error?.slice(0, 80)}`) +
+    (res ? ["ps5", "ps6", "ps7", "ps8"].map((k) => (res[k] === s.ifc[k] ? "✓" : "✗")).join("") + ` ${res.category}${s.ifc.category}` : `NO RESULT ${rec.error ? rec.error.slice(0, 80) : "(no JSON in the answer)"}`) +
     (rec.leak ? "  LEAK" : ""));
   return rec;
 }
@@ -126,7 +130,7 @@ function consistency(recs) {
 }
 
 // ---- Main ------------------------------------------------------------------------
-if (arms.some((a) => a !== "rules") && !process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not set");
+if (arms.some((a) => a !== "rules") && !process.env.ANTHROPIC_API_KEY && !process.argv.includes("--reparse")) throw new Error("ANTHROPIC_API_KEY is not set");
 const usable = sites.filter((s) => existsSync(`data/osm/${s.id}.json`));
 console.log(`Label ${label}, skill ${skillSha}, catalogue ${catalogue.version}, ${usable.length} sites with data, arms ${arms.join(",")}, repeats ${repeats}`);
 const jobs = [];
@@ -137,7 +141,8 @@ await Promise.all(Array.from({ length: concurrency }, async () => {
   while (next < jobs.length) { const [s, arm, rep] = jobs[next++]; records.push(await runOne(s, arm, rep)); }
 }));
 
-const summary = { label, created: new Date().toISOString(), model: MODEL, skill_sha: skillSha, catalogue_version: catalogue.version,
+const shas = [...new Set(records.filter((x) => x.skill_sha).map((x) => x.skill_sha))];
+const summary = { label, created: new Date().toISOString(), model: MODEL, skill_sha: shas.join(", ") || skillSha, catalogue_version: catalogue.version,
   sites: usable.length, repeats, arms: {}, usage_this_run: usageTotal };
 for (const arm of arms) {
   const recs = records.filter((x) => x.arm === arm);
@@ -151,7 +156,7 @@ summary.per_site = usable.map((s) => ({ id: s.id, name: s.name, country: s.count
 mkdirSync(`eval/runs/${label}`, { recursive: true });
 writeFileSync(`eval/runs/${label}/summary.json`, JSON.stringify(summary, null, 1));
 const index = readJson("eval/index.json") || { runs: [] };
-index.runs = [...index.runs.filter((r) => r.label !== label), { label, created: summary.created, skill_sha: skillSha, arms }];
+index.runs = [...index.runs.filter((r) => r.label !== label), { label, created: summary.created, skill_sha: summary.skill_sha, arms }];
 writeFileSync("eval/index.json", JSON.stringify(index, null, 1));
 
 console.log("\narm    sites  agree  kappa  PS5   PS6   PS7   PS8   cat   consistency");

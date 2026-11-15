@@ -33,7 +33,7 @@
 
   <h2>How to read this</h2>
   <div class="card">
-    <p><b>Agreement</b> is the share of yes/no calls that match IFC's. <b>Kappa</b> corrects for agreement you'd get by chance: 0 means no better than guessing, 1 means perfect. <b>Consistency</b> is how often repeated runs on the same site give the same answer.</p>
+    <p><b>Agreement</b> is the share of yes/no calls that match IFC's. Because IFC applies PS5 and PS6 to most projects, saying yes to everything already scores well on those, so compare against that column. <b>Kappa</b> is the fairer measure. It corrects for agreement you'd get by chance: 0 means no better than guessing, 1 means perfect. <b>Consistency</b> is how often repeated runs on the same site give the same answer.</p>
     <p><b>The four set-ups:</b> <i>Rules only</i> applies the skill's distance rules mechanically, with no AI. <i>Skill off</i> is Claude with the same tools but no method. <i>Skill on</i> adds the NTR skill. <i>Skill + web</i> also lets it search the web.</p>
     <p><b>What keeps it honest.</b> The agent never sees the project name or IFC's answer. Web search blocks IFC's and other lenders' disclosure sites, and any run whose searches turn up the project's name is flagged as a leak and scored both with and without. Some hindsight can't be removed: today's web knows what happened after IFC's decision.</p>
     <p><b>Limits.</b> IFC's calls rest on field surveys and project design as well as location, so 100% isn't the target. PS7 (Indigenous Peoples) is triggered for only a few projects in the set, so its numbers are fragile.</p>
@@ -61,10 +61,15 @@ async function show(label) {
   const bar = (x) => (x == null ? "" : `<span class="bar" style="width:${Math.max(2, x * 120)}px"></span>`);
   const head = `<tr><th></th>${arms.map((a) => `<th class="num">${NAMES[a] || a}</th>`).join("")}</tr>`;
   const row = (label, f) => `<tr><td>${label}</td>${arms.map((a) => `<td class="num">${f(s.arms[a], a)}</td>`).join("")}</tr>`;
-  let html = `<h2>Headline</h2><div class="card scroll"><table>${head}
-    ${row("<b>Agreement with IFC, all four standards</b>", (x) => `<b>${pct(x.overall.agree)}</b>`)}
-    ${row("Kappa (0 = chance, 1 = perfect)", (x) => x.overall.kappa ?? "–")}
-    ${PS.map((k) => row(PSNAME[k], (x) => `${pct(x.per_ps[k].agree)} <span class="muted">κ ${x.per_ps[k].kappa ?? "–"}</span>`)).join("")}
+  // What a "yes to everything" answer would score: the bar any method has to clear.
+  const truth = s.per_site.map((x) => x.ifc);
+  const yesRate = (k) => truth.filter((t) => t[k]).length / truth.length;
+  const allYes = PS.reduce((a, k) => a + yesRate(k), 0) / PS.length;
+  const head2 = `<tr><th></th>${arms.map((a) => `<th class="num">${NAMES[a] || a}</th>`).join("")}<th class="num muted">Saying yes to everything</th></tr>`;
+  let html = `<h2>Headline</h2><div class="card scroll"><table>${head2}
+    ${row("<b>Agreement with IFC, all four standards</b>", (x) => `<b>${pct(x.overall.agree)}</b>`).replace("</tr>", `<td class="num muted">${pct(allYes)}</td></tr>`)}
+    ${row("Kappa (0 = chance, 1 = perfect)", (x) => x.overall.kappa ?? "–").replace("</tr>", `<td class="num muted">0</td></tr>`)}
+    ${PS.map((k) => row(PSNAME[k], (x) => `${pct(x.per_ps[k].agree)} <span class="muted">κ ${x.per_ps[k].kappa ?? "–"}</span>`).replace("</tr>", `<td class="num muted">${pct(yesRate(k))} <span class="muted">κ 0</span></td></tr>`)).join("")}
     ${row("Category A/B/C matches", (x) => pct(x.category_agree))}
     ${s.repeats > 1 ? row("Consistency across repeats", (x, a) => (a === "rules" ? "–" : pct(x.consistency))) : ""}
     ${row("Runs that failed", (x) => x.failed)}

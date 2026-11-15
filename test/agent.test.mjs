@@ -90,3 +90,8 @@ if (oldSnap.catalogue_version !== catalogue.version) {
   assert.ok(!JSON.stringify(reqs[1].messages).includes("thinking"));
   console.log("Length-limit recovery works.");
 }
+// A cut-off JSON block followed by a complete one: the complete one wins.
+import { parseResult } from "../js/agent.js";
+assert.deepEqual(parseResult('text ```json\n{"ps5": tr\nMore ```json\n{"ps5": true}\n```'), { ps5: true });
+assert.equal(parseResult("no json here"), null);
+console.log("Parser handles cut-off JSON.");

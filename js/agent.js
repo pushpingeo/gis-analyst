@@ -128,10 +128,14 @@ function compact(history) {
   });
 }
 
+// The last \`\`\`json block that parses wins: an answer cut off at the length limit can leave a broken one earlier.
 export function parseResult(text) {
-  const m = text.match(/```json\s*([\s\S]*?)```/i);
-  if (!m) return null;
-  try { return JSON.parse(m[1]); } catch { return null; }
+  const parts = String(text || "").split(/```json/i).slice(1);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const body = parts[i].split("```")[0];
+    try { const j = JSON.parse(body); if (j && typeof j === "object") return j; } catch { /* try the previous block */ }
+  }
+  return null;
 }
 
 // callClaude({system, messages, tools}) -> API response. onEvent(event) receives trace events.
