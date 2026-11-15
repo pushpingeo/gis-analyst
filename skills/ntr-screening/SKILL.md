@@ -64,12 +64,13 @@ Concepts: settlement, residential land, farmland and orchards, buildings.
 - Customary or pastoral land use is often invisible in mapped data. In arid and semi-arid regions, say that grazing use can't be ruled out.
 
 ### PS6: Biodiversity
-Concepts: protected area, Key Biodiversity Area (KBA), wetland, river, forest/woodland.
-- **High, triggered:** the footprint overlaps a protected area or a KBA, or a dam or reservoir on a river.
-- **Medium, triggered:** a protected area or KBA within 5 km, a wetland or significant river within 1 km, or a wind farm (bird and bat collision risk always needs assessing).
-- **Low, not triggered:** nothing above, and the site is in modified habitat (farmland, industrial, urban).
-- Wider area (5–20 km): list protected areas and KBAs by name and distance anyway, as IBAT reports do.
-- KBAs matter because many aren't legally protected, and they're the usual starting point for IFC's critical habitat test. If no KBA source was checked, say so in the gaps; a low PS6 rating without a KBA check is weak.
+Concepts: protected area, World Heritage site (natural or mixed), Ramsar wetland, wetland, river, forest/woodland, threatened species records.
+- **High, triggered:** the footprint overlaps a protected area, a natural World Heritage site or a Ramsar site, or the project is a dam or reservoir on a river.
+- **Medium, triggered:** any of those within 5 km; a wetland or significant river within 1 km; Critically Endangered or Endangered species recorded within 5 km; or a wind farm (bird and bat collision risk always needs assessing).
+- **Low, not triggered:** none of the above, and the site is in modified habitat (farmland, industrial, urban).
+- Wider area (5–20 km): list protected and internationally recognised areas by name and distance anyway, as IBAT reports do.
+- **Threatened species records** come from GBIF, filtered by IUCN Red List category. They are sightings and specimens, not range maps: many places are under-recorded, and some sensitive species have their locations blurred. A record shows a species has been seen there; no records shows nothing. Name the species, category, year and distance.
+- **Key Biodiversity Areas are not checked.** KBA boundaries are only available for commercial use through IBAT, so this screen uses the proxies above instead. Always list "KBAs not checked" in the gaps, and say that a full critical habitat assessment would start from KBAs.
 
 ### PS7: Indigenous Peoples
 Concepts: Indigenous and community lands (OSM `boundary=aboriginal_lands` now; LandMark later).
@@ -79,7 +80,7 @@ Concepts: Indigenous and community lands (OSM `boundary=aboriginal_lands` now; L
 - Context worth noting: pastoralist groups, hill-tribe areas, the Amazon and Andes, and Southeast Asian forest areas often have IP considerations even when nothing is mapped.
 
 ### PS8: Cultural heritage
-Concepts: heritage site, historic feature, place of worship, cemetery, (later) UNESCO World Heritage.
+Concepts: World Heritage site (cultural or mixed), heritage site, historic feature, place of worship, cemetery. World Heritage sites come from OpenStreetMap tags, which are often points rather than boundaries, so treat the distance to a large site as approximate.
 - **High, triggered:** a listed heritage or World Heritage site on or within 1 km of the footprint.
 - **Medium, triggered:** historic features, places of worship or cemeteries within 1 km.
 - **Low, not triggered:** nothing within 1 km. Still recommend a chance-finds procedure for any project with earthworks; that's standard practice, not a trigger.
