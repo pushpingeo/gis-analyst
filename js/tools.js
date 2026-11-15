@@ -50,14 +50,14 @@ export const OVERPASS_ENDPOINTS = [
   "https://overpass.private.coffee/api/interpreter",
 ];
 
-export async function fetchOverpass(query, endpoint = OVERPASS_ENDPOINTS[0], fetchFn = fetch, timeoutMs = 100000) {
+export async function fetchOverpass(query, endpoint = OVERPASS_ENDPOINTS[0], fetchFn = fetch, timeoutMs = 100000, extraHeaders = {}) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   let res;
   try {
     res = await fetchFn(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...extraHeaders },
       body: "data=" + encodeURIComponent(query),
       signal: ctl.signal,
     });
@@ -84,12 +84,26 @@ export function distanceKm(site, feature) {
       return lineDistance(site, g);
     case "Polygon":
     case "MultiPolygon": {
-      if (turf.booleanPointInPolygon(site, g)) return 0;
-      return lineDistance(site, turf.polygonToLine(g));
+      // Geometry clipped to the search box can leave rings open; close them before testing.
+      const closed = closeRings(g);
+      try {
+        if (turf.booleanPointInPolygon(site, closed)) return 0;
+      } catch (e) { /* degenerate ring: fall back to edge distance */ }
+      return lineDistance(site, turf.polygonToLine(closed));
     }
     default:
       return Infinity;
   }
+}
+
+function closeRing(r) {
+  if (r.length && (r[0][0] !== r[r.length - 1][0] || r[0][1] !== r[r.length - 1][1])) r = [...r, r[0]];
+  while (r.length < 4) r = [...r, r[0]];
+  return r;
+}
+function closeRings(g) {
+  if (g.type === "Polygon") return { type: "Polygon", coordinates: g.coordinates.map(closeRing) };
+  return { type: "MultiPolygon", coordinates: g.coordinates.map((p) => p.map(closeRing)) };
 }
 
 function lineDistance(site, g) {

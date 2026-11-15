@@ -11,6 +11,8 @@ const only = process.argv.find((a) => a.startsWith("--only="))?.slice(7).split("
 mkdirSync("data/osm", { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = [];
+// Overpass servers ask scripts to identify themselves.
+const UA = { "User-Agent": "gis-analyst/0.1 (+https://github.com/pushpingeo/gis-analyst; evaluation snapshots)" };
 
 for (const s of sites) {
   if (only && !only.includes(s.id)) continue;
@@ -23,7 +25,7 @@ for (const s of sites) {
     for (const ep of OVERPASS_ENDPOINTS) {
       const t0 = Date.now();
       try {
-        const osm = await fetchOverpass(q, ep, fetch, 150000);
+        const osm = await fetchOverpass(q, ep, fetch, 150000, UA);
         const out = { site_id: s.id, name: s.name, lon: s.lon, lat: s.lat, asset_type: s.asset_type, footprint_km: r,
           catalogue_version: catalogue.version, fetched: new Date().toISOString(), endpoint: ep,
           licence: "ODbL 1.0, © OpenStreetMap contributors", query: q, osm };
