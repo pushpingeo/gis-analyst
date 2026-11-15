@@ -153,7 +153,10 @@ export async function runAgent({ site, footprintKm, skillOn, skillText, deskRese
     onEvent({ type: "response", round, ms: Date.now() - t0, stop_reason: resp.stop_reason, content: resp.content, usage: resp.usage });
     history.push({ role: "assistant", content: resp.content });
 
-    const text = resp.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    // Web search splits sentences into blocks at each citation, so join them directly, but keep
+    // paragraph breaks before headings, list items and bold labels.
+    const text = resp.content.filter((b) => b.type === "text").map((b) => b.text)
+      .reduce((acc, t) => acc + (acc && /^\s*(#|- |\* |\*\*)/.test(t) && !acc.endsWith("\n") ? "\n\n" : "") + t, "");
     if (text) finalText = retried && parseResult(text) ? finalText + "\n" + text : text;
 
     if (resp.stop_reason === "pause_turn") continue; // server tool (web search) paused a long turn: carry on
