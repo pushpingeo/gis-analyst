@@ -1,0 +1,1629 @@
+{
+ "label": "v2-dev",
+ "site_set": "dev",
+ "created": "2026-11-15T22:14:01.013Z",
+ "model": "claude-haiku-5-5",
+ "skill_sha": "fbfa685ccb29",
+ "catalogue_version": "0.4",
+ "sites": 25,
+ "repeats": 2,
+ "arms": {
+  "off": {
+   "runs": 50,
+   "failed": 0,
+   "leaks": 0,
+   "overall": {
+    "n": 200,
+    "positives": 92,
+    "agree": 0.69,
+    "kappa": 0.4,
+    "precision": 0.61,
+    "recall": 0.92,
+    "fp": 55,
+    "fn": 7
+   },
+   "per_ps": {
+    "ps5": {
+     "n": 50,
+     "positives": 34,
+     "agree": 0.68,
+     "kappa": 0,
+     "precision": 0.68,
+     "recall": 1,
+     "fp": 16,
+     "fn": 0
+    },
+    "ps6": {
+     "n": 50,
+     "positives": 38,
+     "agree": 0.76,
+     "kappa": 0,
+     "precision": 0.76,
+     "recall": 1,
+     "fp": 12,
+     "fn": 0
+    },
+    "ps7": {
+     "n": 50,
+     "positives": 4,
+     "agree": 0.82,
+     "kappa": 0.22,
+     "precision": 0.22,
+     "recall": 0.5,
+     "fp": 7,
+     "fn": 2
+    },
+    "ps8": {
+     "n": 50,
+     "positives": 16,
+     "agree": 0.5,
+     "kappa": 0.08,
+     "precision": 0.35,
+     "recall": 0.69,
+     "fp": 20,
+     "fn": 5
+    }
+   },
+   "category_agree": 0.74,
+   "consistency": 0.96,
+   "flags": {
+    "recall": {
+     "ps5": 1,
+     "ps6": 1,
+     "ps7": 0.75,
+     "ps8": 0.81
+    },
+    "flags_per_site": 5.6,
+    "low_confidence_share": 0.28
+   },
+   "evidence": {
+    "checkable": 586,
+    "verified": 462,
+    "share": 0.79
+   },
+   "usage": {
+    "input_tokens": 877624,
+    "output_tokens": 229763,
+    "web_searches": 0
+   }
+  },
+  "on": {
+   "runs": 50,
+   "failed": 32,
+   "leaks": 0,
+   "overall": {
+    "n": 200,
+    "positives": 92,
+    "agree": 0.23,
+    "kappa": -0.59,
+    "precision": 0.6,
+    "recall": 0.37,
+    "fp": 23,
+    "fn": 58
+   },
+   "per_ps": {
+    "ps5": {
+     "n": 50,
+     "positives": 34,
+     "agree": 0.22,
+     "kappa": -0.4,
+     "precision": 0.65,
+     "recall": 0.32,
+     "fp": 6,
+     "fn": 23
+    },
+    "ps6": {
+     "n": 50,
+     "positives": 38,
+     "agree": 0.3,
+     "kappa": -0.22,
+     "precision": 0.83,
+     "recall": 0.39,
+     "fp": 3,
+     "fn": 23
+    },
+    "ps7": {
+     "n": 50,
+     "positives": 4,
+     "agree": 0.26,
+     "kappa": -3.51,
+     "precision": 0.2,
+     "recall": 0.25,
+     "fp": 4,
+     "fn": 3
+    },
+    "ps8": {
+     "n": 50,
+     "positives": 16,
+     "agree": 0.14,
+     "kappa": -0.94,
+     "precision": 0.41,
+     "recall": 0.44,
+     "fp": 10,
+     "fn": 9
+    }
+   },
+   "category_agree": 0.24,
+   "consistency": 0,
+   "flags": {
+    "recall": {
+     "ps5": 1,
+     "ps6": 1,
+     "ps7": 0.5,
+     "ps8": 0.88
+    },
+    "flags_per_site": 7.9,
+    "low_confidence_share": 0.2
+   },
+   "evidence": {
+    "checkable": 243,
+    "verified": 210,
+    "share": 0.86
+   },
+   "usage": {
+    "input_tokens": 540598,
+    "output_tokens": 135072,
+    "web_searches": 0
+   }
+  }
+ },
+ "usage_this_run": {
+  "requests": 254,
+  "input_tokens": 1418222,
+  "output_tokens": 364835,
+  "web_searches": 0
+ },
+ "per_site": [
+  {
+   "id": "34203",
+   "name": "CBG Expansion",
+   "country": "Guinea",
+   "asset_type": "mine",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": true
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "24374",
+   "name": "Guinea Alumina Corporation",
+   "country": "Guinea",
+   "asset_type": "mine",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": true
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "A",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "35701",
+   "name": "Upper Trishuli-1",
+   "country": "Nepal",
+   "asset_type": "hydro",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": true,
+    "ps8": true
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": true,
+       "category": "A",
+       "flags": 8
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": true,
+       "category": "A",
+       "flags": 10
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "31627",
+   "name": "Tafila Wind",
+   "country": "Jordan",
+   "asset_type": "wind",
+   "ifc": {
+    "category": "B",
+    "ps5": false,
+    "ps6": true,
+    "ps7": false,
+    "ps8": true
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "34228",
+   "name": "Aurora Gold",
+   "country": "Guyana",
+   "asset_type": "mine",
+   "ifc": {
+    "category": "A",
+    "ps5": false,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": false,
+       "category": "A",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 8
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": true,
+       "category": "A",
+       "flags": 10
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "49112",
+   "name": "Rincon Lithium",
+   "country": "Argentina",
+   "asset_type": "mine",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": false,
+       "category": "A",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": false,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "40101",
+   "name": "Sierra Rutile 2",
+   "country": "Sierra Leone",
+   "asset_type": "mine",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": true,
+       "category": "A",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": true,
+       "category": "A",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 8
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "36754",
+   "name": "Yaramoko",
+   "country": "Burkina Faso",
+   "asset_type": "mine",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": false,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "31383",
+   "name": "Reventazon HPP",
+   "country": "Costa Rica",
+   "asset_type": "hydro",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": true
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": false,
+       "category": "A",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": false,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": true,
+       "ps8": true,
+       "category": "A",
+       "flags": 13
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "34079",
+   "name": "Rudine WPP",
+   "country": "Croatia",
+   "asset_type": "wind",
+   "ifc": {
+    "category": "B",
+    "ps5": false,
+    "ps6": true,
+    "ps7": false,
+    "ps8": true
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 8
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 10
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "39102",
+   "name": "Bujagali 2 (Refi)",
+   "country": "Uganda",
+   "asset_type": "hydro",
+   "ifc": {
+    "category": "A",
+    "ps5": false,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 10
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "32874",
+   "name": "Gulpur Hydro",
+   "country": "Pakistan",
+   "asset_type": "hydro",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 10
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "34588",
+   "name": "Acajutla LNG",
+   "country": "El Salvador",
+   "asset_type": "thermal",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 4
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "39358",
+   "name": "CP Achiras",
+   "country": "Argentina",
+   "asset_type": "wind",
+   "ifc": {
+    "category": "B",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 4
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "35175",
+   "name": "Cap des Biches",
+   "country": "Senegal",
+   "asset_type": "thermal",
+   "ifc": {
+    "category": "B",
+    "ps5": false,
+    "ps6": false,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 4
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "38207",
+   "name": "ACWA Power Zarqa",
+   "country": "Jordan",
+   "asset_type": "thermal",
+   "ifc": {
+    "category": "A",
+    "ps5": false,
+    "ps6": false,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "33435",
+   "name": "Adjaristsqali (Shuakhevi)",
+   "country": "Georgia",
+   "asset_type": "hydro",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": true
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 4
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "A",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "39879",
+   "name": "Riau IPP",
+   "country": "Indonesia",
+   "asset_type": "thermal",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": true,
+    "ps8": true
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": {
+       "ps5": false,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "36787",
+   "name": "Mocuba Solar",
+   "country": "Mozambique",
+   "asset_type": "solar",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "37808",
+   "name": "Tobene IPP Phase 2",
+   "country": "Senegal",
+   "asset_type": "thermal",
+   "ifc": {
+    "category": "B",
+    "ps5": false,
+    "ps6": false,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 4
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 4
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "34603",
+   "name": "Elengy Terminal",
+   "country": "Pakistan",
+   "asset_type": "terminal",
+   "ifc": {
+    "category": "A",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 4
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 4
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "35413",
+   "name": "Mazar IPP",
+   "country": "Afghanistan",
+   "asset_type": "thermal",
+   "ifc": {
+    "category": "B",
+    "ps5": true,
+    "ps6": false,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "36877",
+   "name": "FRV Solar Jordan",
+   "country": "Jordan",
+   "asset_type": "solar",
+   "ifc": {
+    "category": "B",
+    "ps5": false,
+    "ps6": false,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 6
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "44816",
+   "name": "EGP India - Thar",
+   "country": "India",
+   "asset_type": "solar",
+   "ifc": {
+    "category": "B",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 4
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 5
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "48399",
+   "name": "Manatuto Solar (Laleia)",
+   "country": "Timor-Leste",
+   "asset_type": "solar",
+   "ifc": {
+    "category": "B",
+    "ps5": true,
+    "ps6": true,
+    "ps7": false,
+    "ps8": false
+   },
+   "arms": {
+    "off": [
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": true,
+       "category": "B",
+       "flags": 4
+      },
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": {
+       "ps5": true,
+       "ps6": true,
+       "ps7": false,
+       "ps8": false,
+       "category": "B",
+       "flags": 7
+      },
+      "leak": false,
+      "repeat": 2
+     }
+    ],
+    "on": [
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 1
+     },
+     {
+      "result": null,
+      "leak": false,
+      "repeat": 2
+     }
+    ]
+   }
+  }
+ ]
+}
