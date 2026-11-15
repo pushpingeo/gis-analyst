@@ -1,5 +1,5 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "note": "Concept catalogue for the NTR skill. Concepts use the same names as the AI Living World Atlas so this can later read from it. v0.1 uses OpenStreetMap through Overpass only.",
   "sources": {
     "osm-overpass": {
@@ -7,62 +7,302 @@
       "publisher": "OpenStreetMap contributors",
       "authority": "community",
       "endpoint": "https://overpass-api.de/api/interpreter",
-      "licence": {"name": "ODbL 1.0", "url": "https://www.openstreetmap.org/copyright", "attribution": "© OpenStreetMap contributors"},
+      "licence": {
+        "name": "ODbL 1.0",
+        "url": "https://www.openstreetmap.org/copyright",
+        "attribution": "\u00a9 OpenStreetMap contributors"
+      },
       "caveat": "Coverage varies by country. Missing features are not evidence of absence."
     }
   },
   "concepts": {
     "protected-area": {
-      "label": "Protected area", "ps": "PS6", "source": "osm-overpass", "radius_km": 20, "containing": true,
-      "match": [["boundary", "protected_area"], ["boundary", "national_park"], ["leisure", "nature_reserve"]]
+      "label": "Protected area",
+      "ps": "PS6",
+      "source": "osm-overpass",
+      "radius_km": 20,
+      "containing": true,
+      "match": [
+        [
+          "boundary",
+          "protected_area"
+        ],
+        [
+          "boundary",
+          "national_park"
+        ],
+        [
+          "leisure",
+          "nature_reserve"
+        ]
+      ],
+      "osm_types": [
+        "way",
+        "relation"
+      ]
     },
     "wetland": {
-      "label": "Wetland", "ps": "PS6", "source": "osm-overpass", "radius_km": 5, "containing": true,
-      "match": [["natural", "wetland"]]
+      "label": "Wetland",
+      "ps": "PS6",
+      "source": "osm-overpass",
+      "radius_km": 5,
+      "containing": true,
+      "match": [
+        [
+          "natural",
+          "wetland"
+        ]
+      ],
+      "osm_types": [
+        "way",
+        "relation"
+      ]
     },
     "river": {
-      "label": "River", "ps": "PS6", "source": "osm-overpass", "radius_km": 5,
-      "match": [["waterway", "river"]]
+      "label": "River",
+      "ps": "PS6",
+      "source": "osm-overpass",
+      "radius_km": 5,
+      "match": [
+        [
+          "waterway",
+          "river"
+        ]
+      ],
+      "osm_types": [
+        "way"
+      ]
     },
     "forest": {
-      "label": "Forest or woodland", "ps": "PS6", "source": "osm-overpass", "radius_km": 2, "containing": true,
-      "match": [["landuse", "forest"], ["natural", "wood"]]
+      "label": "Forest or woodland",
+      "ps": "PS6",
+      "source": "osm-overpass",
+      "radius_km": 2,
+      "containing": true,
+      "match": [
+        [
+          "landuse",
+          "forest"
+        ],
+        [
+          "natural",
+          "wood"
+        ]
+      ],
+      "osm_types": [
+        "way",
+        "relation"
+      ]
     },
     "indigenous-land": {
-      "label": "Indigenous or community land", "ps": "PS7", "source": "osm-overpass", "radius_km": 20, "containing": true,
-      "match": [["boundary", "aboriginal_lands"], ["protect_class", "24"]]
+      "label": "Indigenous or community land",
+      "ps": "PS7",
+      "source": "osm-overpass",
+      "radius_km": 20,
+      "containing": true,
+      "match": [
+        [
+          "boundary",
+          "aboriginal_lands"
+        ],
+        [
+          "protect_class",
+          "24"
+        ]
+      ],
+      "osm_types": [
+        "way",
+        "relation"
+      ]
     },
     "settlement": {
-      "label": "Settlement", "ps": "PS5", "source": "osm-overpass", "radius_km": 20,
-      "match": [["place", "city"], ["place", "town"], ["place", "village"], ["place", "hamlet"], ["place", "isolated_dwelling"]]
+      "label": "Settlement",
+      "ps": "PS5",
+      "source": "osm-overpass",
+      "radius_km": 20,
+      "match": [
+        [
+          "place",
+          "city"
+        ],
+        [
+          "place",
+          "town"
+        ],
+        [
+          "place",
+          "village"
+        ],
+        [
+          "place",
+          "hamlet"
+        ],
+        [
+          "place",
+          "isolated_dwelling"
+        ]
+      ],
+      "osm_types": [
+        "node"
+      ]
     },
     "residential-land": {
-      "label": "Residential land", "ps": "PS5", "source": "osm-overpass", "radius_km": 2, "containing": true,
-      "match": [["landuse", "residential"]]
+      "label": "Residential land",
+      "ps": "PS5",
+      "source": "osm-overpass",
+      "radius_km": 2,
+      "containing": true,
+      "match": [
+        [
+          "landuse",
+          "residential"
+        ]
+      ],
+      "osm_types": [
+        "way",
+        "relation"
+      ]
     },
     "farmland": {
-      "label": "Farmland or orchard", "ps": "PS5", "source": "osm-overpass", "radius_km": 1, "containing": true,
-      "match": [["landuse", "farmland"], ["landuse", "orchard"], ["landuse", "meadow"], ["landuse", "farmyard"]]
+      "label": "Farmland or orchard",
+      "ps": "PS5",
+      "source": "osm-overpass",
+      "radius_km": 1,
+      "containing": true,
+      "match": [
+        [
+          "landuse",
+          "farmland"
+        ],
+        [
+          "landuse",
+          "orchard"
+        ],
+        [
+          "landuse",
+          "meadow"
+        ],
+        [
+          "landuse",
+          "farmyard"
+        ]
+      ],
+      "osm_types": [
+        "way"
+      ]
     },
     "industrial-land": {
-      "label": "Industrial or port land", "ps": "PS5", "source": "osm-overpass", "radius_km": 1, "containing": true,
-      "match": [["landuse", "industrial"], ["landuse", "port"]]
+      "label": "Industrial or port land",
+      "ps": "PS5",
+      "source": "osm-overpass",
+      "radius_km": 1,
+      "containing": true,
+      "match": [
+        [
+          "landuse",
+          "industrial"
+        ],
+        [
+          "landuse",
+          "port"
+        ]
+      ],
+      "osm_types": [
+        "way",
+        "relation"
+      ]
     },
     "heritage-site": {
-      "label": "Heritage or historic site", "ps": "PS8", "source": "osm-overpass", "radius_km": 5,
-      "match": [["heritage", "*"], ["historic", "*"]]
+      "label": "Heritage or historic site",
+      "ps": "PS8",
+      "source": "osm-overpass",
+      "radius_km": 5,
+      "match": [
+        [
+          "heritage",
+          "*"
+        ],
+        [
+          "historic",
+          "*"
+        ]
+      ],
+      "osm_types": [
+        "node",
+        "way"
+      ]
     },
     "place-of-worship": {
-      "label": "Place of worship or cemetery", "ps": "PS8", "source": "osm-overpass", "radius_km": 2,
-      "match": [["amenity", "place_of_worship"], ["landuse", "cemetery"], ["amenity", "grave_yard"]]
+      "label": "Place of worship or cemetery",
+      "ps": "PS8",
+      "source": "osm-overpass",
+      "radius_km": 2,
+      "match": [
+        [
+          "amenity",
+          "place_of_worship"
+        ],
+        [
+          "landuse",
+          "cemetery"
+        ],
+        [
+          "amenity",
+          "grave_yard"
+        ]
+      ],
+      "osm_types": [
+        "node",
+        "way"
+      ]
     },
     "community-facility": {
-      "label": "School or health facility", "ps": "PS4", "source": "osm-overpass", "radius_km": 5,
-      "match": [["amenity", "school"], ["amenity", "hospital"], ["amenity", "clinic"]]
+      "label": "School or health facility",
+      "ps": "PS4",
+      "source": "osm-overpass",
+      "radius_km": 5,
+      "match": [
+        [
+          "amenity",
+          "school"
+        ],
+        [
+          "amenity",
+          "hospital"
+        ],
+        [
+          "amenity",
+          "clinic"
+        ]
+      ],
+      "osm_types": [
+        "node",
+        "way"
+      ]
     },
     "energy-infrastructure": {
-      "label": "Existing energy infrastructure", "ps": "PS4", "source": "osm-overpass", "radius_km": 5,
-      "match": [["power", "plant"], ["power", "substation"], ["man_made", "pipeline"]]
+      "label": "Existing energy infrastructure",
+      "ps": "PS4",
+      "source": "osm-overpass",
+      "radius_km": 5,
+      "match": [
+        [
+          "power",
+          "plant"
+        ],
+        [
+          "power",
+          "substation"
+        ],
+        [
+          "man_made",
+          "pipeline"
+        ]
+      ],
+      "osm_types": [
+        "node",
+        "way"
+      ]
     }
   }
 }

@@ -57,7 +57,7 @@ assert.equal(s["protected-area"].ps, "PS6");
 const q = buildOverpassQuery(catalogue, 10.287, 0.458, 5);
 assert.ok(q.includes("is_in(0.458,10.287)"));
 assert.ok(q.includes('rel(pivot.a)["boundary"="protected_area"]'));
-assert.ok(q.includes('nwr["place"="village"](around:25000,0.458,10.287)'));
-assert.ok(q.includes('nwr["historic"](around:'));
+assert.ok(q.includes('node["place"="village"](around:25000,0.458,10.287)'));
+assert.ok(q.includes('node["historic"](around:'));
 
 console.log("All tool tests passed.");

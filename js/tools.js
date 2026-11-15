@@ -19,8 +19,10 @@ export function buildOverpassQuery(catalogue, lon, lat, footprintKm) {
   const contain = [];
   for (const c of Object.values(catalogue.concepts)) {
     const r = Math.round((footprintKm + c.radius_km) * 1000);
+    const types = c.osm_types || ["node", "way", "relation"];
     for (const m of c.match) {
-      lines.push(`nwr${tagFilter(m)}(around:${r},${lat},${lon});`);
+      // Only ask for the element types that make sense (settlements are nodes, rivers are ways): far cheaper.
+      for (const t of types) lines.push(`${t}${tagFilter(m)}(around:${r},${lat},${lon});`);
       if (c.containing) contain.push(`way(pivot.a)${tagFilter(m)};rel(pivot.a)${tagFilter(m)};`);
     }
   }
@@ -30,7 +32,7 @@ export function buildOverpassQuery(catalogue, lon, lat, footprintKm) {
   const dLon = maxKm / (111.32 * Math.cos((lat * Math.PI) / 180));
   const bbox = [lat - dLat, lon - dLon, lat + dLat, lon + dLon].map((x) => x.toFixed(5)).join(",");
   // Areas that contain the site come back as tags only (distance 0); everything else with clipped geometry.
-  return `[out:json][timeout:60];
+  return `[out:json][timeout:90];
 is_in(${lat},${lon})->.a;
 (
 ${contain.join("\n")}

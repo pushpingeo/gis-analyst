@@ -138,7 +138,7 @@ $("run").onclick = async () => {
   drawSite(s, r);
   const q = buildOverpassQuery(catalogue, s.lon, s.lat, r);
   $("query").textContent = q;
-  let osm, lastErr;
+  let osm, lastErr; const errors = [];
   for (const ep of ENDPOINTS) {
     try {
       $("status").textContent = `Querying ${new URL(ep).host}…`;
@@ -146,10 +146,10 @@ $("run").onclick = async () => {
       osm = await fetchOverpass(q, ep);
       $("status").textContent = `${osm.elements.length} OSM elements in ${((performance.now() - t0) / 1000).toFixed(1)} s from ${new URL(ep).host}.`;
       break;
-    } catch (e) { lastErr = e; }
+    } catch (e) { lastErr = new Error(`${new URL(ep).host}: ${e.message.slice(0, 80)}`); errors.push(lastErr.message); }
   }
   $("run").disabled = false;
-  if (!osm) { $("status").textContent = "Overpass failed: " + lastErr.message; return; }
+  if (!osm) { $("status").textContent = "Overpass failed. " + errors.join(" | "); return; }
 
   const result = screen(osm, catalogue, s.lon, s.lat, r);
   const summary = summarise(result);
