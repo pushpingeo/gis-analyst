@@ -1,7 +1,7 @@
 // Unit tests for the spatial tools, using a made-up Overpass response round a site at (0, 0).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildOverpassQuery, screen, summarise, band } from "../js/tools.js";
+import { buildOverpassQuery, screen, summarise, band, slimGbif, summariseGbif, summariseWikidata, wikidataQuery } from "../js/tools.js";
 
 const catalogue = JSON.parse(readFileSync(new URL("../catalogue/catalogue.json", import.meta.url)));
 const km = (k) => k / 111.32; // degrees of latitude at the equator
@@ -59,5 +59,42 @@ assert.ok(q.includes("is_in(0.458,10.287)"));
 assert.ok(q.includes('rel(pivot.a)["boundary"="protected_area"]'));
 assert.ok(q.includes('node["place"="village"](around:25000,0.458,10.287)'));
 assert.ok(q.includes('node["historic"](around:'));
+
+// Regex tag matches (Ramsar) and the new concepts in the query.
+assert.ok(q.includes('["designation"~"ramsar",i]'));
+assert.ok(q.includes('["heritage"="1"]'));
+assert.ok(!q.includes("threatened"), "GBIF concepts must not leak into the Overpass query");
+const ram = screen({ elements: [{ type: "relation", id: 9, tags: { boundary: "protected_area", protection_title: "Ramsar Site", name: "Wet" } }] },
+  catalogue, 10.287, 0.458, 1);
+assert.equal(ram["ramsar-site"].features.length, 1);
+assert.equal(ram["ramsar-site"].features[0].distance_km, 0);
+
+// GBIF: two records of one species, one of another; distances from the footprint edge.
+const near = slimGbif({ count: 3, results: [
+  { key: 1, speciesKey: 10, species: "Aquila nipalensis", vernacularName: "Steppe Eagle", iucnRedListCategory: "EN", decimalLatitude: 28.0, decimalLongitude: 85.0, year: 2020, license: "http://creativecommons.org/licenses/by/4.0/legalcode" },
+  { key: 2, speciesKey: 10, species: "Aquila nipalensis", iucnRedListCategory: "EN", decimalLatitude: 28.03, decimalLongitude: 85.0, year: 2025, license: "http://creativecommons.org/publicdomain/zero/1.0/legalcode" },
+  { key: 3, speciesKey: 11, species: "Gyps bengalensis", iucnRedListCategory: "CR", decimalLatitude: 28.0, decimalLongitude: 85.05, year: 2019, license: "http://creativecommons.org/licenses/by-nc/4.0/legalcode" },
+] });
+const g = summariseGbif(near, { count: 40, facets: [{ counts: [{}, {}, {}] }] }, 85.0, 28.0, 1);
+assert.equal(g.species.length, 2);
+assert.equal(g.species[0].category, "CR", "CR species listed first");
+const eagle = g.species.find((x) => x.species === "Aquila nipalensis");
+assert.equal(eagle.records, 2);
+assert.equal(eagle.nearest_km, 0);
+assert.equal(eagle.latest_year, 2025);
+assert.deepEqual(eagle.licences.sort(), ["by/4.0", "zero/1.0"]);
+assert.ok(Math.abs(g.species[0].nearest_km - 3.91) < 0.05, "vulture ~4.9 km from point, 3.9 from 1 km footprint");
+assert.equal(g.wider_20km.species, 3);
+
+// Wikidata: duplicates keep the nearest; label equal to the QID means no name.
+const wd = summariseWikidata({ results: { bindings: [
+  { item: { value: "http://www.wikidata.org/entity/Q1" }, itemLabel: { value: "Dhunche" }, dist: { value: "5.23" }, types: { value: "human settlement" } },
+  { item: { value: "http://www.wikidata.org/entity/Q1" }, itemLabel: { value: "Dhunche" }, dist: { value: "7.1" }, types: { value: "human settlement" } },
+  { item: { value: "http://www.wikidata.org/entity/Q2" }, itemLabel: { value: "Q2" }, dist: { value: "9.4" }, types: { value: "col" } },
+] } }, 5);
+assert.equal(wd.items.length, 2);
+assert.equal(wd.items[0].distance_km, 0.23);
+assert.equal(wd.items[1].name, null);
+assert.ok(wikidataQuery(85.29, 28.07, 25).includes('"Point(85.29 28.07)"'));
 
 console.log("All tool tests passed.");

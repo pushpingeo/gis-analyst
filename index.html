@@ -13,6 +13,8 @@
 } }
 </script>
 <style>
+  .muted { color: #5b6575; font-size: 13px; }
+  h3 { font-size: 14px; margin: 16px 0 4px; }
   :root { --ink:#1d2430; --muted:#5b6575; --line:#e3e6eb; --bg:#f7f8fa; --accent:#0b6e4f; }
   * { box-sizing: border-box; }
   body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; color:var(--ink); background:var(--bg); }
@@ -41,7 +43,7 @@
 <body>
 <header>
   <h1>GIS Analyst: spatial tools check</h1>
-  <p>Milestone 1: no AI yet. Pick a site, and the tools pull OpenStreetMap features around it and measure distances.</p>
+  <p>No AI yet. Pick a site, and the tools pull OpenStreetMap features, GBIF threatened species records and Wikidata places around it and measure distances.</p>
 </header>
 <main>
   <div id="map"></div>
@@ -52,22 +54,25 @@
         <label>Asset type <select id="asset"></select></label>
         <label>Footprint km <input id="radius" type="number" step="0.5" min="0"></label>
       </div>
-      <label style="font-size:13px"><input type="checkbox" id="useSnap" checked> Use the saved snapshot if there is one (repeatable); otherwise query Overpass live</label>
+      <label style="font-size:13px"><input type="checkbox" id="useSnap" checked> Use the saved snapshot if there is one (repeatable); otherwise query the services live</label>
       <button id="run">Run tools</button>
       <div class="status" id="status"></div>
     </div>
     <div id="ifc"></div>
     <div id="results"></div>
+    <div id="species"></div>
+    <div id="places"></div>
     <details><summary>Overpass query</summary><pre id="query"></pre></details>
     <details><summary>Summary JSON (what the agent will see)</summary><pre id="json"></pre></details>
   </aside>
 </main>
 <script type="module">
-import { buildOverpassQuery, fetchOverpass, screen, summarise, FOOTPRINT_KM, OVERPASS_ENDPOINTS } from "./js/tools.js";
+import { buildOverpassQuery, fetchOverpass, screen, summarise, FOOTPRINT_KM, OVERPASS_ENDPOINTS,
+  gbifUrl, slimGbif, summariseGbif, wikidataUrl, summariseWikidata } from "./js/tools.js";
 import * as turf from "@turf/turf";
 import osmtogeojson from "osmtogeojson";
 
-const COLOURS = { PS5: "#c2410c", PS6: "#15803d", PS7: "#7c3aed", PS8: "#b45309", PS4: "#475569" };
+const COLOURS = { PS5: "#c2410c", PS6: "#15803d", PS7: "#7c3aed", PS8: "#b45309", PS4: "#475569", "PS6 / PS8": "#0e7490" };
 const $ = (id) => document.getElementById(id);
 
 const [catalogue, evalSites] = await Promise.all([
@@ -98,7 +103,8 @@ function pickSite() {
   $("radius").value = FOOTPRINT_KM[s.asset_type];
   const ps = ["ps5", "ps6", "ps7", "ps8"].map((k) => `${k.toUpperCase()} ${s.ifc[k] ? "yes" : "no"}`).join(" · ");
   $("ifc").innerHTML = `<div class="ifc"><b>IFC's answer (for checking only):</b> Category ${s.ifc.category} · ${ps}<br><a href="${s.esrs_url}" target="_blank" rel="noopener">IFC review summary</a></div>`;
-  $("results").innerHTML = ""; $("status").textContent = "";
+  for (const id of ["results", "species", "places"]) $(id).innerHTML = "";
+  $("status").textContent = "";
   drawSite(s, +$("radius").value);
 }
 $("site").onchange = pickSite;
@@ -136,16 +142,19 @@ $("run").onclick = async () => {
   const r = +$("radius").value;
   $("run").disabled = true;
   drawSite(s, r);
+  const useSnap = $("useSnap").checked && r === FOOTPRINT_KM[s.asset_type];
+  const extras = loadExtras(s, r, useSnap);
   const q = buildOverpassQuery(catalogue, s.lon, s.lat, r);
   $("query").textContent = q;
   let osm, lastErr; const errors = [];
-  if ($("useSnap").checked && r === FOOTPRINT_KM[s.asset_type]) {
+  if (useSnap) {
     try {
       const snap = await fetch(`data/osm/${s.id}.json`).then((x) => (x.ok ? x.json() : null));
       if (snap) {
         osm = snap.osm;
         $("query").textContent = snap.query;
-        $("status").textContent = `${osm.elements.length} OSM elements from the snapshot saved ${snap.fetched.slice(0, 10)} (${new URL(snap.endpoint).host}).`;
+        $("status").textContent = `${osm.elements.length} OSM elements from the snapshot saved ${snap.fetched.slice(0, 10)} (${new URL(snap.endpoint).host}).` +
+          (snap.catalogue_version !== catalogue.version ? ` Snapshot uses catalogue ${snap.catalogue_version}, so newer concepts show as none found until it's refreshed.` : "");
       }
     } catch (e) { /* fall through to live */ }
   }
@@ -167,7 +176,54 @@ $("run").onclick = async () => {
   $("json").textContent = JSON.stringify(summary, null, 1);
   renderTable(summary);
   if (map) mapReady.then((ok) => ok && drawOsm(osm));
+  const { species, places, notes } = await extras;
+  summary["threatened-species"] = species;
+  summary["named-places"] = places;
+  $("json").textContent = JSON.stringify(summary, null, 1);
+  renderSpecies(species, notes.gbif);
+  renderPlaces(places, notes.wikidata);
 };
+
+// GBIF and Wikidata: from the saved snapshot if there is one, otherwise live.
+async function loadExtras(s, r, useSnap) {
+  const notes = {};
+  const snapOf = async (dir) => (useSnap ? fetch(`data/${dir}/${s.id}.json`).then((x) => (x.ok ? x.json() : null)).catch(() => null) : null);
+  const get = async (url) => { const x = await fetch(url, { headers: { Accept: "application/json" } }); if (!x.ok) throw new Error(`${x.status}`); return x.json(); };
+  let species = null, places = null;
+  try {
+    const snap = await snapOf("gbif");
+    if (snap) { species = summariseGbif(snap.near, snap.wide, s.lon, s.lat, r); notes.gbif = `snapshot saved ${snap.fetched.slice(0, 10)}`; }
+    else {
+      const [near, wide] = await Promise.all([get(gbifUrl(s.lon, s.lat, r + 5)), get(gbifUrl(s.lon, s.lat, r + 20, { facetOnly: true }))]);
+      species = summariseGbif(slimGbif(near), wide, s.lon, s.lat, r); notes.gbif = "live";
+    }
+  } catch (e) { notes.gbif = "GBIF failed: " + e.message; }
+  try {
+    const snap = await snapOf("wikidata");
+    if (snap) { places = summariseWikidata(snap.wikidata, r); notes.wikidata = `snapshot saved ${snap.fetched.slice(0, 10)}`; }
+    else { places = summariseWikidata(await get(wikidataUrl(s.lon, s.lat, r + 20)), r); notes.wikidata = "live"; }
+  } catch (e) { notes.wikidata = "Wikidata failed: " + e.message; }
+  return { species, places, notes };
+}
+
+const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function renderSpecies(g, note) {
+  if (!g) { $("species").innerHTML = `<h3>Threatened species records</h3><p class="muted">${esc(note)}</p>`; return; }
+  const rows = g.species.slice(0, 12).map((x) => `<tr><td><b>${x.category}</b></td><td><i>${esc(x.species)}</i>${x.common_name ? `<br>${esc(x.common_name)}` : ""}</td><td>${x.nearest_km} km<br><span class="muted">${x.records} record${x.records > 1 ? "s" : ""}, latest ${x.latest_year ?? "?"}</span></td></tr>`);
+  $("species").innerHTML = `<h3>Threatened species records (CR, EN) within 5 km</h3>
+  <p class="muted">${g.records_found} records${g.truncated ? `, first ${g.records_read} read` : ""}; ${g.wider_20km ? `${g.wider_20km.species} species within 20 km` : ""} · ${esc(note)}</p>
+  ${rows.length ? `<table><tr><th>Cat.</th><th>Species</th><th>Nearest</th></tr>${rows.join("")}</table>` : `<p class="muted">No records found. That is not evidence of absence.</p>`}
+  <p class="muted" style="font-size:12px">Source: GBIF.org occurrence records, filtered by IUCN Red List category. Records, not ranges.</p>`;
+}
+
+function renderPlaces(w, note) {
+  if (!w) { $("places").innerHTML = `<h3>Named places (Wikidata)</h3><p class="muted">${esc(note)}</p>`; return; }
+  const rows = w.items.filter((x) => x.name).slice(0, 15).map((x) => `<tr><td>${x.wikipedia ? `<a href="${esc(x.wikipedia)}" target="_blank" rel="noopener">${esc(x.name)}</a>` : esc(x.name)}${x.heritage ? `<br><span class="muted">${esc(x.heritage)}</span>` : ""}</td><td class="muted">${esc(x.types.slice(0, 2).join(", "))}</td><td>${x.distance_km} km</td></tr>`);
+  $("places").innerHTML = `<h3>Named places for desk research (Wikidata)</h3><p class="muted">${w.items.length} items within 20 km · ${esc(note)}</p>
+  <table><tr><th>Name</th><th>Type</th><th>Distance</th></tr>${rows.join("")}</table>
+  <p class="muted" style="font-size:12px">Source: Wikidata (CC0). Point locations only.</p>`;
+}
 
 function renderTable(summary) {
   const rows = Object.values(summary).map((v) => {
@@ -183,7 +239,7 @@ function drawOsm(osm) {
   const fc = osmtogeojson({ ...osm, elements: osm.elements.filter((e) => e.lat !== undefined || e.geometry || (e.members || []).length) });
   for (const f of fc.features) {
     const p = f.properties;
-    const hit = Object.values(catalogue.concepts).find((c) => c.match.some(([k, v]) => p[k] !== undefined && (v === "*" || p[k] === v)));
+    const hit = Object.values(catalogue.concepts).find((c) => c.match && c.match.some(([k, v]) => p[k] !== undefined && (v === "*" || p[k] === v)));
     p._ps = hit ? hit.ps : "";
   }
   setSource("osm", fc);

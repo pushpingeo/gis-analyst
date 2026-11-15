@@ -4,20 +4,27 @@ import * as turf from "@turf/turf";
 import osmtogeojson from "osmtogeojson";
 
 export const FOOTPRINT_KM = {
-  thermal: 0.5, substation: 0.5, terminal: 0.5, solar: 1, wind: 3, mine: 3, hydro: 5, other: 1,
+  thermal: 0.5, substation: 0.5, terminal: 0.5, solar: 1, wind: 3, mine: 3, hydro: 5,
+  "oil-gas-plant": 1, "oil-gas-field": 5, other: 1,
 };
 
 // ---- Overpass -------------------------------------------------------------
 
+// A match value of "*" means any value; "~text" is a case-insensitive regular expression.
 function tagFilter([k, v]) {
-  return v === "*" ? `["${k}"]` : `["${k}"="${v}"]`;
+  if (v === "*") return `["${k}"]`;
+  if (v.startsWith("~")) return `["${k}"~"${v.slice(1)}",i]`;
+  return `["${k}"="${v}"]`;
 }
+
+const osmConcepts = (catalogue) => Object.values(catalogue.concepts).filter((c) => c.source === "osm-overpass");
+const osmEntries = (catalogue) => Object.entries(catalogue.concepts).filter(([, c]) => c.source === "osm-overpass");
 
 // One request per site: every concept's filters, searched around the site and (for areas) containing it.
 export function buildOverpassQuery(catalogue, lon, lat, footprintKm) {
   const lines = [];
   const contain = [];
-  for (const c of Object.values(catalogue.concepts)) {
+  for (const c of osmConcepts(catalogue)) {
     const r = Math.round((footprintKm + c.radius_km) * 1000);
     const types = c.osm_types || ["node", "way", "relation"];
     for (const m of c.match) {
@@ -27,7 +34,7 @@ export function buildOverpassQuery(catalogue, lon, lat, footprintKm) {
     }
   }
   // Clip returned geometry to a box round the search area so big parks don't blow up the response.
-  const maxKm = footprintKm + Math.max(...Object.values(catalogue.concepts).map((c) => c.radius_km));
+  const maxKm = footprintKm + Math.max(...osmConcepts(catalogue).map((c) => c.radius_km));
   const dLat = maxKm / 111.32;
   const dLon = maxKm / (111.32 * Math.cos((lat * Math.PI) / 180));
   const bbox = [lat - dLat, lon - dLon, lat + dLat, lon + dLon].map((x) => x.toFixed(5)).join(",");
@@ -126,7 +133,8 @@ export function band(dFootprintKm) {
 }
 
 function matchesConcept(tags, concept) {
-  return concept.match.some(([k, v]) => tags[k] !== undefined && (v === "*" || tags[k] === v));
+  return concept.match.some(([k, v]) => tags[k] !== undefined &&
+    (v === "*" || (v.startsWith("~") ? new RegExp(v.slice(1), "i").test(tags[k]) : tags[k] === v)));
 }
 
 // ---- The main tool --------------------------------------------------------
@@ -135,7 +143,7 @@ function matchesConcept(tags, concept) {
 export function screen(osmJson, catalogue, lon, lat, footprintKm) {
   const site = turf.point([lon, lat]);
   const out = {};
-  for (const [id, c] of Object.entries(catalogue.concepts)) out[id] = { label: c.label, ps: c.ps, radius_km: c.radius_km, features: [] };
+  for (const [id, c] of osmEntries(catalogue)) out[id] = { label: c.label, ps: c.ps, radius_km: c.radius_km, features: [] };
 
   // Elements with tags but no geometry came from the "contains the site" set.
   const hasGeom = (e) => e.lat !== undefined || e.geometry || (e.members || []).some((m) => m.geometry || m.lat !== undefined);
@@ -153,7 +161,7 @@ export function screen(osmJson, catalogue, lon, lat, footprintKm) {
     if (seen.has(fid) || !isFinite(d)) continue;
     seen.add(fid);
     const dFoot = Math.max(0, d - footprintKm);
-    for (const [id, c] of Object.entries(catalogue.concepts)) {
+    for (const [id, c] of osmEntries(catalogue)) {
       if (!matchesConcept(tags, c)) continue;
       if (dFoot > c.radius_km) continue;
       out[id].features.push({
@@ -182,4 +190,112 @@ export function summarise(result, top = 5) {
     };
   }
   return s;
+}
+
+// ---- GBIF: threatened species records -------------------------------------
+// Occurrence records (sightings and specimens) of species the IUCN Red List rates Critically Endangered
+// or Endangered. Records, not ranges: absence of records means nothing.
+
+export const GBIF_API = "https://api.gbif.org/v1/occurrence/search";
+export const GBIF_CATEGORIES = ["CR", "EN"];
+
+export function gbifUrl(lon, lat, radiusKm, { limit = 300, facetOnly = false } = {}) {
+  const p = new URLSearchParams({
+    geoDistance: `${lat},${lon},${radiusKm.toFixed(1)}km`,
+    hasGeospatialIssue: "false", occurrenceStatus: "PRESENT", limit: String(facetOnly ? 0 : limit),
+  });
+  for (const c of GBIF_CATEGORIES) p.append("iucnRedListCategory", c);
+  if (facetOnly) { p.set("facet", "speciesKey"); p.set("facetLimit", "500"); }
+  return `${GBIF_API}?${p}`;
+}
+
+// Keep only what the screen needs; full records are ~4 KB each.
+export function slimGbif(json) {
+  return {
+    count: json.count,
+    results: (json.results || []).map((r) => ({
+      key: r.key, speciesKey: r.speciesKey, species: r.species, vernacularName: r.vernacularName || null,
+      category: r.iucnRedListCategory, class: r.class || null, lat: r.decimalLatitude, lon: r.decimalLongitude,
+      uncertainty_m: r.coordinateUncertaintyInMeters ?? null, year: r.year ?? null,
+      basis: r.basisOfRecord, dataset: r.datasetName || r.datasetKey, license: r.license,
+    })),
+    facets: json.facets,
+  };
+}
+
+// near: records within footprint + 5 km; wide: species facet within footprint + 20 km.
+export function summariseGbif(near, wide, lon, lat, footprintKm) {
+  const site = turf.point([lon, lat]);
+  const bySpecies = new Map();
+  for (const r of near.results) {
+    if (r.lat == null || r.lon == null) continue;
+    const d = Math.max(0, turf.distance(site, turf.point([r.lon, r.lat]), { units: "kilometers" }) - footprintKm);
+    const k = r.speciesKey || r.species;
+    const e = bySpecies.get(k) || { species: r.species, common_name: r.vernacularName, category: r.category, group: r.class,
+      records: 0, nearest_km: Infinity, latest_year: null, licences: new Set() };
+    e.records++;
+    e.nearest_km = Math.min(e.nearest_km, d);
+    if (r.year && (!e.latest_year || r.year > e.latest_year)) e.latest_year = r.year;
+    if (!e.common_name && r.vernacularName) e.common_name = r.vernacularName;
+    e.licences.add((r.license || "").replace(/^https?:\/\/creativecommons.org\/(licenses|publicdomain)\//, "").replace(/\/legalcode$/, ""));
+    bySpecies.set(k, e);
+  }
+  const species = [...bySpecies.values()]
+    .map((e) => ({ ...e, nearest_km: Math.round(e.nearest_km * 100) / 100, band: band(e.nearest_km), licences: [...e.licences] }))
+    .sort((a, b) => (a.category === b.category ? 0 : a.category === "CR" ? -1 : 1) || a.nearest_km - b.nearest_km);
+  const wideCounts = wide?.facets?.[0]?.counts || [];
+  return {
+    source: "GBIF occurrence records filtered by IUCN Red List category (CR, EN)",
+    searched_km: 5, records_found: near.count, records_read: near.results.length,
+    truncated: near.count > near.results.length,
+    species,
+    wider_20km: wide ? { records: wide.count, species: wideCounts.length } : null,
+    caveat: "Records are sightings and specimens, not ranges. Many places are under-recorded and some sensitive species are blurred. No records is not evidence of absence.",
+  };
+}
+
+// ---- Wikidata: named places and features near the site --------------------
+// A gazetteer for desk research: settlements, protected and heritage sites, rivers, with Wikipedia links.
+// Point coordinates only, so large areas (parks) are found only if their centre point is near.
+
+export const WIKIDATA_SPARQL = "https://query.wikidata.org/sparql";
+
+export function wikidataQuery(lon, lat, radiusKm, limit = 120) {
+  return `SELECT ?item ?itemLabel ?dist (GROUP_CONCAT(DISTINCT ?typeLabel; separator="|") AS ?types)
+  (SAMPLE(?heritageLabel) AS ?heritage) (SAMPLE(?article) AS ?wikipedia) (SAMPLE(?whs) AS ?whs_id) WHERE {
+  SERVICE wikibase:around { ?item wdt:P625 ?loc .
+    bd:serviceParam wikibase:center "Point(${lon} ${lat})"^^geo:wktLiteral .
+    bd:serviceParam wikibase:radius "${radiusKm.toFixed(1)}" . bd:serviceParam wikibase:distance ?dist . }
+  OPTIONAL { ?item wdt:P31 ?type . ?type rdfs:label ?typeLabel . FILTER(LANG(?typeLabel) = "en") }
+  OPTIONAL { ?item wdt:P1435 ?h . ?h rdfs:label ?heritageLabel . FILTER(LANG(?heritageLabel) = "en") }
+  OPTIONAL { ?item wdt:P757 ?whs . }
+  OPTIONAL { ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> . }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul" . }
+} GROUP BY ?item ?itemLabel ?dist ORDER BY ?dist LIMIT ${limit}`;
+}
+
+export function wikidataUrl(lon, lat, radiusKm, limit) {
+  return `${WIKIDATA_SPARQL}?format=json&query=${encodeURIComponent(wikidataQuery(lon, lat, radiusKm, limit))}`;
+}
+
+export function summariseWikidata(json, footprintKm) {
+  const seen = new Map();
+  for (const b of json.results.bindings) {
+    const qid = b.item.value.split("/").pop();
+    const d = Math.max(0, parseFloat(b.dist.value) - footprintKm);
+    const name = b.itemLabel?.value;
+    if (seen.has(qid) && seen.get(qid).distance_km <= d) continue;
+    seen.set(qid, {
+      qid, name: name && name !== qid ? name : null,
+      types: b.types?.value ? b.types.value.split("|") : [],
+      distance_km: Math.round(d * 100) / 100, band: band(d),
+      heritage: b.heritage?.value || null, world_heritage_id: b.whs_id?.value || null,
+      wikipedia: b.wikipedia?.value || null,
+    });
+  }
+  const items = [...seen.values()].sort((a, b) => a.distance_km - b.distance_km);
+  return {
+    source: "Wikidata (CC0)", items,
+    caveat: "Point locations only: large areas such as parks appear only if their centre point is within the search radius.",
+  };
 }
