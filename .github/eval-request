@@ -1,2 +1,2 @@
 --label=v2-dev --arms=off,on --repeats=2 --sites=dev --concurrency=4
-# skill v2 on the development sites: retry the runs that failed for lack of credit
+# skill v2 on the development sites: retry after raising the spend limit
