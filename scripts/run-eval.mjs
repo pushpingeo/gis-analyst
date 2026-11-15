@@ -13,6 +13,7 @@ import { rules } from "../js/rules.js";
 
 const arg = (k, d) => process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1] ?? d;
 const label = arg("label", "dev");
+const fromLabel = arg("from", label); // rescore another run's saved answers (e.g. v1 on the dev sites) without API calls
 const arms = arg("arms", "rules,off,on").split(",");
 const repeats = +arg("repeats", "1");
 const concurrency = +arg("concurrency", "4");
@@ -70,7 +71,7 @@ function slimEvents(events) {
 }
 
 async function runOne(s, arm, rep) {
-  const out = `eval/runs/${label}/${arm}/r${rep}/${s.id}.json`;
+  const out = `eval/runs/${fromLabel}/${arm}/r${rep}/${s.id}.json`;
   if (existsSync(out)) { // resumable; --reparse re-reads saved answers with the current parser (no API calls)
     const rec = readJson(out);
     if (process.argv.includes("--reparse") && rec.text) { rec.result = parseResult(rec.text); writeFileSync(out, JSON.stringify(rec)); }
@@ -124,6 +125,54 @@ function scoreArm(recs, excludeLeaks = false) {
   return { runs: use.length, failed: use.filter((x) => !x.result).length, leaks: recs.filter((x) => x.leak).length,
     overall: all, per_ps, category_agree: Math.round(catAgree * 100) / 100 };
 }
+// ---- Flags and evidence -------------------------------------------------------------
+// Flag recall: of the standards IFC applied, how many did at least one flag point to?
+// Evidence check: does each cited feature (name + distance) appear in what the tools actually returned?
+const norm = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+function toolFeatures(events) {
+  const out = [];
+  for (const e of events || []) {
+    if (e.type !== "tool" || !e.output) continue;
+    if (e.name === "find_features") for (const v of Object.values(e.output)) for (const f of v?.nearest || []) out.push([f.name, f.distance_km]);
+    if (e.name === "threatened_species_records") for (const f of e.output.species || []) { out.push([f.species, f.nearest_km]); out.push([f.common_name, f.nearest_km]); }
+    if (e.name === "named_places") for (const f of e.output.items || []) out.push([f.name, f.distance_km]);
+  }
+  return out.filter(([n]) => n).map(([n, d]) => [norm(n), d]);
+}
+function evidenceCheck(rec) {
+  const feats = toolFeatures(rec.events);
+  const items = [...(rec.result?.flags || []), ...(rec.result?.themes || [])].flatMap((f) => f.evidence || []);
+  let checkable = 0, verified = 0;
+  for (const ev of items) {
+    // Strip the agent's decorations: "Dambantian (village)", "Gyps africanus (White-backed Vulture), CR, 1 record".
+    const raw = norm(ev.name);
+    const n = raw.replace(/\(.*?\)/g, " ").split(",")[0].replace(/\s+/g, " ").trim();
+    const d = Number(ev.distance_km);
+    if (!n || n.length < 3 || /unnamed|landuse|^(none|n\/a|nearest|no )/.test(raw) || !Number.isFinite(d)) continue;
+    checkable++;
+    // A name match at about the right distance, or (for translated names, e.g. Arabic script in OSM) a
+    // non-zero distance that matches a returned feature almost exactly.
+    if (feats.some(([fn, fd]) => (fn === n || (n.length > 4 && (fn.includes(n) || n.includes(fn)))) && Math.abs(fd - d) <= Math.max(0.15, 0.1 * fd)) ||
+        (d > 0 && feats.some(([, fd]) => Math.abs(fd - d) <= 0.011))) verified++;
+  }
+  return { checkable, verified };
+}
+function flagStats(recs) {
+  const bySite = Object.fromEntries(sites.map((s) => [s.id, s]));
+  const withFlags = recs.filter((x) => Array.isArray(x.result?.flags));
+  if (!withFlags.length) return null;
+  const recall = {};
+  for (const k of PS) {
+    const pos = withFlags.filter((x) => bySite[x.site_id].ifc[k]);
+    const hit = pos.filter((x) => x.result.flags.some((f) => String(f.ps || "").toLowerCase().replace(/\s/g, "") === k));
+    recall[k] = pos.length ? Math.round((hit.length / pos.length) * 100) / 100 : null;
+  }
+  const nFlags = withFlags.map((x) => x.result.flags.length);
+  const low = withFlags.flatMap((x) => x.result.flags).filter((f) => f.confidence === "low").length;
+  const total = nFlags.reduce((a, b) => a + b, 0);
+  return { recall, flags_per_site: Math.round((total / withFlags.length) * 10) / 10, low_confidence_share: total ? Math.round((low / total) * 100) / 100 : null };
+}
+
 // Consistency: for each site and standard, do all repeats give the same answer?
 function consistency(recs) {
   const groups = {};
@@ -133,7 +182,7 @@ function consistency(recs) {
 }
 
 // ---- Main ------------------------------------------------------------------------
-if (arms.some((a) => a !== "rules") && !process.env.ANTHROPIC_API_KEY && !process.argv.includes("--reparse")) throw new Error("ANTHROPIC_API_KEY is not set");
+if (arms.some((a) => a !== "rules") && !process.env.ANTHROPIC_API_KEY && !process.argv.includes("--reparse") && fromLabel === label) throw new Error("ANTHROPIC_API_KEY is not set");
 const usable = sites.filter((s) => existsSync(`data/osm/${s.id}.json`));
 console.log(`Label ${label}, skill ${skillSha}, catalogue ${catalogue.version}, ${usable.length} sites with data, arms ${arms.join(",")}, repeats ${repeats}`);
 const jobs = [];
@@ -151,20 +200,23 @@ for (const arm of arms) {
   const recs = records.filter((x) => x.arm === arm);
   summary.arms[arm] = { ...scoreArm(recs), without_leaks: arm === "web" ? scoreArm(recs, true) : undefined,
     consistency: consistency(recs),
+    flags: flagStats(recs),
+    evidence: (() => { const c = recs.filter((x) => x.events).map(evidenceCheck).reduce((a, b) => ({ checkable: a.checkable + b.checkable, verified: a.verified + b.verified }), { checkable: 0, verified: 0 });
+      return c.checkable ? { ...c, share: Math.round((c.verified / c.checkable) * 100) / 100 } : null; })(),
     usage: recs.reduce((a, x) => (x.usage ? { input_tokens: a.input_tokens + x.usage.input_tokens, output_tokens: a.output_tokens + x.usage.output_tokens, web_searches: a.web_searches + (x.usage.web_searches || 0) } : a), { input_tokens: 0, output_tokens: 0, web_searches: 0 }) };
 }
 // Per-site table for the results page.
 summary.per_site = usable.map((s) => ({ id: s.id, name: s.name, country: s.country, asset_type: s.asset_type, ifc: s.ifc,
-  arms: Object.fromEntries(arms.map((arm) => [arm, records.filter((x) => x.arm === arm && x.site_id === s.id).map((x) => ({ result: x.result && { ...Object.fromEntries(PS.map((k) => [k, x.result[k]])), category: x.result.category }, leak: !!x.leak, repeat: x.repeat }))])) }));
+  arms: Object.fromEntries(arms.map((arm) => [arm, records.filter((x) => x.arm === arm && x.site_id === s.id).map((x) => ({ result: x.result && { ...Object.fromEntries(PS.map((k) => [k, x.result[k]])), category: x.result.category, flags: (x.result.flags || []).length || undefined }, leak: !!x.leak, repeat: x.repeat }))])) }));
 mkdirSync(`eval/runs/${label}`, { recursive: true });
 writeFileSync(`eval/runs/${label}/summary.json`, JSON.stringify(summary, null, 1));
 const index = readJson("eval/index.json") || { runs: [] };
 index.runs = [...index.runs.filter((r) => r.label !== label), { label, created: summary.created, skill_sha: summary.skill_sha, arms }];
 writeFileSync("eval/index.json", JSON.stringify(index, null, 1));
 
-console.log("\narm    sites  agree  kappa  PS5   PS6   PS7   PS8   cat   consistency");
+console.log("\narm    sites  agree  kappa  PS5   PS6   PS7   PS8   cat   consistency  flag-recall(5/6/7/8)  flags/site  evidence-verified");
 for (const [arm, a] of Object.entries(summary.arms)) {
-  console.log(`${arm.padEnd(6)} ${String(a.runs).padStart(5)}  ${a.overall.agree}   ${a.overall.kappa}  ` + PS.map((k) => String(a.per_ps[k].agree).padEnd(5)).join(" ") + ` ${a.category_agree}  ${a.consistency ?? "-"}${a.leaks ? `  (${a.leaks} leaks)` : ""}`);
+  console.log(`${arm.padEnd(6)} ${String(a.runs).padStart(5)}  ${a.overall.agree}   ${a.overall.kappa}  ` + PS.map((k) => String(a.per_ps[k].agree).padEnd(5)).join(" ") + ` ${a.category_agree}  ${a.consistency ?? "-"}  ${a.flags ? PS.map((k) => a.flags.recall[k]).join("/") : "-"}  ${a.flags?.flags_per_site ?? "-"}  ${a.evidence ? `${a.evidence.verified}/${a.evidence.checkable}` : "-"}${a.leaks ? `  (${a.leaks} leaks)` : ""}`);
 }
 const cost = (usageTotal.input_tokens * 0.1 + usageTotal.output_tokens * 0.5) / 1e6 + usageTotal.web_searches * 0.01;
 console.log(`\nThis run: ${usageTotal.requests} API requests, ${usageTotal.input_tokens} input / ${usageTotal.output_tokens} output tokens, ${usageTotal.web_searches} searches, about $${cost.toFixed(2)}`);

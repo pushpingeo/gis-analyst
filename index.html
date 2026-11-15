@@ -67,6 +67,8 @@
   <aside>
     <div class="controls">
       <select id="site" aria-label="Site"></select>
+      <label class="muted">Project stage (optional)
+        <select id="stage"><option value="">Not known</option><option>greenfield</option><option>expansion</option><option>refinancing</option></select></label>
       <div class="toggles">
         <label><input type="checkbox" id="skill" checked> Use the NTR skill</label>
         <label><input type="checkbox" id="desk"> Desk research (web search)</label>
@@ -198,6 +200,17 @@ function compareTable(res, s) {
   return `<table><tr><th></th><th>Agent</th><th>IFC</th><th></th></tr>${rows.join("")}</table>`;
 }
 
+const CONF = { high: 0, medium: 1, low: 2 };
+function flagsTable(res) {
+  const flags = (res?.flags || []).slice().sort((a, b) => (CONF[a.confidence] ?? 3) - (CONF[b.confidence] ?? 3));
+  if (!flags.length) return "";
+  const rows = flags.map((f) => {
+    const ev = (f.evidence || []).slice(0, 3).map((e) => `${esc(e.name || e.concept || "")}${e.distance_km != null ? ` (${esc(e.distance_km)} km)` : ""}`).join("; ");
+    return `<tr><td><span class="tag ${f.confidence === "low" ? "off" : ""}">${esc(f.ps || "")}</span></td><td><b>${esc(f.risk)}</b>${ev ? `<br><span class="muted">${ev}</span>` : ""}${f.why ? `<br>${esc(f.why)}` : ""}</td><td class="muted">${esc(f.confidence || "")}</td></tr>`;
+  });
+  return `<p style="margin:8px 0 2px"><b>${flags.length} flags</b> <span class="muted">for the opportunity manager to weigh, most certain first</span></p><table>${rows.join("")}</table>`;
+}
+
 function traceItem(e) {
   const j = (o, n = 6000) => esc(JSON.stringify(o, null, 1).slice(0, n));
   if (e.type === "start") return `<li>Started with ${e.tools.length} tools: ${e.tools.map((t) => `<code>${esc(t)}</code>`).join(" ")}<details><summary>System prompt (${e.system.length.toLocaleString()} characters)</summary><pre>${esc(e.system)}</pre></details><details><summary>User message</summary><pre>${esc(e.user)}</pre></details></li>`;
@@ -230,7 +243,7 @@ async function runOnce(skillOn) {
   const card = document.createElement("div");
   card.className = "run";
   card.innerHTML = `<h3><span>${esc(s.name)}</span><span><span class="tag ${skillOn ? "" : "off"}">skill ${skillOn ? "on" : "off"}</span> <span class="tag ${desk ? "" : "off"}">${desk ? "maps + web" : "maps only"}</span></span></h3>
-    <div class="muted state">Loading site data…</div><div class="summary"></div><div class="compare"></div>
+    <div class="muted state">Loading site data…</div><div class="flags"></div><div class="summary"></div><div class="compare"></div>
     <details open><summary>Trace: what the agent did</summary><ul class="trace"></ul></details>`;
   $("runs").prepend(card);
   const q = (sel) => card.querySelector(sel);
@@ -246,7 +259,7 @@ async function runOnce(skillOn) {
   const t0 = Date.now();
   try {
     const out = await runAgent({
-      site: s, footprintKm: r, skillOn, skillText, deskResearch: desk, data, callClaude, maxRounds: CONFIG.maxRounds,
+      site: s, footprintKm: r, skillOn, skillText, deskResearch: desk, data, callClaude, maxRounds: CONFIG.maxRounds, stage: $("stage").value || null,
       onEvent: (e) => {
         q(".trace").insertAdjacentHTML("beforeend", traceItem(e));
         if (e.type === "response") for (const b of e.content) {
@@ -258,7 +271,8 @@ async function runOnce(skillOn) {
     const u = out.usage;
     q(".state").textContent = `Data: ${notes.join(" · ")}. Finished in ${((Date.now() - t0) / 1000).toFixed(0)} s · ${u.input_tokens.toLocaleString()} input and ${u.output_tokens.toLocaleString()} output tokens${u.web_searches ? ` · ${u.web_searches} web searches` : ""}.`;
     q(".summary").innerHTML = (leak ? `<p class="box no">Leak warning: the agent's web searches or results mention "${esc(leak)}", from the project's name. It may have found documents about this project, so this result can't count as a blind test.</p>` : "") + mdLite(out.text);
-    q(".compare").innerHTML = `<p class="muted" style="margin:8px 0 0">Compared with IFC's own screening:</p>` + compareTable(out.result, s);
+    q(".flags").innerHTML = flagsTable(out.result);
+    q(".compare").innerHTML = `<p class="muted" style="margin:8px 0 0">IFC view, compared with IFC's own screening:</p>` + compareTable(out.result, s);
     q("details").open = false;
   } catch (e) {
     q(".state").innerHTML = `<span class="no">${e instanceof LimitReached ? esc(e.message) : "The run stopped: " + esc(e.message)}</span>`;

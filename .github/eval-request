@@ -1,2 +1,2 @@
---label=v1 --arms=rules,off,on,web --repeats=2 --sites=all --concurrency=4
-# baseline: skill v1, every arm, two repeats for consistency
+--label=v2-dev --arms=off,on --repeats=2 --sites=dev --concurrency=4
+# skill v2 (flag list) on the 25 development sites

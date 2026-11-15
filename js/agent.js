@@ -11,16 +11,14 @@ export const BLOCKED_DOMAINS = [
 
 const OUTPUT_SPEC = `Finish with a summary for a person of no more than 400 words, then exactly one JSON block in a \`\`\`json fence:
 {
-  "themes": [{"ps": "PS5", "rating": "high|medium|low|not_assessed", "triggered": true,
-              "evidence": [{"concept": "", "name": "", "distance_km": 0, "source": ""}],
-              "desk_research": [{"finding": "", "url": "", "date": ""}], "gaps": ""}],
+  "flags": [{"risk": "", "ps": "PS5|PS6|PS7|PS8|PS4|context", "confidence": "high|medium|low",
+             "evidence": [{"concept": "", "name": "", "distance_km": 0, "source": ""}], "why": ""}],
   "ps5": true, "ps6": true, "ps7": false, "ps8": false,
   "category": "A|B|C",
   "category_drivers": [""],
-  "context": {"country_risk": [], "social": []},
   "data_gaps": [""]
 }
-"ps5" to "ps8" mean: would IFC expect this Performance Standard to apply to the project?
+"flags" lists the risks you found, one per distinct risk. "ps5" to "ps8" mean: would IFC expect this Performance Standard to apply to the project?
 Screen the place, not a particular project: don't try to work out which project this is or look up documents about it.`;
 
 export function systemPrompt({ skillOn, skillText, deskResearch }) {
@@ -31,9 +29,11 @@ ${OUTPUT_SPEC}`;
   return base + "\n\nFollow this skill exactly:\n\n<skill>\n" + skillText.replace(/^---[\s\S]*?---\n/, "") + "\n</skill>";
 }
 
-export function userPrompt(site, footprintKm) {
+// stage (optional): "greenfield", "expansion" or "refinancing". Left out when not known.
+export function userPrompt(site, footprintKm, stage = null) {
   return `Site: latitude ${site.lat}, longitude ${site.lon}, ${site.country}.
 Asset type: ${site.asset_type}. Footprint: treat it as a circle of ${footprintKm} km radius around the point; the tools measure distances from its edge.
+${stage ? `Project stage: ${stage}.` : "Project stage: not known."}
 Screen this site.`;
 }
 
@@ -139,10 +139,10 @@ export function parseResult(text) {
 }
 
 // callClaude({system, messages, tools}) -> API response. onEvent(event) receives trace events.
-export async function runAgent({ site, footprintKm, skillOn, skillText, deskResearch, data, callClaude, onEvent = () => {}, maxRounds = 10 }) {
+export async function runAgent({ site, footprintKm, skillOn, skillText, deskResearch, data, callClaude, onEvent = () => {}, maxRounds = 10, stage = null }) {
   const system = systemPrompt({ skillOn, skillText, deskResearch });
   const tools = toolDefs({ deskResearch });
-  const history = [{ role: "user", content: userPrompt(site, footprintKm) }];
+  const history = [{ role: "user", content: userPrompt(site, footprintKm, stage) }];
   onEvent({ type: "start", system, user: history[0].content, tools: tools.map((t) => t.name) });
   const usage = { input_tokens: 0, output_tokens: 0, web_searches: 0 };
   let finalText = "";
