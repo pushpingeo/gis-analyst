@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GIS Analyst: spatial tools check</title>
+<title>GIS Analyst: site risk screening agent</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
@@ -13,239 +13,249 @@
 } }
 </script>
 <style>
-  .muted { color: #5b6575; font-size: 13px; }
-  h3 { font-size: 14px; margin: 16px 0 4px; }
-  :root { --ink:#1d2430; --muted:#5b6575; --line:#e3e6eb; --bg:#f7f8fa; --accent:#0b6e4f; }
+  :root { --ink:#1d2430; --muted:#5b6575; --line:#e3e6eb; --bg:#f7f8fa; --accent:#0b6e4f; --bad:#b42318; --good:#067647; }
   * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; color:var(--ink); background:var(--bg); }
+  body { margin:0; font:14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; color:var(--ink); background:var(--bg); }
   header { padding:12px 16px; border-bottom:1px solid var(--line); background:#fff; }
   header h1 { margin:0; font-size:17px; }
-  header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
-  main { display:grid; grid-template-columns: 1fr 420px; height: calc(100vh - 62px); }
-  #map { height:100%; }
-  aside { overflow:auto; background:#fff; border-left:1px solid var(--line); padding:12px 14px; }
-  .controls { display:grid; gap:8px; margin-bottom:10px; }
+  header p { margin:2px 0 0; color:var(--muted); font-size:13px; max-width:900px; }
+  header a { color:var(--accent); }
+  main { display:grid; grid-template-columns: minmax(0,1fr) 480px; height: calc(100vh - 70px); }
+  #map { height:100%; min-height:260px; }
+  aside { overflow:auto; background:#fff; border-left:1px solid var(--line); padding:12px 14px 40px; }
+  @media (max-width: 860px) {
+    main { display:block; height:auto; }
+    #map { height:40vh; }
+    aside { border-left:0; }
+  }
+  .controls { display:grid; gap:8px; margin-bottom:8px; }
   select, input, button { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
-  button { background:var(--accent); color:#fff; border:0; cursor:pointer; }
+  button { background:var(--accent); color:#fff; border:0; cursor:pointer; padding:8px; }
+  button.secondary { background:#fff; color:var(--accent); border:1px solid var(--accent); }
   button:disabled { opacity:.5; cursor:default; }
+  .toggles { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; }
+  .toggles label { display:flex; gap:6px; align-items:center; }
   .row { display:flex; gap:8px; } .row > * { flex:1; }
   .status { color:var(--muted); font-size:13px; min-height:1.4em; }
-  table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 12px; }
-  th, td { text-align:left; padding:4px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .muted { color:var(--muted); font-size:13px; }
+  .box { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:13px; }
+  .run { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:12px 0; background:#fff; }
+  .run h3 { margin:0 0 4px; font-size:14px; display:flex; justify-content:space-between; gap:8px; }
+  .tag { font-size:11px; font-weight:600; padding:1px 6px; border-radius:10px; background:#e7f3ee; color:var(--accent); white-space:nowrap; }
+  .tag.off { background:#f2f4f7; color:var(--muted); }
+  .summary p { margin:6px 0; } .summary ul { margin:4px 0 6px 18px; padding:0; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0; }
+  th, td { text-align:left; padding:3px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
   th { color:var(--muted); font-weight:600; }
-  .ps { font-weight:600; white-space:nowrap; }
-  .ifc { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:8px; font-size:13px; }
-  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
-  details { margin-top:8px; } pre { white-space:pre-wrap; font-size:11px; background:var(--bg); padding:8px; border-radius:6px; max-height:300px; overflow:auto; }
-  @media (max-width: 800px) { main { grid-template-columns: 1fr; grid-template-rows: 45vh auto; height:auto; } aside { border-left:0; } }
+  .ok { color:var(--good); font-weight:600; } .no { color:var(--bad); font-weight:600; }
+  details { margin-top:6px; } summary { cursor:pointer; color:var(--accent); font-size:13px; }
+  pre { white-space:pre-wrap; word-break:break-word; font-size:11px; background:var(--bg); padding:8px; border-radius:6px; max-height:320px; overflow:auto; margin:4px 0; }
+  .trace { list-style:none; margin:6px 0 0; padding:0; font-size:12.5px; }
+  .trace li { border-left:3px solid var(--line); padding:3px 0 3px 8px; margin:4px 0; }
+  .trace li.tool { border-color:#2e90fa; } .trace li.search { border-color:#f79009; } .trace li.model { border-color:#7a5af8; }
+  .trace li.warn { border-color:var(--bad); }
+  code { font-size:12px; background:var(--bg); padding:0 3px; border-radius:3px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>GIS Analyst: spatial tools check</h1>
-  <p>No AI yet. Pick a site, and the tools pull OpenStreetMap features, GBIF threatened species records and Wikidata places around it and measure distances.</p>
+  <h1>GIS Analyst: site risk screening agent</h1>
+  <p>Claude screens a project site for environmental and social risk in IFC Performance Standard terms, using open map data. Switch the <b>skill</b> off to see what the same model does without a method. It only sees the coordinates, country and asset type. <a href="tools.html">Tools without AI</a> · <a href="https://github.com/pushpingeo/gis-analyst">GitHub</a></p>
 </header>
 <main>
   <div id="map"></div>
   <aside>
     <div class="controls">
-      <select id="site"></select>
-      <div class="row">
-        <label>Asset type <select id="asset"></select></label>
-        <label>Footprint km <input id="radius" type="number" step="0.5" min="0"></label>
+      <select id="site" aria-label="Site"></select>
+      <div class="toggles">
+        <label><input type="checkbox" id="skill" checked> Use the NTR skill</label>
+        <label><input type="checkbox" id="desk"> Desk research (web search)</label>
       </div>
-      <label style="font-size:13px"><input type="checkbox" id="useSnap" checked> Use the saved snapshot if there is one (repeatable); otherwise query the services live</label>
-      <button id="run">Run tools</button>
+      <div class="row">
+        <button id="run">Screen this site</button>
+        <button id="both" class="secondary">Run skill off, then on</button>
+      </div>
       <div class="status" id="status"></div>
     </div>
-    <div id="ifc"></div>
-    <div id="results"></div>
-    <div id="species"></div>
-    <div id="places"></div>
-    <details><summary>Overpass query</summary><pre id="query"></pre></details>
-    <details><summary>Summary JSON (what the agent will see)</summary><pre id="json"></pre></details>
+    <details><summary>IFC's answer (for checking, never shown to the model)</summary><div class="box" id="ifc"></div></details>
+    <details><summary>Use your own Anthropic API key</summary>
+      <div class="box">The demo uses a shared, rate-limited connection. With your own key, calls go straight from this tab to Anthropic and the key is kept only for this tab.
+        <div class="row" style="margin-top:6px"><input id="key" type="password" placeholder="sk-ant-..." autocomplete="off"><button id="saveKey" class="secondary">Use key</button></div>
+      </div>
+    </details>
+    <div id="runs"></div>
   </aside>
 </main>
 <script type="module">
-import { buildOverpassQuery, fetchOverpass, screen, summarise, FOOTPRINT_KM, OVERPASS_ENDPOINTS,
-  gbifUrl, slimGbif, summariseGbif, wikidataUrl, summariseWikidata } from "./js/tools.js";
+import { CONFIG } from "./js/config.js";
+import { callClaude, setUserKey, getUserKey, LimitReached } from "./js/claude.js";
+import { runAgent, prepareData } from "./js/agent.js";
+import { FOOTPRINT_KM, buildOverpassQuery, fetchOverpass, OVERPASS_ENDPOINTS, gbifUrl, slimGbif, wikidataUrl } from "./js/tools.js";
 import * as turf from "@turf/turf";
-import osmtogeojson from "osmtogeojson";
 
-const COLOURS = { PS5: "#c2410c", PS6: "#15803d", PS7: "#7c3aed", PS8: "#b45309", PS4: "#475569", "PS6 / PS8": "#0e7490" };
 const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+window.addEventListener("unhandledrejection", (e) => { $("status").textContent = "Error: " + (e.reason?.message || e.reason); });
 
-const [catalogue, evalSites] = await Promise.all([
+const [catalogue, evalSites, skillText] = await Promise.all([
   fetch("catalogue/catalogue.json").then((r) => r.json()),
   fetch("data/eval-sites.json").then((r) => r.json()),
+  fetch("skills/ntr-screening/SKILL.md").then((r) => r.text()),
 ]);
 const sites = evalSites.sites;
-$("site").innerHTML = sites.map((s, i) => `<option value="${i}">${s.name} (${s.country})</option>`).join("");
-$("asset").innerHTML = Object.keys(FOOTPRINT_KM).map((a) => `<option>${a}</option>`).join("");
+$("site").innerHTML = sites.map((s, i) => `<option value="${i}">${esc(s.name)} (${esc(s.country)}), ${esc(s.asset_type)}</option>`).join("");
+if (getUserKey()) $("key").placeholder = "Your key is set for this tab";
+$("saveKey").onclick = () => { setUserKey($("key").value.trim()); $("key").value = ""; $("key").placeholder = getUserKey() ? "Your key is set for this tab" : "sk-ant-..."; };
 
-window.addEventListener("error", (e) => { $("status").textContent = "Error: " + e.message; });
-window.addEventListener("unhandledrejection", (e) => { $("status").textContent = "Error: " + (e.reason && e.reason.message || e.reason); });
-
-// The tools must work even if the map can't draw (no WebGL, background tab).
-let map = null;
-let mapReady = Promise.resolve(false);
+// Map: optional. Everything works without it (no WebGL, background tab).
+let map = null, mapReady = Promise.resolve(false);
 try {
-  map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/positron", center: [0, 20], zoom: 2 });
+  map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/positron", center: [20, 10], zoom: 1.5 });
   map.addControl(new maplibregl.NavigationControl(), "top-right");
-  mapReady = new Promise((r) => { map.on("load", () => r(true)); map.on("error", () => {}); });
+  mapReady = new Promise((r) => map.on("load", () => r(true)));
 } catch (e) {
-  $("map").innerHTML = `<p style="padding:16px;color:#5b6575">Map unavailable here (${e.message}). The tools still run.</p>`;
+  $("map").innerHTML = `<p class="muted" style="padding:16px">The map can't be drawn in this browser. The agent still runs.</p>`;
+}
+async function drawSite(s, r) {
+  if (!map || !(await mapReady)) return;
+  const data = turf.featureCollection([turf.circle([s.lon, s.lat], r, { units: "kilometers" }), turf.point([s.lon, s.lat])]);
+  const ring = turf.circle([s.lon, s.lat], r + 20, { units: "kilometers" });
+  if (map.getSource("site")) { map.getSource("site").setData(data); map.getSource("ring").setData(ring); }
+  else {
+    map.addSource("site", { type: "geojson", data }); map.addSource("ring", { type: "geojson", data: ring });
+    map.addLayer({ id: "ring", source: "ring", type: "line", paint: { "line-color": "#64748b", "line-dasharray": [2, 2] } });
+    map.addLayer({ id: "site-fill", source: "site", type: "fill", filter: ["==", "$type", "Polygon"], paint: { "fill-color": "#0b6e4f", "fill-opacity": 0.15 } });
+    map.addLayer({ id: "site-pt", source: "site", type: "circle", filter: ["==", "$type", "Point"], paint: { "circle-radius": 6, "circle-color": "#0b6e4f", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+  }
+  map.fitBounds(turf.bbox(ring), { padding: 20, duration: 0 });
 }
 
 function pickSite() {
   const s = sites[+$("site").value];
-  $("asset").value = s.asset_type;
-  $("radius").value = FOOTPRINT_KM[s.asset_type];
   const ps = ["ps5", "ps6", "ps7", "ps8"].map((k) => `${k.toUpperCase()} ${s.ifc[k] ? "yes" : "no"}`).join(" · ");
-  $("ifc").innerHTML = `<div class="ifc"><b>IFC's answer (for checking only):</b> Category ${s.ifc.category} · ${ps}<br><a href="${s.esrs_url}" target="_blank" rel="noopener">IFC review summary</a></div>`;
-  for (const id of ["results", "species", "places"]) $(id).innerHTML = "";
-  $("status").textContent = "";
-  drawSite(s, +$("radius").value);
+  $("ifc").innerHTML = `${esc(s.name)}: Category ${s.ifc.category} · ${ps}<br><a href="${esc(s.esrs_url)}" target="_blank" rel="noopener">IFC review summary</a>`;
+  drawSite(s, FOOTPRINT_KM[s.asset_type]);
 }
 $("site").onchange = pickSite;
-$("asset").onchange = () => { $("radius").value = FOOTPRINT_KM[$("asset").value]; };
-
-async function drawSite(s, r) {
-  if (!map || !(await mapReady)) return;
-  const foot = r > 0 ? turf.circle([s.lon, s.lat], r, { units: "kilometers" }) : turf.point([s.lon, s.lat]);
-  const ring20 = turf.circle([s.lon, s.lat], r + 20, { units: "kilometers" });
-  setSource("site", turf.featureCollection([foot, turf.point([s.lon, s.lat])]));
-  setSource("ring", ring20);
-  setSource("osm", turf.featureCollection([]));
-  map.fitBounds(turf.bbox(turf.circle([s.lon, s.lat], r + 6, { units: "kilometers" })), { padding: 20, duration: 0 });
-}
-
-function setSource(id, data) {
-  if (!map || !map.isStyleLoaded()) return;
-  if (map.getSource(id)) { map.getSource(id).setData(data); return; }
-  map.addSource(id, { type: "geojson", data });
-  if (id === "ring") map.addLayer({ id, source: id, type: "line", paint: { "line-color": "#64748b", "line-dasharray": [2, 2] } });
-  if (id === "site") {
-    map.addLayer({ id: "site-fill", source: id, type: "fill", filter: ["==", "$type", "Polygon"], paint: { "fill-color": "#0b6e4f", "fill-opacity": 0.12 } });
-    map.addLayer({ id: "site-pt", source: id, type: "circle", filter: ["==", "$type", "Point"], paint: { "circle-radius": 6, "circle-color": "#0b6e4f", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
-  }
-  if (id === "osm") {
-    const c = ["match", ["get", "_ps"], ...Object.entries(COLOURS).flat(), "#999"];
-    map.addLayer({ id: "osm-fill", source: id, type: "fill", filter: ["==", "$type", "Polygon"], paint: { "fill-color": c, "fill-opacity": 0.2 } }, "site-fill");
-    map.addLayer({ id: "osm-line", source: id, type: "line", paint: { "line-color": c, "line-width": 1.5 } }, "site-fill");
-    map.addLayer({ id: "osm-pt", source: id, type: "circle", filter: ["==", "$type", "Point"], paint: { "circle-radius": 4, "circle-color": c } }, "site-fill");
-  }
-}
-
-$("run").onclick = async () => {
-  const s = sites[+$("site").value];
-  const r = +$("radius").value;
-  $("run").disabled = true;
-  drawSite(s, r);
-  const useSnap = $("useSnap").checked && r === FOOTPRINT_KM[s.asset_type];
-  const extras = loadExtras(s, r, useSnap);
-  const q = buildOverpassQuery(catalogue, s.lon, s.lat, r);
-  $("query").textContent = q;
-  let osm, lastErr; const errors = [];
-  if (useSnap) {
-    try {
-      const snap = await fetch(`data/osm/${s.id}.json`).then((x) => (x.ok ? x.json() : null));
-      if (snap) {
-        osm = snap.osm;
-        $("query").textContent = snap.query;
-        $("status").textContent = `${osm.elements.length} OSM elements from the snapshot saved ${snap.fetched.slice(0, 10)} (${new URL(snap.endpoint).host}).` +
-          (snap.catalogue_version !== catalogue.version ? ` Snapshot uses catalogue ${snap.catalogue_version}, so newer concepts show as none found until it's refreshed.` : "");
-      }
-    } catch (e) { /* fall through to live */ }
-  }
-  for (const ep of osm ? [] : OVERPASS_ENDPOINTS) {
-    try {
-      $("status").textContent = `Querying ${new URL(ep).host}…`;
-      const t0 = performance.now();
-      osm = await fetchOverpass(q, ep);
-      $("status").textContent = `${osm.elements.length} OSM elements in ${((performance.now() - t0) / 1000).toFixed(1)} s from ${new URL(ep).host}.`;
-      break;
-    } catch (e) { lastErr = new Error(`${new URL(ep).host}: ${e.message.slice(0, 80)}`); errors.push(lastErr.message); }
-  }
-  $("run").disabled = false;
-  if (!osm) { $("status").textContent = "Overpass failed. " + errors.join(" | "); return; }
-
-  const result = screen(osm, catalogue, s.lon, s.lat, r);
-  const summary = summarise(result);
-  window.lastResult = { site: s, footprint_km: r, summary, result };
-  $("json").textContent = JSON.stringify(summary, null, 1);
-  renderTable(summary);
-  if (map) mapReady.then((ok) => ok && drawOsm(osm));
-  const { species, places, notes } = await extras;
-  summary["threatened-species"] = species;
-  summary["named-places"] = places;
-  $("json").textContent = JSON.stringify(summary, null, 1);
-  renderSpecies(species, notes.gbif);
-  renderPlaces(places, notes.wikidata);
-};
-
-// GBIF and Wikidata: from the saved snapshot if there is one, otherwise live.
-async function loadExtras(s, r, useSnap) {
-  const notes = {};
-  const snapOf = async (dir) => (useSnap ? fetch(`data/${dir}/${s.id}.json`).then((x) => (x.ok ? x.json() : null)).catch(() => null) : null);
-  const get = async (url) => { const x = await fetch(url, { headers: { Accept: "application/json" } }); if (!x.ok) throw new Error(`${x.status}`); return x.json(); };
-  let species = null, places = null;
-  try {
-    const snap = await snapOf("gbif");
-    if (snap) { species = summariseGbif(snap.near, snap.wide, s.lon, s.lat, r); notes.gbif = `snapshot saved ${snap.fetched.slice(0, 10)}`; }
-    else {
-      const [near, wide] = await Promise.all([get(gbifUrl(s.lon, s.lat, r + 5)), get(gbifUrl(s.lon, s.lat, r + 20, { facetOnly: true }))]);
-      species = summariseGbif(slimGbif(near), wide, s.lon, s.lat, r); notes.gbif = "live";
-    }
-  } catch (e) { notes.gbif = "GBIF failed: " + e.message; }
-  try {
-    const snap = await snapOf("wikidata");
-    if (snap) { places = summariseWikidata(snap.wikidata, r); notes.wikidata = `snapshot saved ${snap.fetched.slice(0, 10)}`; }
-    else { places = summariseWikidata(await get(wikidataUrl(s.lon, s.lat, r + 20)), r); notes.wikidata = "live"; }
-  } catch (e) { notes.wikidata = "Wikidata failed: " + e.message; }
-  return { species, places, notes };
-}
-
-const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-
-function renderSpecies(g, note) {
-  if (!g) { $("species").innerHTML = `<h3>Threatened species records</h3><p class="muted">${esc(note)}</p>`; return; }
-  const rows = g.species.slice(0, 12).map((x) => `<tr><td><b>${x.category}</b></td><td><i>${esc(x.species)}</i>${x.common_name ? `<br>${esc(x.common_name)}` : ""}</td><td>${x.nearest_km} km<br><span class="muted">${x.records} record${x.records > 1 ? "s" : ""}, latest ${x.latest_year ?? "?"}</span></td></tr>`);
-  $("species").innerHTML = `<h3>Threatened species records (CR, EN) within 5 km</h3>
-  <p class="muted">${g.records_found} records${g.truncated ? `, first ${g.records_read} read` : ""}; ${g.wider_20km ? `${g.wider_20km.species} species within 20 km` : ""} · ${esc(note)}</p>
-  ${rows.length ? `<table><tr><th>Cat.</th><th>Species</th><th>Nearest</th></tr>${rows.join("")}</table>` : `<p class="muted">No records found. That is not evidence of absence.</p>`}
-  <p class="muted" style="font-size:12px">Source: GBIF.org occurrence records, filtered by IUCN Red List category. Records, not ranges.</p>`;
-}
-
-function renderPlaces(w, note) {
-  if (!w) { $("places").innerHTML = `<h3>Named places (Wikidata)</h3><p class="muted">${esc(note)}</p>`; return; }
-  const rows = w.items.filter((x) => x.name).slice(0, 15).map((x) => `<tr><td>${x.wikipedia ? `<a href="${esc(x.wikipedia)}" target="_blank" rel="noopener">${esc(x.name)}</a>` : esc(x.name)}${x.heritage ? `<br><span class="muted">${esc(x.heritage)}</span>` : ""}</td><td class="muted">${esc(x.types.slice(0, 2).join(", "))}</td><td>${x.distance_km} km</td></tr>`);
-  $("places").innerHTML = `<h3>Named places for desk research (Wikidata)</h3><p class="muted">${w.items.length} items within 20 km · ${esc(note)}</p>
-  <table><tr><th>Name</th><th>Type</th><th>Distance</th></tr>${rows.join("")}</table>
-  <p class="muted" style="font-size:12px">Source: Wikidata (CC0). Point locations only.</p>`;
-}
-
-function renderTable(summary) {
-  const rows = Object.values(summary).map((v) => {
-    const near = v.nearest.length ? v.nearest.map((f) => `${f.name || "<i>unnamed</i>"} <span style="color:#5b6575">${f.type}, ${f.distance_km} km</span>`).join("<br>") : "<span style='color:#5b6575'>none found</span>";
-    const c = v.counts;
-    return `<tr><td class="ps"><span class="dot" style="background:${COLOURS[v.ps]}"></span>${v.ps}</td><td><b>${v.label}</b><br><span style="color:#5b6575">on site ${c.on_site} · ≤1 km ${c.near} · 1–5 km ${c.close} · 5–20 km ${c.wider}</span></td><td>${near}</td></tr>`;
-  });
-  $("results").innerHTML = `<table><tr><th>PS</th><th>Concept (searched)</th><th>Nearest</th></tr>${rows.join("")}</table>
-  <p style="color:#5b6575;font-size:12px">Distances are from the footprint edge. Source: © OpenStreetMap contributors (ODbL). Missing features are not evidence of absence.</p>`;
-}
-
-function drawOsm(osm) {
-  const fc = osmtogeojson({ ...osm, elements: osm.elements.filter((e) => e.lat !== undefined || e.geometry || (e.members || []).length) });
-  for (const f of fc.features) {
-    const p = f.properties;
-    const hit = Object.values(catalogue.concepts).find((c) => c.match && c.match.some(([k, v]) => p[k] !== undefined && (v === "*" || p[k] === v)));
-    p._ps = hit ? hit.ps : "";
-  }
-  setSource("osm", fc);
-}
-
 pickSite();
+
+// Site data: the saved snapshot if there is one (so every run sees the same data), otherwise live.
+const dataCache = new Map();
+async function siteData(s, r) {
+  if (dataCache.has(s.id)) return dataCache.get(s.id);
+  const snap = (dir) => fetch(`data/${dir}/${s.id}.json`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  let [osmSnap, gbifSnap, wdSnap] = await Promise.all([snap("osm"), snap("gbif"), snap("wikidata")]);
+  const notes = [];
+  let osm = osmSnap?.osm;
+  if (osm) notes.push(`OSM snapshot ${osmSnap.fetched.slice(0, 10)}`);
+  else {
+    const q = buildOverpassQuery(catalogue, s.lon, s.lat, r);
+    for (const ep of OVERPASS_ENDPOINTS) {
+      try { $("status").textContent = `Fetching OpenStreetMap data from ${new URL(ep).host}…`; osm = await fetchOverpass(q, ep); notes.push("OSM live"); break; } catch { /* next */ }
+    }
+  }
+  const get = (u) => fetch(u).then((x) => (x.ok ? x.json() : Promise.reject(new Error(x.status))));
+  let gbif = gbifSnap ? { near: gbifSnap.near, wide: gbifSnap.wide } : null;
+  if (!gbif) try { const [n, w] = await Promise.all([get(gbifUrl(s.lon, s.lat, r + 5)), get(gbifUrl(s.lon, s.lat, r + 20, { facetOnly: true }))]); gbif = { near: slimGbif(n), wide: w }; notes.push("GBIF live"); } catch { notes.push("GBIF unavailable"); }
+  else notes.push(`GBIF snapshot ${gbifSnap.fetched.slice(0, 10)}`);
+  let wikidata = wdSnap?.wikidata;
+  if (!wikidata) try { wikidata = await get(wikidataUrl(s.lon, s.lat, r + 20)); notes.push("Wikidata live"); } catch { notes.push("Wikidata unavailable"); }
+  else notes.push(`Wikidata snapshot ${wdSnap.fetched.slice(0, 10)}`);
+  if (osmSnap && osmSnap.catalogue_version !== catalogue.version) notes.push(`OSM snapshot is catalogue ${osmSnap.catalogue_version}; newer concepts read as none found`);
+  const d = { data: prepareData({ catalogue, site: s, footprintKm: r, osm, gbif, wikidata }), notes };
+  dataCache.set(s.id, d);
+  return d;
+}
+
+// ---- Rendering --------------------------------------------------------------
+
+function mdLite(text) {
+  const body = text.replace(/```json[\s\S]*?```/i, "").trim();
+  const lines = esc(body).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").split("\n");
+  let html = "", inList = false;
+  for (const l of lines) {
+    const li = l.match(/^\s*[-*•]\s+(.*)/);
+    if (li) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${li[1]}</li>`; continue; }
+    if (inList) { html += "</ul>"; inList = false; }
+    const h = l.match(/^#+\s*(.*)/);
+    if (h) html += `<p><b>${h[1]}</b></p>`; else if (l.trim()) html += `<p>${l}</p>`;
+  }
+  return html + (inList ? "</ul>" : "");
+}
+
+function compareTable(res, s) {
+  if (!res) return `<p class="no">The agent didn't return the JSON result, so this run can't be scored.</p>`;
+  const rating = (ps) => (res.themes || []).find((t) => (t.ps || "").toUpperCase() === ps)?.rating || "";
+  const rows = ["ps5", "ps6", "ps7", "ps8"].map((k) => {
+    const a = res[k], b = s.ifc[k];
+    return `<tr><td><b>${k.toUpperCase()}</b></td><td>${a === undefined ? "?" : a ? "yes" : "no"} <span class="muted">${esc(rating(k.toUpperCase()))}</span></td><td>${b ? "yes" : "no"}</td><td class="${a === b ? "ok" : "no"}">${a === b ? "✓" : "✗"}</td></tr>`;
+  });
+  const cOk = res.category === s.ifc.category;
+  rows.push(`<tr><td><b>Category</b></td><td>${esc(res.category ?? "?")}</td><td>${s.ifc.category}</td><td class="${cOk ? "ok" : "no"}">${cOk ? "✓" : "✗"}</td></tr>`);
+  return `<table><tr><th></th><th>Agent</th><th>IFC</th><th></th></tr>${rows.join("")}</table>`;
+}
+
+function traceItem(e) {
+  const j = (o, n = 6000) => esc(JSON.stringify(o, null, 1).slice(0, n));
+  if (e.type === "start") return `<li>Started with ${e.tools.length} tools: ${e.tools.map((t) => `<code>${esc(t)}</code>`).join(" ")}<details><summary>System prompt (${e.system.length.toLocaleString()} characters)</summary><pre>${esc(e.system)}</pre></details><details><summary>User message</summary><pre>${esc(e.user)}</pre></details></li>`;
+  if (e.type === "response") {
+    const parts = [];
+    for (const b of e.content) {
+      if (b.type === "text" && b.text.trim()) parts.push(`<li class="model">${esc(b.text.replace(/```json[\s\S]*?```/i, "[JSON result]").slice(0, 600))}${b.text.length > 600 ? "…" : ""}</li>`);
+      if (b.type === "tool_use") parts.push(`<li class="tool">Calls <code>${esc(b.name)}</code> ${Object.keys(b.input || {}).length ? `<code>${esc(JSON.stringify(b.input))}</code>` : ""}</li>`);
+      if (b.type === "server_tool_use") parts.push(`<li class="search">Web search: <b>${esc(b.input?.query)}</b></li>`);
+      if (b.type === "web_search_tool_result") {
+        const rs = Array.isArray(b.content) ? b.content : [];
+        parts.push(`<li class="search">${rs.length ? rs.slice(0, 6).map((r) => `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.url)}</a>`).join("<br>") : `<span class="no">Search failed: ${esc(b.content?.error_code || "no results")}</span>`}</li>`);
+      }
+    }
+    return `<li class="muted">Model turn ${e.round + 1}: ${(e.ms / 1000).toFixed(1)} s, stop: ${esc(e.stop_reason)}</li>` + parts.join("");
+  }
+  if (e.type === "tool") return `<li class="tool"><code>${esc(e.name)}</code> returned ${e.error ? `<span class="no">an error: ${esc(e.error)}</span>` : ""}<details><summary>Result</summary><pre>${j(e.output ?? e.error)}</pre></details></li>`;
+  if (e.type === "warning") return `<li class="warn">${esc(e.message)}</li>`;
+  return "";
+}
+
+// ---- Running ----------------------------------------------------------------
+
+let busy = false;
+async function runOnce(skillOn) {
+  const s = sites[+$("site").value];
+  const r = FOOTPRINT_KM[s.asset_type];
+  const desk = $("desk").checked;
+  const card = document.createElement("div");
+  card.className = "run";
+  card.innerHTML = `<h3><span>${esc(s.name)}</span><span><span class="tag ${skillOn ? "" : "off"}">skill ${skillOn ? "on" : "off"}</span> <span class="tag ${desk ? "" : "off"}">${desk ? "maps + web" : "maps only"}</span></span></h3>
+    <div class="muted state">Loading site data…</div><div class="summary"></div><div class="compare"></div>
+    <details open><summary>Trace: what the agent did</summary><ul class="trace"></ul></details>`;
+  $("runs").prepend(card);
+  const q = (sel) => card.querySelector(sel);
+  const { data, notes } = await siteData(s, r);
+  q(".state").textContent = `Data: ${notes.join(" · ")}. Thinking…`;
+  const t0 = Date.now();
+  try {
+    const out = await runAgent({
+      site: s, footprintKm: r, skillOn, skillText, deskResearch: desk, data, callClaude, maxRounds: CONFIG.maxRounds,
+      onEvent: (e) => { q(".trace").insertAdjacentHTML("beforeend", traceItem(e)); },
+    });
+    const u = out.usage;
+    q(".state").textContent = `Data: ${notes.join(" · ")}. Finished in ${((Date.now() - t0) / 1000).toFixed(0)} s · ${u.input_tokens.toLocaleString()} input and ${u.output_tokens.toLocaleString()} output tokens${u.web_searches ? ` · ${u.web_searches} web searches` : ""}.`;
+    q(".summary").innerHTML = mdLite(out.text);
+    q(".compare").innerHTML = `<p class="muted" style="margin:8px 0 0">Compared with IFC's own screening:</p>` + compareTable(out.result, s);
+    q("details").open = false;
+  } catch (e) {
+    q(".state").innerHTML = `<span class="no">${e instanceof LimitReached ? esc(e.message) : "The run stopped: " + esc(e.message)}</span>`;
+    throw e;
+  }
+}
+
+async function guarded(fn) {
+  if (busy) return;
+  busy = true; $("run").disabled = $("both").disabled = true; $("status").textContent = "";
+  try { await fn(); } catch (e) { $("status").textContent = e.message; } finally { busy = false; $("run").disabled = $("both").disabled = false; }
+}
+$("run").onclick = () => guarded(() => runOnce($("skill").checked));
+$("both").onclick = () => guarded(async () => { await runOnce(false); await runOnce(true); });
 </script>
 </body>
 </html>
