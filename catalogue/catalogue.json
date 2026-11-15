@@ -1,0 +1,68 @@
+{
+  "version": "0.1",
+  "note": "Concept catalogue for the NTR skill. Concepts use the same names as the AI Living World Atlas so this can later read from it. v0.1 uses OpenStreetMap through Overpass only.",
+  "sources": {
+    "osm-overpass": {
+      "name": "OpenStreetMap via Overpass API",
+      "publisher": "OpenStreetMap contributors",
+      "authority": "community",
+      "endpoint": "https://overpass-api.de/api/interpreter",
+      "licence": {"name": "ODbL 1.0", "url": "https://www.openstreetmap.org/copyright", "attribution": "© OpenStreetMap contributors"},
+      "caveat": "Coverage varies by country. Missing features are not evidence of absence."
+    }
+  },
+  "concepts": {
+    "protected-area": {
+      "label": "Protected area", "ps": "PS6", "source": "osm-overpass", "radius_km": 20, "containing": true,
+      "match": [["boundary", "protected_area"], ["boundary", "national_park"], ["leisure", "nature_reserve"]]
+    },
+    "wetland": {
+      "label": "Wetland", "ps": "PS6", "source": "osm-overpass", "radius_km": 5, "containing": true,
+      "match": [["natural", "wetland"]]
+    },
+    "river": {
+      "label": "River", "ps": "PS6", "source": "osm-overpass", "radius_km": 5,
+      "match": [["waterway", "river"]]
+    },
+    "forest": {
+      "label": "Forest or woodland", "ps": "PS6", "source": "osm-overpass", "radius_km": 2, "containing": true,
+      "match": [["landuse", "forest"], ["natural", "wood"]]
+    },
+    "indigenous-land": {
+      "label": "Indigenous or community land", "ps": "PS7", "source": "osm-overpass", "radius_km": 20, "containing": true,
+      "match": [["boundary", "aboriginal_lands"], ["protect_class", "24"]]
+    },
+    "settlement": {
+      "label": "Settlement", "ps": "PS5", "source": "osm-overpass", "radius_km": 20,
+      "match": [["place", "city"], ["place", "town"], ["place", "village"], ["place", "hamlet"], ["place", "isolated_dwelling"]]
+    },
+    "residential-land": {
+      "label": "Residential land", "ps": "PS5", "source": "osm-overpass", "radius_km": 2, "containing": true,
+      "match": [["landuse", "residential"]]
+    },
+    "farmland": {
+      "label": "Farmland or orchard", "ps": "PS5", "source": "osm-overpass", "radius_km": 1, "containing": true,
+      "match": [["landuse", "farmland"], ["landuse", "orchard"], ["landuse", "meadow"], ["landuse", "farmyard"]]
+    },
+    "industrial-land": {
+      "label": "Industrial or port land", "ps": "PS5", "source": "osm-overpass", "radius_km": 1, "containing": true,
+      "match": [["landuse", "industrial"], ["landuse", "port"]]
+    },
+    "heritage-site": {
+      "label": "Heritage or historic site", "ps": "PS8", "source": "osm-overpass", "radius_km": 5,
+      "match": [["heritage", "*"], ["historic", "*"]]
+    },
+    "place-of-worship": {
+      "label": "Place of worship or cemetery", "ps": "PS8", "source": "osm-overpass", "radius_km": 2,
+      "match": [["amenity", "place_of_worship"], ["landuse", "cemetery"], ["amenity", "grave_yard"]]
+    },
+    "community-facility": {
+      "label": "School or health facility", "ps": "PS4", "source": "osm-overpass", "radius_km": 5,
+      "match": [["amenity", "school"], ["amenity", "hospital"], ["amenity", "clinic"]]
+    },
+    "energy-infrastructure": {
+      "label": "Existing energy infrastructure", "ps": "PS4", "source": "osm-overpass", "radius_km": 5,
+      "match": [["power", "plant"], ["power", "substation"], ["man_made", "pipeline"]]
+    }
+  }
+}

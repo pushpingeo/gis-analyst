@@ -1,0 +1,7 @@
+{
+  "name": "gis-analyst",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node test/tools.test.mjs" },
+  "devDependencies": { "@turf/turf": "^7.2.0", "osmtogeojson": "^3.0.0-beta.5" }
+}
