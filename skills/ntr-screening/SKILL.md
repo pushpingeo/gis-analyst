@@ -64,11 +64,12 @@ Concepts: settlement, residential land, farmland and orchards, buildings.
 - Customary or pastoral land use is often invisible in mapped data. In arid and semi-arid regions, say that grazing use can't be ruled out.
 
 ### PS6: Biodiversity
-Concepts: protected area, wetland, river, forest/woodland, (later) Key Biodiversity Areas.
-- **High, triggered:** the footprint overlaps a protected area, or a dam or reservoir on a river.
-- **Medium, triggered:** a protected area within 5 km, a wetland or significant river within 1 km, or a wind farm (bird and bat collision risk always needs assessing).
+Concepts: protected area, Key Biodiversity Area (KBA), wetland, river, forest/woodland.
+- **High, triggered:** the footprint overlaps a protected area or a KBA, or a dam or reservoir on a river.
+- **Medium, triggered:** a protected area or KBA within 5 km, a wetland or significant river within 1 km, or a wind farm (bird and bat collision risk always needs assessing).
 - **Low, not triggered:** nothing above, and the site is in modified habitat (farmland, industrial, urban).
-- Wider area (5–20 km): list protected areas by name and distance anyway, as IBAT reports do.
+- Wider area (5–20 km): list protected areas and KBAs by name and distance anyway, as IBAT reports do.
+- KBAs matter because many aren't legally protected, and they're the usual starting point for IFC's critical habitat test. If no KBA source was checked, say so in the gaps; a low PS6 rating without a KBA check is weak.
 
 ### PS7: Indigenous Peoples
 Concepts: Indigenous and community lands (OSM `boundary=aboriginal_lands` now; LandMark later).
