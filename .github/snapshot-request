@@ -1,2 +1,2 @@
---all
-# run 5: catalogue 0.4 (roads, borders) plus GBIF and Wikidata
+--sources=osm
+# run 6: OSM sites still below catalogue 0.4
