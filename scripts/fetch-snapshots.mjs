@@ -21,11 +21,11 @@ for (const s of sites) {
   const r = FOOTPRINT_KM[s.asset_type];
   const q = buildOverpassQuery(catalogue, s.lon, s.lat, r);
   let ok = false;
-  for (let attempt = 0; attempt < 2 && !ok; attempt++) {
+  for (let attempt = 0; attempt < 1 && !ok; attempt++) {
     for (const ep of OVERPASS_ENDPOINTS) {
       const t0 = Date.now();
       try {
-        const osm = await fetchOverpass(q, ep, fetch, 150000, UA);
+        const osm = await fetchOverpass(q, ep, fetch, 90000, UA);
         const out = { site_id: s.id, name: s.name, lon: s.lon, lat: s.lat, asset_type: s.asset_type, footprint_km: r,
           catalogue_version: catalogue.version, fetched: new Date().toISOString(), endpoint: ep,
           licence: "ODbL 1.0, © OpenStreetMap contributors", query: q, osm };
@@ -38,7 +38,7 @@ for (const s of sites) {
         await sleep(5000);
       }
     }
-    if (!ok) await sleep(30000);
+    if (!ok) await sleep(10000);
   }
   await sleep(4000); // be polite to a shared public service
 }

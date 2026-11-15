@@ -1,0 +1,13 @@
+{
+ "label": "rules only (no AI)",
+ "results": [
+  {
+   "project_number": "41172",
+   "ps5": true,
+   "ps6": true,
+   "ps7": false,
+   "ps8": false,
+   "category": "A"
+  }
+ ]
+}
