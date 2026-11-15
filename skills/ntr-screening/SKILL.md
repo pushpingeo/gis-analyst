@@ -1,5 +1,6 @@
 ---
 name: ntr-screening
+version: 2
 description: Screen a project site for non-technical risk (NTR) using spatial evidence, framed in IFC Performance Standard terms. Use when asked whether a site raises land, biodiversity, Indigenous Peoples, heritage or community issues, or what IFC category it would likely get.
 ---
 
@@ -77,8 +78,9 @@ Concepts: protected area, World Heritage site (natural or mixed), Ramsar wetland
 Concepts: Indigenous and community lands (OSM `boundary=aboriginal_lands` now; LandMark later).
 - **High, triggered:** the footprint overlaps mapped Indigenous or community land.
 - **Medium, triggered:** mapped Indigenous land within 5 km.
-- **Not assessed:** no mapped land nearby. **Never** report this as "no Indigenous Peoples": coverage is patchy and absence of data is not evidence of absence. Say which data was checked.
-- Context worth noting: pastoralist groups, hill-tribe areas, the Amazon and Andes, and Southeast Asian forest areas often have IP considerations even when nothing is mapped.
+- **Medium, triggered, pending confirmation:** nothing mapped, but a strong regional signal that Indigenous Peoples live in or use the area. Strong signals: highland and hill-tribe areas of South and Southeast Asia (for example the Himalayan middle hills, Myanmar and Laos uplands); forest peoples of central Africa and the Amazon; Andean highlands; pastoralist drylands of East Africa and the Sahel; Arctic and boreal regions; and any group the desk research names as Indigenous. Say which signal you used and label it *regional knowledge, not mapped data*.
+- **Not assessed:** nothing mapped and no strong regional signal. **Never** report this as "no Indigenous Peoples": coverage is patchy and absence of data is not evidence of absence. Say which data was checked.
+- Urban, industrial and long-settled farmland sites rarely trigger PS7 on regional signal alone.
 
 ### PS8: Cultural heritage
 Concepts: World Heritage site (cultural or mixed), heritage site, historic feature, place of worship, cemetery. World Heritage sites come from OpenStreetMap tags, which are often points rather than boundaries, so treat the distance to a large site as approximate.
