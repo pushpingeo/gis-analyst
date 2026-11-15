@@ -1,2 +1,2 @@
-# Edit and push this file to (re)fetch snapshots. One line of arguments, e.g. --only=41172,45837 or --force
---all # run 3: the sites still missing
+--all
+# run 4: GBIF and Wikidata for every site; OSM refreshed for catalogue 0.3

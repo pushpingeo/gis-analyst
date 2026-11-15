@@ -59,7 +59,8 @@ for (const s of sites) {
   if (!sources.includes("osm")) break;
   if (only && !only.includes(s.id)) continue;
   const file = `data/osm/${s.id}.json`;
-  if (existsSync(file) && !force) { console.log(`skip ${s.id} (exists)`); continue; }
+  // Re-fetch when the catalogue has changed since the snapshot was taken, so a timed-out run can simply be rerun.
+  if (existsSync(file) && !force && JSON.parse(readFileSync(file)).catalogue_version === catalogue.version) { console.log(`skip ${s.id} (current)`); continue; }
   const r = FOOTPRINT_KM[s.asset_type];
   const q = buildOverpassQuery(catalogue, s.lon, s.lat, r);
   let ok = false;
