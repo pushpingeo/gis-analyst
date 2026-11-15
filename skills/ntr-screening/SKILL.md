@@ -109,6 +109,12 @@ IFC's category describes the project's own environmental and social impacts. Two
 ### Country risk
 Political stability, governance, conflict and financial exposure (for example a weak or volatile currency, or debt distress). These shape how likely it is that local issues escalate and how costly delays become. Give the country's position on each with its source and date. If the catalogue has no source, record a data gap; don't rate a country from general knowledge.
 
+### Site context: access, borders, night lights, terrain
+- **Access.** Distance to the nearest main road. A remote site needs a new access road, which takes land (PS5) and opens up forest and wildlife to logging, hunting and settlement. IFC calls this induced access, and it's a common route to PS6 impacts. Flag it when there's no main road within 10 km.
+- **Borders.** Distance to the nearest international or disputed boundary, including maritime boundaries. Near a contested border, security (PS4) and political risk rise.
+- **Night lights** (later). Satellite night-time light shows how dark the area is now. A new lit facility in a dark area affects nocturnal species, migrating birds and nesting turtles (PS6) and neighbours (PS4). Dark settlements also usually mean no grid power, which tells you about poverty and what communities will expect.
+- **Terrain** (later). Slope and elevation from a free global elevation model. Steep, remote ground means longer roads, more earthworks and more erosion.
+
 ### Who lives around the site
 Not just whether people live nearby, but who. Look for contrasts and vulnerable groups: informal settlements or townships next to wealthy farms or estates, migrant camps, pastoralists, a single dominant employer. Sharp contrasts in wealth or land holding near a site are a common source of conflict over jobs, compensation and benefits. Report what the data shows (population, settlement type, any wealth or deprivation measure) and what it can't show.
 
