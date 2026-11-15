@@ -1,2 +1,2 @@
 --label=v2-dev --arms=off,on --repeats=2 --sites=dev --concurrency=4
-# skill v2 (flag list) on the 25 development sites
+# skill v2 on the development sites: retry the runs that failed for lack of credit
