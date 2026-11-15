@@ -10,6 +10,17 @@
     "on",
     "web"
    ]
+  },
+  {
+   "label": "v1",
+   "created": "2026-11-15T21:16:24.422Z",
+   "skill_sha": "c1d81420c9ca",
+   "arms": [
+    "rules",
+    "off",
+    "on",
+    "web"
+   ]
   }
  ]
 }
