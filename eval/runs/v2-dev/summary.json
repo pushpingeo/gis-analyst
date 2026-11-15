@@ -1,7 +1,7 @@
 {
  "label": "v2-dev",
  "site_set": "dev",
- "created": "2026-11-15T22:14:01.013Z",
+ "created": "2026-11-15T22:22:24.749Z",
  "model": "claude-haiku-5-5",
  "skill_sha": "fbfa685ccb29",
  "catalogue_version": "0.4",
@@ -168,9 +168,9 @@
   }
  },
  "usage_this_run": {
-  "requests": 254,
-  "input_tokens": 1418222,
-  "output_tokens": 364835,
+  "requests": 32,
+  "input_tokens": 0,
+  "output_tokens": 0,
   "web_searches": 0
  },
  "per_site": [
@@ -1350,12 +1350,12 @@
      {
       "result": null,
       "leak": false,
-      "repeat": 2
+      "repeat": 1
      },
      {
       "result": null,
       "leak": false,
-      "repeat": 1
+      "repeat": 2
      }
     ]
    }
@@ -1403,12 +1403,12 @@
      {
       "result": null,
       "leak": false,
-      "repeat": 2
+      "repeat": 1
      },
      {
       "result": null,
       "leak": false,
-      "repeat": 1
+      "repeat": 2
      }
     ]
    }
