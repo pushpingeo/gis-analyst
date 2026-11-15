@@ -1,0 +1,47 @@
+fail 35175 overpass-api.de: Overpass 406: <html>
+<head><title>406 Not Acceptable</title></head>
+<body>
+<center><h1>406 Not Acceptable</h1></cente
+fail 35175 overpass.kumi.systems: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
+fail 35175 overpass.private.coffee: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
+fail 35175 overpass-api.de: Overpass 406: <html>
+<head><title>406 Not Acceptable</title></head>
+<body>
+<center><h1>406 Not Acceptable</h1></cente
+fail 35175 overpass.kumi.systems: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
+fail 35175 overpass.private.coffee: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
+fail 41172 overpass-api.de: Overpass 406: <html>
+<head><title>406 Not Acceptable</title></head>
+<body>
+<center><h1>406 Not Acceptable</h1></cente
+fail 41172 overpass.kumi.systems: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
+fail 41172 overpass.private.coffee: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
+fail 41172 overpass-api.de: Overpass 406: <html>
+<head><title>406 Not Acceptable</title></head>
+<body>
+<center><h1>406 Not Acceptable</h1></cente
+fail 41172 overpass.kumi.systems: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
+ok   41172 Kinguele Aval Hydro: 21 elements, 88.1 s, overpass.private.coffee
+fail 45837 overpass-api.de: Overpass 406: <html>
+<head><title>406 Not Acceptable</title></head>
+<body>
+<center><h1>406 Not Acceptable</h1></cente
+fail 45837 overpass.kumi.systems: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
+fail 45837 overpass.private.coffee: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
+fail 45837 overpass-api.de: Overpass 406: <html>
+<head><title>406 Not Acceptable</title></head>
+<body>
+<center><h1>406 Not Acceptable</h1></cente
+fail 45837 overpass.kumi.systems: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
+fail 45837 overpass.private.coffee: Overpass 429: Please include a meaningful User-Agent string with your requests to avoid rate-limiting.
+
