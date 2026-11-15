@@ -4,123 +4,45 @@ This Overpass API server is currently at capacity. All query workers are busy
 and t
 fail 46824 overpass.kumi.systems: timed out after 90 s
 fail 46824 overpass.private.coffee: timed out after 90 s
-fail 34203 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
-fail 34203 overpass.kumi.systems: timed out after 90 s
-fail 34203 overpass.private.coffee: timed out after 90 s
-ok   24374 Guinea Alumina Corporation: 71 elements, 52.5 s, overpass-api.de
-ok   41009 Tasiast Mauritania: 6 elements, 44.1 s, overpass-api.de
+ok   34203 CBG Expansion: 214 elements, 52.3 s, overpass-api.de
 fail 33841 overpass-api.de: Overpass 502: # 502 Gateway Timeout
 
 This Overpass API server is currently at capacity. All query workers are busy
 and t
 fail 33841 overpass.kumi.systems: timed out after 90 s
 fail 33841 overpass.private.coffee: timed out after 90 s
-ok   37673 Nachtigal: 114 elements, 47.8 s, overpass-api.de
-fail 35701 overpass-api.de: Overpass 504: <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-    "http:
+fail 35701 overpass-api.de: Overpass 502: # 502 Gateway Timeout
+
+This Overpass API server is currently at capacity. All query workers are busy
+and t
 fail 35701 overpass.kumi.systems: timed out after 90 s
 fail 35701 overpass.private.coffee: timed out after 90 s
-fail 36313 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
-fail 36313 overpass.kumi.systems: timed out after 90 s
-fail 36313 overpass.private.coffee: timed out after 90 s
-ok   31627 Tafila Wind: 122 elements, 49.6 s, overpass-api.de
-ok   34405 Luz del Norte: 19 elements, 58.9 s, overpass-api.de
-fail 29007 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
-fail 29007 overpass.kumi.systems: timed out after 90 s
-fail 29007 overpass.private.coffee: timed out after 90 s
-ok   34228 Aurora Gold: 13 elements, 53.3 s, overpass-api.de
-fail 49112 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
-fail 49112 overpass.kumi.systems: timed out after 90 s
-fail 49112 overpass.private.coffee: timed out after 90 s
-ok   40101 Sierra Rutile 2: 282 elements, 53.6 s, overpass-api.de
-ok   34785 New Liberty Gold: 311 elements, 57.7 s, overpass-api.de
+ok   36313 Kipoi Copper: 15 elements, 43.1 s, overpass-api.de
+ok   29007 Oyu Tolgoi: 27 elements, 50.6 s, overpass-api.de
+ok   49112 Rincon Lithium: 12 elements, 45.6 s, overpass-api.de
 fail 36754 overpass-api.de: Overpass 502: # 502 Gateway Timeout
 
 This Overpass API server is currently at capacity. All query workers are busy
 and t
 fail 36754 overpass.kumi.systems: timed out after 90 s
 fail 36754 overpass.private.coffee: timed out after 90 s
-ok   36008 Karot Hydro: 155 elements, 55.3 s, overpass-api.de
-fail 31383 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
-fail 31383 overpass.kumi.systems: timed out after 90 s
-fail 31383 overpass.private.coffee: timed out after 90 s
-ok   42750 Kampong Solar: 30 elements, 50.1 s, overpass-api.de
-ok   34079 Rudine WPP: 795 elements, 44.6 s, overpass-api.de
-ok   39102 Bujagali 2 (Refi): 1754 elements, 45.6 s, overpass-api.de
-ok   32874 Gulpur Hydro: 120 elements, 56.3 s, overpass-api.de
-ok   36627 Myingyan: 400 elements, 48.8 s, overpass-api.de
-fail 32859 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
-fail 32859 overpass.kumi.systems: timed out after 90 s
-fail 32859 overpass.private.coffee: timed out after 90 s
-fail 43099 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
+ok   31383 Reventazon HPP: 472 elements, 55.0 s, overpass-api.de
+ok   32859 Azura Edo IPP: 154 elements, 41.9 s, overpass-api.de
+fail 43099 overpass-api.de: Overpass 504: <?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http:
 fail 43099 overpass.kumi.systems: timed out after 90 s
 fail 43099 overpass.private.coffee: timed out after 90 s
-ok   34588 Acajutla LNG: 359 elements, 52.4 s, overpass-api.de
-ok   45668 Sal de Vida: 2 elements, 49.7 s, overpass-api.de
-ok   39358 CP Achiras: 65 elements, 59.2 s, overpass-api.de
-ok   35175 Cap des Biches: 660 elements, 63.7 s, overpass-api.de
-ok   38207 ACWA Power Zarqa: 349 elements, 50.9 s, overpass-api.de
 fail 41172 overpass-api.de: Overpass 502: # 502 Gateway Timeout
 
 This Overpass API server is currently at capacity. All query workers are busy
 and t
 fail 41172 overpass.kumi.systems: timed out after 90 s
 fail 41172 overpass.private.coffee: timed out after 90 s
-ok   33435 Adjaristsqali (Shuakhevi): 574 elements, 50.4 s, overpass-api.de
-ok   39879 Riau IPP: 506 elements, 46.2 s, overpass-api.de
-ok   36787 Mocuba Solar: 53 elements, 58.1 s, overpass-api.de
-fail 50309 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
-fail 50309 overpass.kumi.systems: timed out after 90 s
-fail 50309 overpass.private.coffee: timed out after 90 s
-ok   35349 Daehan Wind: 119 elements, 58.1 s, overpass-api.de
-ok   37808 Tobene IPP Phase 2: 266 elements, 52.1 s, overpass-api.de
-fail 34603 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
-fail 34603 overpass.kumi.systems: timed out after 90 s
-fail 34603 overpass.private.coffee: timed out after 90 s
-fail 49251 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
-fail 49251 overpass.kumi.systems: timed out after 90 s
-fail 49251 overpass.private.coffee: timed out after 90 s
-ok   45837 Amunet Wind IPP: 44 elements, 52.6 s, overpass-api.de
-ok   35413 Mazar IPP: 104 elements, 51.2 s, overpass-api.de
-ok   36877 FRV Solar Jordan: 152 elements, 48.9 s, overpass-api.de
-ok   35479 Jordan Solar One: 96 elements, 50.3 s, overpass-api.de
-fail 44816 overpass-api.de: Overpass 502: # 502 Gateway Timeout
-
-This Overpass API server is currently at capacity. All query workers are busy
-and t
-fail 44816 overpass.kumi.systems: timed out after 90 s
-fail 44816 overpass.private.coffee: timed out after 90 s
+ok   50309 Abydos Solar II: 44 elements, 42.2 s, overpass-api.de
+ok   34603 Elengy Terminal: 220 elements, 46.8 s, overpass-api.de
+ok   49251 Aysha I Wind: 15 elements, 42.0 s, overpass-api.de
+ok   44816 EGP India - Thar: 67 elements, 47.4 s, overpass-api.de
 fail 48399 overpass-api.de: Overpass 502: # 502 Gateway Timeout
 
 This Overpass API server is currently at capacity. All query workers are busy
