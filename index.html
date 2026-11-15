@@ -78,9 +78,19 @@ const sites = evalSites.sites;
 $("site").innerHTML = sites.map((s, i) => `<option value="${i}">${s.name} (${s.country})</option>`).join("");
 $("asset").innerHTML = Object.keys(FOOTPRINT_KM).map((a) => `<option>${a}</option>`).join("");
 
-const map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/positron", center: [0, 20], zoom: 2 });
-map.addControl(new maplibregl.NavigationControl(), "top-right");
-const mapReady = new Promise((r) => map.on("load", r));
+window.addEventListener("error", (e) => { $("status").textContent = "Error: " + e.message; });
+window.addEventListener("unhandledrejection", (e) => { $("status").textContent = "Error: " + (e.reason && e.reason.message || e.reason); });
+
+// The tools must work even if the map can't draw (no WebGL, background tab).
+let map = null;
+let mapReady = Promise.resolve(false);
+try {
+  map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/positron", center: [0, 20], zoom: 2 });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  mapReady = new Promise((r) => { map.on("load", () => r(true)); map.on("error", () => {}); });
+} catch (e) {
+  $("map").innerHTML = `<p style="padding:16px;color:#5b6575">Map unavailable here (${e.message}). The tools still run.</p>`;
+}
 
 function pickSite() {
   const s = sites[+$("site").value];
@@ -95,7 +105,7 @@ $("site").onchange = pickSite;
 $("asset").onchange = () => { $("radius").value = FOOTPRINT_KM[$("asset").value]; };
 
 async function drawSite(s, r) {
-  await mapReady;
+  if (!map || !(await mapReady)) return;
   const foot = r > 0 ? turf.circle([s.lon, s.lat], r, { units: "kilometers" }) : turf.point([s.lon, s.lat]);
   const ring20 = turf.circle([s.lon, s.lat], r + 20, { units: "kilometers" });
   setSource("site", turf.featureCollection([foot, turf.point([s.lon, s.lat])]));
@@ -105,6 +115,7 @@ async function drawSite(s, r) {
 }
 
 function setSource(id, data) {
+  if (!map || !map.isStyleLoaded()) return;
   if (map.getSource(id)) { map.getSource(id).setData(data); return; }
   map.addSource(id, { type: "geojson", data });
   if (id === "ring") map.addLayer({ id, source: id, type: "line", paint: { "line-color": "#64748b", "line-dasharray": [2, 2] } });
@@ -145,7 +156,7 @@ $("run").onclick = async () => {
   window.lastResult = { site: s, footprint_km: r, summary, result };
   $("json").textContent = JSON.stringify(summary, null, 1);
   renderTable(summary);
-  drawOsm(osm);
+  if (map) mapReady.then((ok) => ok && drawOsm(osm));
 };
 
 function renderTable(summary) {
