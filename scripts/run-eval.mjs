@@ -20,13 +20,16 @@ const onlySites = arg("sites", "all");
 const MODEL = arg("model", "claude-haiku-5-5");
 const MAX_TOKENS = 8000; // same cap as the public Worker
 
+const readJson = (f) => (existsSync(f) ? JSON.parse(readFileSync(f)) : null);
 const catalogue = JSON.parse(readFileSync("catalogue/catalogue.json"));
 const skillText = readFileSync("skills/ntr-screening/SKILL.md", "utf8");
 const skillSha = createHash("sha256").update(skillText).digest("hex").slice(0, 12);
 let { sites } = JSON.parse(readFileSync("data/eval-sites.json"));
-if (onlySites !== "all") sites = sites.filter((s) => onlySites.split(",").includes(s.id));
+// --sites=dev or --sites=test use the fixed split in data/eval-split.json; otherwise a list of ids or "all".
+const split = readJson("data/eval-split.json");
+const wanted = onlySites === "all" ? null : split?.[onlySites] || onlySites.split(",");
+if (wanted) sites = sites.filter((s) => wanted.includes(s.id));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const readJson = (f) => (existsSync(f) ? JSON.parse(readFileSync(f)) : null);
 
 // ---- Claude API with retries ----------------------------------------------------
 const usageTotal = { requests: 0, input_tokens: 0, output_tokens: 0, web_searches: 0 };
@@ -142,7 +145,7 @@ await Promise.all(Array.from({ length: concurrency }, async () => {
 }));
 
 const shas = [...new Set(records.filter((x) => x.skill_sha).map((x) => x.skill_sha))];
-const summary = { label, created: new Date().toISOString(), model: MODEL, skill_sha: shas.join(", ") || skillSha, catalogue_version: catalogue.version,
+const summary = { label, site_set: onlySites, created: new Date().toISOString(), model: MODEL, skill_sha: shas.join(", ") || skillSha, catalogue_version: catalogue.version,
   sites: usable.length, repeats, arms: {}, usage_this_run: usageTotal };
 for (const arm of arms) {
   const recs = records.filter((x) => x.arm === arm);
