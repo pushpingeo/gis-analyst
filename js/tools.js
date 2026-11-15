@@ -44,12 +44,28 @@ ${lines.join("\n")}
 out geom(${bbox});`;
 }
 
-export async function fetchOverpass(query, endpoint = "https://overpass-api.de/api/interpreter", fetchFn = fetch) {
-  const res = await fetchFn(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: "data=" + encodeURIComponent(query),
-  });
+export const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
+
+export async function fetchOverpass(query, endpoint = OVERPASS_ENDPOINTS[0], fetchFn = fetch, timeoutMs = 100000) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetchFn(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "data=" + encodeURIComponent(query),
+      signal: ctl.signal,
+    });
+  } catch (e) {
+    throw new Error(e.name === "AbortError" ? `timed out after ${timeoutMs / 1000} s` : e.message);
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(`Overpass ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return res.json();
 }

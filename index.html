@@ -52,6 +52,7 @@
         <label>Asset type <select id="asset"></select></label>
         <label>Footprint km <input id="radius" type="number" step="0.5" min="0"></label>
       </div>
+      <label style="font-size:13px"><input type="checkbox" id="useSnap" checked> Use the saved snapshot if there is one (repeatable); otherwise query Overpass live</label>
       <button id="run">Run tools</button>
       <div class="status" id="status"></div>
     </div>
@@ -62,12 +63,11 @@
   </aside>
 </main>
 <script type="module">
-import { buildOverpassQuery, fetchOverpass, screen, summarise, FOOTPRINT_KM } from "./js/tools.js";
+import { buildOverpassQuery, fetchOverpass, screen, summarise, FOOTPRINT_KM, OVERPASS_ENDPOINTS } from "./js/tools.js";
 import * as turf from "@turf/turf";
 import osmtogeojson from "osmtogeojson";
 
 const COLOURS = { PS5: "#c2410c", PS6: "#15803d", PS7: "#7c3aed", PS8: "#b45309", PS4: "#475569" };
-const ENDPOINTS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
 const $ = (id) => document.getElementById(id);
 
 const [catalogue, evalSites] = await Promise.all([
@@ -139,7 +139,17 @@ $("run").onclick = async () => {
   const q = buildOverpassQuery(catalogue, s.lon, s.lat, r);
   $("query").textContent = q;
   let osm, lastErr; const errors = [];
-  for (const ep of ENDPOINTS) {
+  if ($("useSnap").checked && r === FOOTPRINT_KM[s.asset_type]) {
+    try {
+      const snap = await fetch(`data/osm/${s.id}.json`).then((x) => (x.ok ? x.json() : null));
+      if (snap) {
+        osm = snap.osm;
+        $("query").textContent = snap.query;
+        $("status").textContent = `${osm.elements.length} OSM elements from the snapshot saved ${snap.fetched.slice(0, 10)} (${new URL(snap.endpoint).host}).`;
+      }
+    } catch (e) { /* fall through to live */ }
+  }
+  for (const ep of osm ? [] : OVERPASS_ENDPOINTS) {
     try {
       $("status").textContent = `Querying ${new URL(ep).host}…`;
       const t0 = performance.now();
