@@ -1,6 +1,6 @@
 // The NTR agent loop. No DOM in here, so the same code runs in the page and in the evaluation script.
 // The model only sees the site's coordinates, country and asset type, never the project name.
-import { screen, summarise, summariseGbif, summariseWikidata, tagFilter } from "./tools.js";
+import { screen, summarise, summariseGbif, summariseWikidata, tagFilter } from "./tools.js?v=m2b";
 
 // Lenders' disclosure sites are blocked for web search so the agent can't read the answer.
 export const BLOCKED_DOMAINS = [

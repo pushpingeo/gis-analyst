@@ -1,5 +1,5 @@
 // Calls Claude through the Worker, or directly with a visitor's own key (kept for this tab only).
-import { CONFIG } from "./config.js";
+import { CONFIG } from "./config.js?v=m2b";
 
 const KEY_STORE = "gisanalyst.anthropicKey";
 let memKey = "";

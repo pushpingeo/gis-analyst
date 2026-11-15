@@ -87,10 +87,10 @@
   </aside>
 </main>
 <script type="module">
-import { CONFIG } from "./js/config.js";
-import { callClaude, setUserKey, getUserKey, LimitReached } from "./js/claude.js";
-import { runAgent, prepareData } from "./js/agent.js";
-import { FOOTPRINT_KM, buildOverpassQuery, fetchOverpass, OVERPASS_ENDPOINTS, gbifUrl, slimGbif, wikidataUrl } from "./js/tools.js";
+import { CONFIG } from "./js/config.js?v=m2b";
+import { callClaude, setUserKey, getUserKey, LimitReached } from "./js/claude.js?v=m2b";
+import { runAgent, prepareData } from "./js/agent.js?v=m2b";
+import { FOOTPRINT_KM, buildOverpassQuery, fetchOverpass, OVERPASS_ENDPOINTS, gbifUrl, slimGbif, wikidataUrl } from "./js/tools.js?v=m2b";
 import * as turf from "@turf/turf";
 
 const $ = (id) => document.getElementById(id);
