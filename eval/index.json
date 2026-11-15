@@ -31,15 +31,6 @@
     "off",
     "on"
    ]
-  },
-  {
-   "label": "v2-dev",
-   "created": "2026-11-15T22:14:01.013Z",
-   "skill_sha": "fbfa685ccb29",
-   "arms": [
-    "off",
-    "on"
-   ]
   }
  ]
 }

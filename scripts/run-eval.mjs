@@ -72,7 +72,7 @@ function slimEvents(events) {
 
 async function runOne(s, arm, rep) {
   const out = `eval/runs/${fromLabel}/${arm}/r${rep}/${s.id}.json`;
-  if (existsSync(out)) { // resumable; --reparse re-reads saved answers with the current parser (no API calls)
+  if (existsSync(out) && !(readJson(out).error && fromLabel === label && !process.argv.includes("--reparse"))) { // resumable; failed API calls are retried; --reparse re-reads saved answers with the current parser (no API calls)
     const rec = readJson(out);
     if (process.argv.includes("--reparse") && rec.text) { rec.result = parseResult(rec.text); writeFileSync(out, JSON.stringify(rec)); }
     return rec;
