@@ -11,7 +11,7 @@ export const FOOTPRINT_KM = {
 // ---- Overpass -------------------------------------------------------------
 
 // A match value of "*" means any value; "~text" is a case-insensitive regular expression.
-function tagFilter([k, v]) {
+export function tagFilter([k, v]) {
   if (v === "*") return `["${k}"]`;
   if (v.startsWith("~")) return `["${k}"~"${v.slice(1)}",i]`;
   return `["${k}"="${v}"]`;

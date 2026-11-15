@@ -1,6 +1,6 @@
 // The NTR agent loop. No DOM in here, so the same code runs in the page and in the evaluation script.
 // The model only sees the site's coordinates, country and asset type, never the project name.
-import { screen, summarise, summariseGbif, summariseWikidata } from "./tools.js";
+import { screen, summarise, summariseGbif, summariseWikidata, tagFilter } from "./tools.js";
 
 // Lenders' disclosure sites are blocked for web search so the agent can't read the answer.
 export const BLOCKED_DOMAINS = [
@@ -68,8 +68,16 @@ export function toolDefs({ deskResearch }) {
 }
 
 // Prepare the data the tools answer from (from saved snapshots or live responses).
-export function prepareData({ catalogue, site, footprintKm, osm, gbif, wikidata }) {
+// osmQuery: the Overpass query a saved snapshot was made with. Concepts it didn't ask for are marked
+// "not checked" so an older snapshot can't be read as "nothing there".
+export function prepareData({ catalogue, site, footprintKm, osm, gbif, wikidata, osmQuery }) {
   const osmSummary = osm ? summarise(screen(osm, catalogue, site.lon, site.lat, footprintKm), 5) : null;
+  if (osmSummary && osmQuery) {
+    for (const [id, c] of Object.entries(catalogue.concepts)) {
+      if (c.source !== "osm-overpass" || !osmSummary[id]) continue;
+      if (!c.match.some((m) => osmQuery.includes(tagFilter(m)))) osmSummary[id] = { label: c.label, ps: c.ps, not_checked: "This concept wasn't in the saved data for this site. Treat it as a data gap, not as absence." };
+    }
+  }
   const species = gbif ? summariseGbif(gbif.near, gbif.wide, site.lon, site.lat, footprintKm) : null;
   const places = wikidata ? summariseWikidata(wikidata, footprintKm) : null;
   return { catalogue, osmSummary, species, places };

@@ -100,8 +100,11 @@ window.addEventListener("unhandledrejection", (e) => { $("status").textContent =
 const [catalogue, evalSites, skillText] = await Promise.all([
   fetch("catalogue/catalogue.json").then((r) => r.json()),
   fetch("data/eval-sites.json").then((r) => r.json()),
-  fetch("skills/ntr-screening/SKILL.md").then((r) => r.text()),
+  fetch("skills/ntr-screening/SKILL.md", { cache: "no-store" }).then((r) => r.text()),
 ]);
+// Never run "skill on" with something that isn't the skill (e.g. an error page).
+const skillOk = /^---\s*\nname: ntr-screening/.test(skillText);
+if (!skillOk) { $("skill").checked = false; $("skill").disabled = true; }
 const sites = evalSites.sites;
 $("site").innerHTML = sites.map((s, i) => `<option value="${i}">${esc(s.name)} (${esc(s.country)}), ${esc(s.asset_type)}</option>`).join("");
 if (getUserKey()) $("key").placeholder = "Your key is set for this tab";
@@ -162,7 +165,7 @@ async function siteData(s, r) {
   if (!wikidata) try { wikidata = await get(wikidataUrl(s.lon, s.lat, r + 20)); notes.push("Wikidata live"); } catch { notes.push("Wikidata unavailable"); }
   else notes.push(`Wikidata snapshot ${wdSnap.fetched.slice(0, 10)}`);
   if (osmSnap && osmSnap.catalogue_version !== catalogue.version) notes.push(`OSM snapshot is catalogue ${osmSnap.catalogue_version}; newer concepts read as none found`);
-  const d = { data: prepareData({ catalogue, site: s, footprintKm: r, osm, gbif, wikidata }), notes };
+  const d = { data: prepareData({ catalogue, site: s, footprintKm: r, osm, gbif, wikidata, osmQuery: osmSnap?.query }), notes };
   dataCache.set(s.id, d);
   return d;
 }
@@ -171,7 +174,7 @@ async function siteData(s, r) {
 
 function mdLite(text) {
   const body = text.replace(/```json[\s\S]*?```/i, "").trim();
-  const lines = esc(body).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").split("\n");
+  const lines = esc(body).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*\w])\*([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>").split("\n");
   let html = "", inList = false;
   for (const l of lines) {
     const li = l.match(/^\s*[-*•]\s+(.*)/);
@@ -220,6 +223,7 @@ function traceItem(e) {
 
 let busy = false;
 async function runOnce(skillOn) {
+  if (skillOn && !skillOk) throw new Error("The skill file didn't load, so a skill-on run isn't possible. Reload the page.");
   const s = sites[+$("site").value];
   const r = FOOTPRINT_KM[s.asset_type];
   const desk = $("desk").checked;

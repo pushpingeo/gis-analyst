@@ -67,3 +67,12 @@ assert.ok(ff.output._unknown.includes("nonsense"));
 const sp = events.find((e) => e.name === "threatened_species_records");
 assert.ok(sp.output.species.length > 0);
 console.log("Agent loop tests passed.", JSON.stringify(sent.at(-1)).length, "bytes in the last request");
+// An older snapshot without the road and border concepts must say "not checked", not "none".
+const oldSnap = JSON.parse(readFileSync(`data/osm/${site.id}.json`));
+const d2 = prepareData({ catalogue, site, footprintKm: 5, osm: oldSnap.osm, osmQuery: oldSnap.query });
+if (oldSnap.catalogue_version !== catalogue.version) {
+  assert.ok(d2.osmSummary["main-road"].not_checked);
+  assert.ok(d2.osmSummary["international-boundary"].not_checked);
+  assert.ok(!d2.osmSummary["protected-area"].not_checked);
+  console.log("Not-checked marking works on an older snapshot.");
+}
