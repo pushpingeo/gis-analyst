@@ -238,7 +238,9 @@ async function runOnce(skillOn) {
   const GENERIC = new Set(["solar", "wind", "hydro", "power", "plant", "project", "ipp", "gold", "copper", "lithium", "terminal", "expansion", "phase", "corporation", "refi", "lng", "wpp", "hpp", "the", "and", "energy"]);
   const nameWords = s.name.toLowerCase().replace(/[()]/g, " ").split(/[\s\-]+/).filter((w) => w.length > 3 && !GENERIC.has(w));
   let leak = "";
-  const checkLeak = (str) => { const t = String(str || "").toLowerCase(); const w = nameWords.find((n) => t.includes(n)); if (w && !leak) leak = w; };
+  // Match the distinctive part of the name as a phrase ("upper trishuli"), not single words: a river can share the name.
+  const phrase = nameWords.join(" ");
+  const checkLeak = (str) => { const t = String(str || "").toLowerCase().replace(/[-_]+/g, " "); if (phrase && t.includes(phrase) && !leak) leak = phrase; };
   const { data, notes } = await siteData(s, r);
   q(".state").textContent = `Data: ${notes.join(" · ")}. Thinking…`;
   const t0 = Date.now();
@@ -255,8 +257,7 @@ async function runOnce(skillOn) {
     });
     const u = out.usage;
     q(".state").textContent = `Data: ${notes.join(" · ")}. Finished in ${((Date.now() - t0) / 1000).toFixed(0)} s · ${u.input_tokens.toLocaleString()} input and ${u.output_tokens.toLocaleString()} output tokens${u.web_searches ? ` · ${u.web_searches} web searches` : ""}.`;
-    if (desk) checkLeak(out.text);
-    q(".summary").innerHTML = (leak ? `<p class="box no">Leak warning: the agent's searches or answer mention "${esc(leak)}", from the project's name. It may have found documents about this project, so this result can't count as a blind test.</p>` : "") + mdLite(out.text);
+    q(".summary").innerHTML = (leak ? `<p class="box no">Leak warning: the agent's web searches or results mention "${esc(leak)}", from the project's name. It may have found documents about this project, so this result can't count as a blind test.</p>` : "") + mdLite(out.text);
     q(".compare").innerHTML = `<p class="muted" style="margin:8px 0 0">Compared with IFC's own screening:</p>` + compareTable(out.result, s);
     q("details").open = false;
   } catch (e) {
