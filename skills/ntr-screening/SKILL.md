@@ -97,7 +97,7 @@ One part of PS1 is spatial: it expects a project to identify disadvantaged or vu
 
 ## Desk research
 Mapped data misses most of what drives community conflict: customary land and grazing, sacred sites, who lives where, past disputes. After the spatial checks, search for it.
-- **Search about the place, not the project.** Use the names the spatial checks found (villages, rivers, districts, protected areas), e.g. "[village] pastoralists", "[district] land dispute", "[river] endangered fish". The screen has to work for a site nobody has written about yet.
+- **Search about the place, not the project.** Don't try to identify which project is planned here or look up its documents. Use the names the spatial checks found (villages, rivers, districts, protected areas), e.g. "[village] pastoralists", "[district] land dispute", "[river] endangered fish". The screen has to work for a site nobody has written about yet.
 - **Good sources:** Wikidata and Wikipedia for places and peoples; national statistics; NGO and academic reports; other lenders' published impact assessments for nearby projects; local news.
 - **What to look for:** Indigenous or pastoralist groups, informal settlements, sacred or cultural sites, threatened species or habitats, past land or water disputes, protests, conflict.
 - **Cite every finding** with its URL and date, and label it *desk research* so it's never confused with mapped data. If a finding changes a theme's rating, say which finding and why.

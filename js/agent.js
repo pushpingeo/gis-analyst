@@ -9,7 +9,7 @@ export const BLOCKED_DOMAINS = [
   "equator-principles.com",
 ];
 
-const OUTPUT_SPEC = `Finish with a short summary for a person, then exactly one JSON block in a \`\`\`json fence:
+const OUTPUT_SPEC = `Finish with a summary for a person of no more than 400 words, then exactly one JSON block in a \`\`\`json fence:
 {
   "themes": [{"ps": "PS5", "rating": "high|medium|low|not_assessed", "triggered": true,
               "evidence": [{"concept": "", "name": "", "distance_km": 0, "source": ""}],
@@ -20,7 +20,8 @@ const OUTPUT_SPEC = `Finish with a short summary for a person, then exactly one 
   "context": {"country_risk": [], "social": []},
   "data_gaps": [""]
 }
-"ps5" to "ps8" mean: would IFC expect this Performance Standard to apply to the project?`;
+"ps5" to "ps8" mean: would IFC expect this Performance Standard to apply to the project?
+Screen the place, not a particular project: don't try to work out which project this is or look up documents about it.`;
 
 export function systemPrompt({ skillOn, skillText, deskResearch }) {
   const base = `You are a geospatial analyst doing a desk-based screen of a project site for environmental and social (non-technical) risk, in IFC Performance Standard terms. You can only see the site's location, country and asset type. Use the tools to look at open data around the site.${deskResearch ? " You can also search the web." : ""}
@@ -141,6 +142,7 @@ export async function runAgent({ site, footprintKm, skillOn, skillText, deskRese
   onEvent({ type: "start", system, user: history[0].content, tools: tools.map((t) => t.name) });
   const usage = { input_tokens: 0, output_tokens: 0, web_searches: 0 };
   let finalText = "";
+  let retried = false;
 
   for (let round = 0; round < maxRounds; round++) {
     const t0 = Date.now();
@@ -151,13 +153,21 @@ export async function runAgent({ site, footprintKm, skillOn, skillText, deskRese
     onEvent({ type: "response", round, ms: Date.now() - t0, stop_reason: resp.stop_reason, content: resp.content, usage: resp.usage });
     history.push({ role: "assistant", content: resp.content });
 
-    const text = resp.content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
-    if (text) finalText = text;
+    const text = resp.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    if (text) finalText = retried && parseResult(text) ? finalText + "\n" + text : text;
 
     if (resp.stop_reason === "pause_turn") continue; // server tool (web search) paused a long turn: carry on
     if (resp.stop_reason === "max_tokens") {
-      onEvent({ type: "warning", message: "The response hit the length limit before finishing." });
-      break;
+      // Out of room mid-answer: keep what it wrote and ask for the JSON on its own.
+      if (parseResult(text) || retried) {
+        onEvent({ type: "warning", message: "The response hit the length limit." });
+        break;
+      }
+      retried = true;
+      onEvent({ type: "warning", message: "The answer hit the length limit, so the agent was asked for just the JSON result." });
+      history[history.length - 1] = { role: "assistant", content: [{ type: "text", text: text || "(no text)" }] };
+      history.push({ role: "user", content: "You ran out of space. Reply with only the JSON block now, nothing else." });
+      continue;
     }
     const uses = resp.content.filter((b) => b.type === "tool_use");
     if (resp.stop_reason !== "tool_use" || !uses.length) break;

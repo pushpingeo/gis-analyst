@@ -234,17 +234,29 @@ async function runOnce(skillOn) {
     <details open><summary>Trace: what the agent did</summary><ul class="trace"></ul></details>`;
   $("runs").prepend(card);
   const q = (sel) => card.querySelector(sel);
+  // Leak check for the honesty of the test: did anything the agent read or wrote name the project?
+  const GENERIC = new Set(["solar", "wind", "hydro", "power", "plant", "project", "ipp", "gold", "copper", "lithium", "terminal", "expansion", "phase", "corporation", "refi", "lng", "wpp", "hpp", "the", "and", "energy"]);
+  const nameWords = s.name.toLowerCase().replace(/[()]/g, " ").split(/[\s\-]+/).filter((w) => w.length > 3 && !GENERIC.has(w));
+  let leak = "";
+  const checkLeak = (str) => { const t = String(str || "").toLowerCase(); const w = nameWords.find((n) => t.includes(n)); if (w && !leak) leak = w; };
   const { data, notes } = await siteData(s, r);
   q(".state").textContent = `Data: ${notes.join(" · ")}. Thinking…`;
   const t0 = Date.now();
   try {
     const out = await runAgent({
       site: s, footprintKm: r, skillOn, skillText, deskResearch: desk, data, callClaude, maxRounds: CONFIG.maxRounds,
-      onEvent: (e) => { q(".trace").insertAdjacentHTML("beforeend", traceItem(e)); },
+      onEvent: (e) => {
+        q(".trace").insertAdjacentHTML("beforeend", traceItem(e));
+        if (e.type === "response") for (const b of e.content) {
+          if (b.type === "web_search_tool_result" && Array.isArray(b.content)) b.content.forEach((r) => { checkLeak(r.title); checkLeak(r.url); });
+          if (b.type === "server_tool_use") checkLeak(b.input?.query);
+        }
+      },
     });
     const u = out.usage;
     q(".state").textContent = `Data: ${notes.join(" · ")}. Finished in ${((Date.now() - t0) / 1000).toFixed(0)} s · ${u.input_tokens.toLocaleString()} input and ${u.output_tokens.toLocaleString()} output tokens${u.web_searches ? ` · ${u.web_searches} web searches` : ""}.`;
-    q(".summary").innerHTML = mdLite(out.text);
+    if (desk) checkLeak(out.text);
+    q(".summary").innerHTML = (leak ? `<p class="box no">Leak warning: the agent's searches or answer mention "${esc(leak)}", from the project's name. It may have found documents about this project, so this result can't count as a blind test.</p>` : "") + mdLite(out.text);
     q(".compare").innerHTML = `<p class="muted" style="margin:8px 0 0">Compared with IFC's own screening:</p>` + compareTable(out.result, s);
     q("details").open = false;
   } catch (e) {

@@ -76,3 +76,17 @@ if (oldSnap.catalogue_version !== catalogue.version) {
   assert.ok(!d2.osmSummary["protected-area"].not_checked);
   console.log("Not-checked marking works on an older snapshot.");
 }
+// Out of room before the JSON: the agent is asked once for the JSON alone, and the summary is kept.
+{
+  const s2 = [
+    { stop_reason: "max_tokens", content: [{ type: "thinking", thinking: "x", signature: "s" }, { type: "text", text: "Long summary that got cut" }] },
+    { stop_reason: "end_turn", content: [{ type: "text", text: '```json\n{"ps5": false, "ps6": true, "ps7": false, "ps8": false, "category": "B"}\n```' }] },
+  ];
+  let k = 0; const reqs = [];
+  const out2 = await runAgent({ site, footprintKm: 5, skillOn: false, skillText: "", deskResearch: false, data, callClaude: async (r) => { reqs.push(r); return s2[k++]; } });
+  assert.equal(out2.result.category, "B");
+  assert.ok(out2.text.startsWith("Long summary"));
+  assert.equal(reqs[1].messages.at(-1).content, "You ran out of space. Reply with only the JSON block now, nothing else.");
+  assert.ok(!JSON.stringify(reqs[1].messages).includes("thinking"));
+  console.log("Length-limit recovery works.");
+}
