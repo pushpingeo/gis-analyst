@@ -15,7 +15,7 @@ The method is assembled from published practice rather than invented:
 
 ## Inputs
 - **Site:** a point, line or polygon. If only a point is given, also ask for or assume the asset type, because the footprint matters (see *Footprint*).
-- **Asset type:** e.g. solar, wind, hydro, thermal power, mine, pipeline, port/terminal.
+- **Asset type:** e.g. solar, wind, hydro, thermal power, mine, oil and gas facility or field, pipeline, port/terminal.
 - **Optional:** a short project description (capacity, land take, workforce).
 
 ## Footprint
@@ -27,6 +27,8 @@ Distances are measured from the footprint, not just a point. If you only have a 
 | Solar PV | 1 km |
 | Wind farm | 3 km |
 | Mine | 3 km |
+| Oil and gas processing plant, refinery | 1 km |
+| Onshore oil or gas field development (well pads, flowlines, roads) | Use the field outline if there is one; otherwise 5 km, and say the real footprint is spread out |
 | Hydropower (dam + reservoir) | 5 km, and flag that the reservoir and dewatered reach extend along the river |
 
 For linear assets (pipelines, power lines, roads), screen along the line, not just at the end points.
@@ -37,7 +39,8 @@ For linear assets (pipelines, power lines, roads), screen along the line, not ju
 3. **Measure.** For each concept, call the tools to get the features within 20 km of the footprint, each with its distance (0 = inside or overlapping) and its name where there is one.
 4. **Rate each theme** using the rules below. Quote the evidence: feature name, type, distance, source.
 5. **Categorise.** Give a likely IFC category with the themes that drove it.
-6. **State the gaps.** For each theme, say what wasn't covered and why.
+6. **Add the wider context** (see *Context beyond IFC*): country risk and who lives around the site. Report it separately; it doesn't change the IFC call.
+7. **State the gaps.** For each theme, say what wasn't covered and why.
 
 ## Distance bands
 | Band | Distance from footprint | Meaning |
@@ -86,6 +89,17 @@ Concepts: settlements, schools, hospitals and roads within 5 km; existing energy
 ### PS1–PS3
 PS1 (management systems), PS2 (labour) and PS3 (pollution and resource efficiency) apply to almost every real project. Mention them, but don't score them; spatial data says little about them.
 
+One part of PS1 is spatial: it expects a project to identify disadvantaged or vulnerable groups who may be affected differently. See *Who lives around the site* below.
+
+## Context beyond IFC (reported, not scored)
+IFC's category describes the project's own environmental and social impacts. Two things an NTR analyst also looks at sit outside it, so report them in their own section and keep them out of the category.
+
+### Country risk
+Political stability, governance, conflict and financial exposure (for example a weak or volatile currency, or debt distress). These shape how likely it is that local issues escalate and how costly delays become. Give the country's position on each with its source and date. If the catalogue has no source, record a data gap; don't rate a country from general knowledge.
+
+### Who lives around the site
+Not just whether people live nearby, but who. Look for contrasts and vulnerable groups: informal settlements or townships next to wealthy farms or estates, migrant camps, pastoralists, a single dominant employer. Sharp contrasts in wealth or land holding near a site are a common source of conflict over jobs, compensation and benefits. Report what the data shows (population, settlement type, any wealth or deprivation measure) and what it can't show.
+
 ## Likely IFC category
 - **A:** any theme rated *high*, or two or more themes triggered at *medium*, together with a large or irreversible asset (dam, mine, large thermal plant, large wind farm in a bird corridor).
 - **B:** one or more themes triggered, but impacts look limited and site-specific: small solar, expansions within an existing footprint, plants inside industrial zones.
@@ -107,6 +121,8 @@ Give a short narrative for a person, then this JSON block (the evaluation reads 
   "ps5": true, "ps6": true, "ps7": false, "ps8": false,
   "category": "A|B|C",
   "category_drivers": ["PS6: overlaps X National Park"],
+  "context": {"country_risk": [{"indicator": "", "value": "", "source": "", "date": ""}],
+              "social": [{"finding": "", "source": ""}]},
   "data_gaps": ["No mapped Indigenous lands checked beyond OSM"]
 }
 ```
