@@ -40,6 +40,17 @@
     "off",
     "on"
    ]
+  },
+  {
+   "label": "v2-test",
+   "created": "2026-11-15T22:56:43.135Z",
+   "skill_sha": "fbfa685ccb29",
+   "arms": [
+    "rules",
+    "off",
+    "on",
+    "web"
+   ]
   }
  ]
 }
