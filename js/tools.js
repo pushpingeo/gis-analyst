@@ -39,7 +39,7 @@ export function buildOverpassQuery(catalogue, lon, lat, footprintKm) {
   const dLon = maxKm / (111.32 * Math.cos((lat * Math.PI) / 180));
   const bbox = [lat - dLat, lon - dLon, lat + dLat, lon + dLon].map((x) => x.toFixed(5)).join(",");
   // Areas that contain the site come back as tags only (distance 0); everything else with clipped geometry.
-  return `[out:json][timeout:90];
+  return `[out:json][timeout:180];
 is_in(${lat},${lon})->.a;
 (
 ${contain.join("\n")}

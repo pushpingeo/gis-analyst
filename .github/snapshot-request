@@ -1,2 +1,2 @@
 --sources=osm
-# run 6: OSM sites still below catalogue 0.4
+# run 7: retry the heavy sites with a 180 s server timeout
