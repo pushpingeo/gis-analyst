@@ -18,7 +18,7 @@ const MODEL = arg("model", "claude-haiku-5-5");
 const LIMIT = +arg("sites", "0");
 const SET = arg("set", "names");
 const MAX_TOKENS = 8000;
-const UA = { "User-Agent": "gis-analyst-eval/1.0 (+https://github.com/pushpingeo/gis-analyst)" };
+const UA = { "User-Agent": "tobler-eval/1.0 (+https://github.com/pushpingeo/tobler)" };
 
 const csv = readFileSync("data/eval_set.csv", "utf8").trim().split(/\r?\n/);
 const head = csv[0].split(",");

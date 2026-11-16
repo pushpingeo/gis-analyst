@@ -14,7 +14,7 @@ for (const d of ["osm", "gbif", "wikidata"]) mkdirSync(`data/${d}`, { recursive:
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = [];
 // Overpass servers ask scripts to identify themselves.
-const UA = { "User-Agent": "gis-analyst/0.1 (+https://github.com/pushpingeo/gis-analyst; evaluation snapshots)" };
+const UA = { "User-Agent": "tobler/0.1 (+https://github.com/pushpingeo/tobler; evaluation snapshots)" };
 
 async function getJson(url) {
   const ctl = new AbortController();

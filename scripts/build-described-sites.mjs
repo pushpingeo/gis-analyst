@@ -12,7 +12,7 @@ const rows = csv.slice(1).map((l) => {
   return Object.fromEntries(head.map((h, i) => [h, cells[i]]));
 }).filter((r) => ["correct", "moved"].includes(r.location_status) && r.lat && r.lon && r.esrs_url);
 
-const UA = { "User-Agent": "gis-analyst-eval/1.0 (+https://github.com/pushpingeo/gis-analyst)" };
+const UA = { "User-Agent": "tobler-eval/1.0 (+https://github.com/pushpingeo/tobler)" };
 const CUES = /\b(located|location|situated|km|kilomet|district|province|region|county|municipalit|village|town|city|near|adjacent|north|south|east|west|river|lake|coast|valley|plateau|border|road|highway)\b/i;
 const COORDS = /(-?\d{1,3}\.\d{3,}\s*°?\s*[NSEW]?\s*,?\s*-?\d{1,3}\.\d{3,})|(\d{1,3}\s*°\s*\d{1,2}\s*['′])/;
 
