@@ -15,8 +15,10 @@ const remembered = (key, fn) => {
   return memo.get(key);
 };
 
-// Overpass: start with the server that answered last time, and give each one 15 seconds.
-// If every server fails, say so at once for the next two minutes instead of waiting 45 seconds each time.
+// Overpass: ask the server that answered last time; if it hasn't answered in 4 seconds, ask the next one too,
+// and so on (a staggered start, so a healthy server isn't asked three times). The whole search gives up after
+// 15 seconds, not 45 as when the servers were tried in turn. If every server fails, say so at once for the
+// next two minutes.
 let fastest = 0;
 let overpassDownUntil = 0;
 export class ServiceDown extends Error {}
@@ -24,11 +26,19 @@ async function overpass(q, fetchFn, headers) {
   if (Date.now() < overpassDownUntil) throw new ServiceDown("OpenStreetMap's Overpass service isn't answering right now (all three public servers failed a moment ago).");
   return remembered(`overpass:${q}`, async () => {
     let lastErr;
-    for (let k = 0; k < OVERPASS_ENDPOINTS.length; k++) {
+    const t0 = Date.now();
+    const tries = OVERPASS_ENDPOINTS.map((_, k) => (async () => {
       const i = (fastest + k) % OVERPASS_ENDPOINTS.length;
-      try { const j = await fetchOverpass(q, OVERPASS_ENDPOINTS[i], fetchFn, 15000, headers); fastest = i; overpassDownUntil = 0; return j; }
-      catch (e) { lastErr = e; }
-    }
+      if (k) await new Promise((r) => setTimeout(r, 4000 * k));
+      const left = 15000 - (Date.now() - t0);
+      if (left < 2000) throw new Error("out of time");
+      try { const j = await fetchOverpass(q, OVERPASS_ENDPOINTS[i], fetchFn, left, headers); return { j, i }; }
+      catch (e) { lastErr = e; throw e; }
+    })());
+    try {
+      const { j, i } = await Promise.any(tries);
+      fastest = i; overpassDownUntil = 0; return j;
+    } catch { /* all failed */ }
     overpassDownUntil = Date.now() + 120000;
     throw new ServiceDown(`OpenStreetMap's Overpass service isn't answering right now (all three public servers failed; last: ${lastErr?.message}).`);
   });

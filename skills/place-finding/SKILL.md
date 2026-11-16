@@ -1,6 +1,6 @@
 ---
 name: place-finding
-version: 4.2
+version: 4.3
 description: Turn words into a place on the map. Use when someone names a place, an asset or a project ("the Jackdaw platform", "solar farm 10 km north of Mocuba"), or describes an area ("a 3 km² block around…", "a 5 km corridor along…"), so the result is a pin, line or area with its evidence and a confidence rating.
 ---
 
@@ -54,7 +54,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
 - Give the shape's size and where it is in plain words; the tools return these.
 - Keep it short. The map shows the shape; the card holds the detail.
 - **Directions:** when you say where the site is relative to a town, quote the check's `reads` line rather than working out the direction yourself.
-- **Never show candidate ids** (C1, C14) to the person. They're for the tools only; use the feature's name.
+- **Name features by their names.** Candidate ids (C3) are also the labels on the map, so when you list several features you may add the id in brackets after the name to help the person find them; never use an id on its own.
 - **If a shape can't be built, say so.** Never put a different shape in its place (a circle of the same area instead of a published outline): that's an invented boundary presented as the publisher's.
 - Only offer what the tools can actually do.
 - Coordinate data you're given is WGS84. If a source states another datum (e.g. ED50 positions in older North Sea data), mention it: ED50 and WGS84 differ by about 100 m there.
