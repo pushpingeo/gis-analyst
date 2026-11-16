@@ -52,6 +52,35 @@ await test("describeChange reports moves, area and vertices", () => {
   assert.match(G.describeChange(sq, five), /1 vertex added/);
 });
 
+await test("local projection round-trips", () => {
+  for (const [c, p] of [[[1.97, 57], [2.5, 57.3]], [[-70, -30], [-60, -25]], [[179.5, 10], [-179.5, 10.5]]]) {
+    const back = G.fromLocal(G.toLocal(p, c), c);
+    near(turf.distance(back, p), 0, 1e-6, "km");
+    near(Math.hypot(...G.toLocal(p, c)), turf.distance(c, p), 0.001, "distance from centre");
+  }
+});
+
+await test("a big square keeps its size and shape when rotated", () => {
+  const sq = G.squareAround([10, 60], 400 * 400);
+  near(turf.area(sq) / 1e6, 160000, 1600, "area within 1%");
+  const r = G.rotate(sq, 45);
+  near(turf.area(r) / 1e6, turf.area(sq) / 1e6, 1600, "rotated area within 1%");
+  const [a, b, c] = r.geometry.coordinates[0];
+  near(turf.distance(a, b), turf.distance(b, c), 2, "sides still equal (km)");
+});
+
+await test("resizeTo is exact on a regional shape", () => {
+  const sq = G.squareAround([20, 65], 250000);
+  near(turf.area(G.resizeTo(sq, 100000)) / 1e6, 100000, 50, "km²");
+});
+
+await test("rectangleAround", () => {
+  const r = G.rectangleAround([0, 51.5], 4, 1, 90);
+  near(turf.area(r) / 1e6, 4, 0.01, "area");
+  const [w, s, e, n] = turf.bbox(r);
+  assert.ok(turf.distance([w, 51.5], [e, 51.5]) < 1.2, "rotated 90°, now narrow east–west");
+});
+
 // ---- reference ----
 await test("country lookup: on land, offshore", async () => {
   const countries = await ref.get("countries");

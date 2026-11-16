@@ -1,0 +1,242 @@
+// Tools the conversation agent uses to find places and build areas from words.
+// The model works with ids (C3 for a found candidate, "Area 1" for a place); geometry stays here.
+// A host object supplies the project's places and reference data, so the same code runs in the page and in the evaluation.
+import * as turf from "./vendor/turf.js";
+import * as G from "./geometry.js";
+import * as R from "./reference.js";
+import { searchAnchors, searchNominatim, searchNaturalEarth, findFeaturesNear, FEATURE_TYPES } from "./gazetteer.js";
+
+const round = (v, d = 3) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
+
+export function placeToolDefs(skills) {
+  return [
+    {
+      name: "load_skill",
+      description: `Load a skill: a written method for a kind of GIS work. Load it before doing that work and follow it. Available: ${skills.map((s) => `${s.name} (${s.description})`).join("; ")}`,
+      input_schema: { type: "object", properties: { name: { type: "string", enum: skills.map((s) => s.name) } }, required: ["name"] },
+    },
+    {
+      name: "find_place",
+      description: "Search for a named place, asset or feature: authoritative named-feature layers from the atlas (e.g. NSTA offshore installations, fields and licensing blocks on the UK Continental Shelf), OpenStreetMap (Nominatim) and Natural Earth towns. Returns candidates with ids (C1, C2…), type, source, position and size. Give a block reference like 30/2 to find a UK licensing block.",
+      input_schema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The name to search for, e.g. 'Jackdaw', 'Mocuba', '30/2', 'Lake Turkana'" },
+          near: { type: "string", description: "Optional: a candidate id or place name to search near" },
+          country: { type: "string", description: "Optional ISO 3166 two-letter country code to restrict OpenStreetMap results" },
+        },
+        required: ["query"],
+      },
+    },
+    {
+      name: "find_features_near",
+      description: `Find OpenStreetMap features of a type within a radius of an anchor, with distance and bearing from it, largest first. Use to find the asset itself once a town or feature anchors the search. Types: ${Object.keys(FEATURE_TYPES).join(", ")}.`,
+      input_schema: {
+        type: "object",
+        properties: {
+          anchor: { type: "string", description: "Candidate id (e.g. C2) or place name (e.g. Area 1)" },
+          feature_type: { type: "string", enum: Object.keys(FEATURE_TYPES) },
+          radius_km: { type: "number", description: "Search radius, 0.5 to 50 km" },
+          name: { type: "string", description: "Optional: part of the feature's name" },
+        },
+        required: ["anchor", "feature_type", "radius_km"],
+      },
+    },
+    {
+      name: "make_place",
+      description: "Build a place on the map from an anchor, with a deterministic geometry tool. Shapes: point; square (area_km2 or side_km); circle (radius_km or area_km2); rectangle (width_km, height_km); feature (the anchor's own outline, e.g. a field or block); buffer (buffer_km around the anchor's geometry, e.g. a corridor along a line). Any shape can be offset from the anchor by offset_km along bearing_deg, and rotated by rotation_deg (clockwise). The place is shown as a proposal for the person to accept or adjust.",
+      input_schema: {
+        type: "object",
+        properties: {
+          anchor: { type: "string", description: "Candidate id or existing place name" },
+          shape: { type: "string", enum: ["point", "square", "circle", "rectangle", "feature", "buffer"] },
+          area_km2: { type: "number" }, side_km: { type: "number" }, radius_km: { type: "number" },
+          width_km: { type: "number", description: "East–west size before rotation" }, height_km: { type: "number", description: "North–south size before rotation" },
+          buffer_km: { type: "number" }, rotation_deg: { type: "number" },
+          offset_km: { type: "number" }, bearing_deg: { type: "number", description: "Degrees clockwise from north for the offset" },
+          words: { type: "string", description: "The person's own words that this place answers" },
+          confidence: { type: "string", enum: ["high", "medium", "low"] },
+          reason: { type: "string", description: "One line: the evidence for the location and the confidence" },
+        },
+        required: ["anchor", "shape", "words", "confidence", "reason"],
+      },
+    },
+    {
+      name: "edit_place",
+      description: "Change a place: rotate (degrees clockwise), resize to an area (km²) or length (km), move (km along a bearing) or rename. Rotation and resizing keep the centre and are done on the ground, not on the map projection.",
+      input_schema: {
+        type: "object",
+        properties: {
+          place: { type: "string", description: "Place name, e.g. Area 1" },
+          rotate_deg: { type: "number" }, resize_to: { type: "number" },
+          move_km: { type: "number" }, move_bearing_deg: { type: "number" },
+          rename: { type: "string" },
+        },
+        required: ["place"],
+      },
+    },
+    {
+      name: "get_place",
+      description: "Full details of a place: size, where it is, how it was made and its edit history.",
+      input_schema: { type: "object", properties: { place: { type: "string" } }, required: ["place"] },
+    },
+  ];
+}
+
+// host: { places(), addPlace({feature, origin}), updatePlace(name, feature, words), renamePlace(name, newName),
+//         findPlace(name), ref, anchors (sources), fetchFn, headers, onCandidates(list), skillText(name) }
+export function createPlaceTools(host) {
+  const cands = new Map();
+  let n = 0;
+  const keep = (c) => { const id = `C${++n}`; cands.set(id, { ...c, id }); return id; };
+
+  const resolve = (ref) => {
+    if (!ref) throw new Error("No anchor given.");
+    const c = cands.get(String(ref).trim().toUpperCase());
+    if (c) return { feature: { type: "Feature", properties: {}, geometry: c.geometry }, lonlat: c.lonlat, label: c.name || c.id, cand: c };
+    const p = host.findPlace(ref);
+    if (p) {
+      const at = p.feature.geometry.type === "Point" ? p.feature.geometry.coordinates : turf.centroid(p.feature).geometry.coordinates;
+      return { feature: p.feature, lonlat: at, label: p.name, place: p };
+    }
+    throw new Error(`"${ref}" isn't a candidate id from this conversation or a place name. Use find_place first.`);
+  };
+
+  const compact = (c) => ({
+    id: c.id, name: c.name, type: c.type, source: `${c.source.publisher} – ${c.source.title}`, licence: c.source.licence,
+    lat: round(c.lonlat[1], 4), lon: round(c.lonlat[0], 4),
+    ...(c.area_km2 != null ? { area_km2: c.area_km2 } : {}), ...(c.length_km != null ? { length_km: c.length_km } : {}),
+    ...(c.distance_km != null ? { distance_km: c.distance_km, bearing_deg: c.bearing } : {}),
+    ...(Object.keys(c.extra || {}).length ? { details: c.extra } : {}),
+  });
+
+  async function placeSummary(p) {
+    const d = await R.describe(host.ref, p.feature);
+    return { place: p.name, status: p.status, summary: R.summaryLine(d), scale: d.scale, area_km2: d.area_km2, length_km: d.length_km, countries: d.countries, offshore: d.offshore };
+  }
+
+  const run = {
+    async load_skill({ name }) {
+      return { skill: name, method: host.skillText(name) };
+    },
+
+    async find_place({ query, near, country }) {
+      const nearAt = near ? resolve(near).lonlat : null;
+      const results = [];
+      const errors = [];
+      const anchors = await searchAnchors(host.anchors, query, { near: nearAt, fetchFn: host.fetchFn });
+      for (const a of anchors) (a.error ? errors.push(a.error) : results.push(a));
+      try { results.push(...(await searchNominatim(query, { near: nearAt, country, fetchFn: host.fetchFn, headers: host.headers }))); }
+      catch (e) { errors.push(`OpenStreetMap search: ${e.message}`); }
+      try { results.push(...searchNaturalEarth(await host.ref.get("places"), query)); } catch { /* reference not loaded */ }
+      const list = results.map((c) => {
+        if (nearAt) { c.distance_km = round(turf.distance(nearAt, c.lonlat), 1); c.bearing = Math.round((turf.bearing(nearAt, c.lonlat) + 360) % 360); }
+        return cands.get(keep(c));
+      });
+      host.onCandidates?.(list);
+      return { query, candidates: list.slice(0, 12).map(compact), ...(errors.length ? { problems: errors } : {}),
+        note: list.length ? undefined : "Nothing found. Try another spelling, a shorter name, or the nearest town and find_features_near." };
+    },
+
+    async find_features_near({ anchor, feature_type, radius_km, name }) {
+      const a = resolve(anchor);
+      const r = await findFeaturesNear(a.lonlat, feature_type, radius_km, { name, fetchFn: host.fetchFn, headers: host.headers });
+      const list = r.candidates.map((c) => cands.get(keep(c)));
+      host.onCandidates?.(list);
+      return { anchor: a.label, feature_type, radius_km, found: r.total, wind_turbines: r.wind_turbines, candidates: list.map(compact) };
+    },
+
+    async make_place(i) {
+      const a = resolve(i.anchor);
+      let centre = a.lonlat;
+      const steps = [];
+      if (i.offset_km) {
+        centre = turf.destination(centre, i.offset_km, i.bearing_deg ?? 0).geometry.coordinates;
+        steps.push(`moved ${i.offset_km} km on a bearing of ${i.bearing_deg ?? 0}° from ${a.label}`);
+      }
+      let f;
+      switch (i.shape) {
+        case "point": f = turf.point(centre); steps.push("point"); break;
+        case "square": {
+          const area = i.area_km2 ?? (i.side_km ? i.side_km ** 2 : null);
+          if (!area) throw new Error("A square needs area_km2 or side_km.");
+          f = G.squareAround(centre, area, i.rotation_deg || 0); steps.push(`square of ${round(area)} km² centred there`); break;
+        }
+        case "circle": {
+          const r = i.radius_km ?? (i.area_km2 ? Math.sqrt(i.area_km2 / Math.PI) : null);
+          if (!r) throw new Error("A circle needs radius_km or area_km2.");
+          f = G.circleAround(centre, { radiusKm: r }); steps.push(`circle of radius ${round(r, 2)} km`); break;
+        }
+        case "rectangle":
+          if (!i.width_km || !i.height_km) throw new Error("A rectangle needs width_km and height_km.");
+          f = G.rectangleAround(centre, i.width_km, i.height_km, i.rotation_deg || 0); steps.push(`rectangle ${i.width_km} × ${i.height_km} km`); break;
+        case "feature":
+          f = JSON.parse(JSON.stringify(a.feature));
+          if (i.offset_km) f = G.move(f, i.offset_km, i.bearing_deg ?? 0);
+          steps.push(`outline of ${a.label}`); break;
+        case "buffer":
+          if (!i.buffer_km) throw new Error("A buffer needs buffer_km.");
+          f = turf.buffer(i.offset_km ? G.move(a.feature, i.offset_km, i.bearing_deg ?? 0) : a.feature, i.buffer_km, { units: "kilometers", steps: 16 });
+          steps.push(`${i.buffer_km} km buffer around ${a.label}`); break;
+        default: throw new Error(`Unknown shape ${i.shape}.`);
+      }
+      if (i.rotation_deg && !["square", "rectangle", "point"].includes(i.shape)) { f = G.rotate(f, i.rotation_deg); steps.push(`rotated ${i.rotation_deg}°`); }
+      else if (i.rotation_deg && ["square", "rectangle"].includes(i.shape)) steps.push(`rotated ${i.rotation_deg}°`);
+      f = G.roundCoords({ type: "Feature", properties: {}, geometry: f.geometry });
+      const origin = {
+        method: "words", words: i.words, steps, confidence: i.confidence, reason: i.reason,
+        anchor: a.cand ? { name: a.cand.name, type: a.cand.type, source: a.cand.source, lonlat: a.cand.lonlat, extra: a.cand.extra } : { place: a.label },
+        at: new Date().toISOString(),
+      };
+      const p = host.addPlace({ feature: f, origin });
+      return { ...(await placeSummary(p)), how: steps.join(", then "), next: "Shown on the map as a proposal. Ask the person if it's what they meant." };
+    },
+
+    async edit_place(i) {
+      const p = host.findPlace(i.place);
+      if (!p) throw new Error(`No place called "${i.place}".`);
+      let f = p.feature;
+      const words = [];
+      if (i.rotate_deg) { f = G.rotate(f, i.rotate_deg); words.push(`rotated ${i.rotate_deg}°`); }
+      if (i.resize_to) { f = G.resizeTo(f, i.resize_to); words.push(`resized to ${i.resize_to} ${/Polygon/.test(f.geometry.type) ? "km²" : "km"}`); }
+      if (i.move_km) { f = G.move(f, i.move_km, i.move_bearing_deg ?? 0); words.push(`moved ${i.move_km} km on a bearing of ${i.move_bearing_deg ?? 0}°`); }
+      if (words.length) host.updatePlace(p.name, G.roundCoords(f), `${words.join(", ")} (asked in chat)`);
+      if (i.rename) { host.renamePlace(p.name, i.rename); words.push(`renamed to ${i.rename}`); }
+      return { ...(await placeSummary(host.findPlace(i.rename || p.name))), changed: words.join(", ") || "nothing" };
+    },
+
+    async get_place({ place }) {
+      const p = host.findPlace(place);
+      if (!p) throw new Error(`No place called "${place}".`);
+      const d = await R.describe(host.ref, p.feature);
+      return {
+        place: p.name, status: p.status, summary: R.summaryLine(d), ...pickD(d),
+        how_made: p.origin?.method === "words" ? { words: p.origin.words, anchor: p.origin.anchor?.name || p.origin.anchor?.place, source: p.origin.anchor?.source?.title, steps: p.origin.steps, confidence: p.origin.confidence } : { method: "drawn on the map" },
+        edits: (p.edits || []).map((e) => e.change),
+      };
+    },
+  };
+
+  return {
+    candidates: cands,
+    async exec(name, input) {
+      if (!run[name]) throw new Error(`Unknown tool ${name}`);
+      return run[name](input || {});
+    },
+  };
+}
+
+const pickD = (d) => ({ scale: d.scale, area_km2: d.area_km2, length_km: d.length_km, extent_km: d.extent_km, countries: d.countries, offshore: d.offshore, coast_km: d.coast_km, centre: { lat: round(d.centroid[1], 4), lon: round(d.centroid[0], 4) } });
+
+// One line per place for the conversation agent's project summary. Coordinates stay out.
+export async function projectSummary(ref, places, focus) {
+  if (!places.length) return "No places yet.";
+  const lines = [];
+  for (const p of places) {
+    const d = await R.describe(ref, p.feature);
+    const how = p.origin?.method === "words" ? `from words "${p.origin.words}" (anchor: ${p.origin.anchor?.name || p.origin.anchor?.place}, ${p.origin.confidence} confidence)` : "drawn on the map";
+    const edits = p.edits?.length ? `; edited: ${p.edits.slice(-3).map((e) => e.change).join("; ")}` : "";
+    lines.push(`- ${p.name}${p.name === focus ? " [in focus]" : ""} (${p.status}): ${R.summaryLine(d)}; scale ${p.scale || d.scale}; ${how}${edits}`);
+  }
+  return lines.join("\n");
+}

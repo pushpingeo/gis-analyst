@@ -14,24 +14,60 @@ export function roundCoords(feature, digits = 7) {
 }
 const anchorOf = (f) => turf.centroid(f).geometry.coordinates;
 
+// ---- local projection --------------------------------------------------------------
+// Rotating and resizing happen on a flat map centred on the shape (azimuthal equidistant), never on
+// longitude/latitude or Web Mercator, so a large shape keeps its true shape and size on the ground.
+const R = 6371.0088; // mean Earth radius in km, as Turf uses
+const rad = (d) => (d * Math.PI) / 180, deg = (r) => (r * 180) / Math.PI;
+
+export function toLocal([lon, lat], [lon0, lat0]) {
+  const p = rad(lat), p0 = rad(lat0), dl = rad(lon - lon0);
+  const cosc = Math.sin(p0) * Math.sin(p) + Math.cos(p0) * Math.cos(p) * Math.cos(dl);
+  const c = Math.acos(Math.max(-1, Math.min(1, cosc)));
+  const k = c < 1e-12 ? 1 : c / Math.sin(c);
+  return [R * k * Math.cos(p) * Math.sin(dl), R * k * (Math.cos(p0) * Math.sin(p) - Math.sin(p0) * Math.cos(p) * Math.cos(dl))];
+}
+
+export function fromLocal([x, y], [lon0, lat0]) {
+  const p0 = rad(lat0), rho = Math.hypot(x, y);
+  if (rho < 1e-12) return [lon0, lat0];
+  const c = rho / R;
+  const lat = Math.asin(Math.cos(c) * Math.sin(p0) + (y * Math.sin(c) * Math.cos(p0)) / rho);
+  const lon = rad(lon0) + Math.atan2(x * Math.sin(c), rho * Math.cos(p0) * Math.cos(c) - y * Math.sin(p0) * Math.sin(c));
+  return [((deg(lon) + 540) % 360) - 180, deg(lat)];
+}
+
+// Apply fn([x, y]) -> [x, y] to every vertex, in a local projection centred on `centre`.
+function mapLocal(feature, centre, fn) {
+  const f = clone(feature);
+  const walk = (c) => (typeof c[0] === "number" ? fromLocal(fn(toLocal(c, centre)), centre) : c.map(walk));
+  f.geometry.coordinates = walk(f.geometry.coordinates);
+  return f;
+}
+
 // Rotate about the centroid, clockwise in degrees.
 export function rotate(feature, degrees) {
   if (feature.geometry.type === "Point") return clone(feature);
-  return turf.transformRotate(clone(feature), degrees, { pivot: anchorOf(feature) });
+  const t = rad(degrees), cos = Math.cos(t), sin = Math.sin(t);
+  return mapLocal(feature, anchorOf(feature), ([x, y]) => [x * cos + y * sin, -x * sin + y * cos]);
 }
 
 // Scale lengths by a factor about the centroid (area changes by factor²).
 export function scaleBy(feature, factor) {
   if (feature.geometry.type === "Point") return clone(feature);
-  return turf.transformScale(clone(feature), factor, { origin: anchorOf(feature) });
+  return mapLocal(feature, anchorOf(feature), ([x, y]) => [x * factor, y * factor]);
 }
 
 // Resize a polygon to a target area (km²), or a line to a target length (km), keeping its shape and centre.
+// A second pass corrects the small difference between the flat map and the curved Earth on very large shapes.
 export function resizeTo(feature, target) {
   const g = feature.geometry.type;
-  if (g === "Polygon" || g === "MultiPolygon") return scaleBy(feature, Math.sqrt(target / (turf.area(feature) / 1e6)));
-  if (g === "LineString" || g === "MultiLineString") return scaleBy(feature, target / turf.length(feature));
-  throw new Error("A point has no size to change.");
+  const size = /Polygon/.test(g) ? (f) => turf.area(f) / 1e6 : /LineString/.test(g) ? (f) => turf.length(f) : null;
+  if (!size) throw new Error("A point has no size to change.");
+  const power = /Polygon/.test(g) ? 0.5 : 1;
+  let f = scaleBy(feature, (target / size(feature)) ** power);
+  f = scaleBy(f, (target / size(f)) ** power);
+  return f;
 }
 
 // Move by a distance (km) along a bearing (degrees from north).
@@ -39,15 +75,19 @@ export function move(feature, km, bearing) {
   return turf.transformTranslate(clone(feature), km, bearing);
 }
 
-// A square of the given area (km²) centred on a point, sides aligned north–south unless rotated.
+// A rectangle of the given width and height (km) centred on a point, sides north–south and east–west
+// unless rotated (degrees clockwise). Built on the ground, so it's true to size anywhere.
+export function rectangleAround(lonlat, widthKm, heightKm, rotation = 0) {
+  const w = widthKm / 2, h = heightKm / 2;
+  const ring = [[-w, -h], [w, -h], [w, h], [-w, h], [-w, -h]].map((xy) => fromLocal(xy, lonlat));
+  const r = turf.polygon([ring]);
+  return rotation ? rotate(r, rotation) : r;
+}
+
+// A square of the given area (km²) centred on a point.
 export function squareAround(lonlat, areaKm2, rotation = 0) {
-  const half = Math.sqrt(areaKm2) / 2;
-  const n = turf.destination(lonlat, half, 0).geometry.coordinates[1];
-  const s = turf.destination(lonlat, half, 180).geometry.coordinates[1];
-  // East–west offset measured at the centre latitude, so the square is square on the ground.
-  const dLon = turf.destination(lonlat, half, 90).geometry.coordinates[0] - lonlat[0];
-  const sq = turf.polygon([[[lonlat[0] - dLon, s], [lonlat[0] + dLon, s], [lonlat[0] + dLon, n], [lonlat[0] - dLon, n], [lonlat[0] - dLon, s]]]);
-  return rotation ? rotate(sq, rotation) : sq;
+  const side = Math.sqrt(areaKm2);
+  return rectangleAround(lonlat, side, side, rotation);
 }
 
 // A circle of the given area (km²) or radius (km) around a point.
