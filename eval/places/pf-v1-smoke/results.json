@@ -1,0 +1,457 @@
+[
+ {
+  "project": "46824",
+  "name": "Reko Diq Copper",
+  "country": "Pakistan",
+  "site_type": "Mine + borefield",
+  "placed": true,
+  "error_km": 40.79,
+  "truth_inside_shape": false,
+  "shape": "Point",
+  "confidence": "low",
+  "reason": "Only the Reko Diq Airport (OSM, Chagai district, Balochistan) matched by name. The mine and borefield themselves are not mapped under the project name, so this pin marks the district anchor, not the mine footprint.",
+  "anchor": "Reko Diq Airport",
+  "anchor_source": "osm-nominatim",
+  "steps": [
+   "point"
+  ],
+  "text": "I've added a proposed point, Area 1, at Reko Diq Airport in Chagai district, Balochistan (OpenStreetMap). I rated it low confidence.\n\nThe pin marks the airport, not the mine. No feature under the project name, \"Reko Diq Mine\" or a borefield, is mapped, so I couldn't place the mine footprint itself.\n\nDo you want the pin left at the airport as a district anchor, or should I build a larger area around it? If you can tell me the mine's approximate distance and bearing from the airport, I can offset the pin to it.",
+  "usage": {
+   "input_tokens": 17845,
+   "output_tokens": 1257
+  },
+  "seconds": 44,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Reko Diq",
+     "country": "PK"
+    },
+    "n": 1
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C1",
+     "feature_type": "mine or quarry",
+     "radius_km": 30
+    },
+    "n": 3
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Reko Diq mine",
+     "country": "PK"
+    },
+    "n": 0
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C1",
+     "shape": "point",
+     "words": "Reko Diq Copper (Copper mining; Mine + borefield), Pakistan",
+     "confidence": "low",
+     "reason": "Only the Reko Diq Airport (OSM, Chagai district, Balochistan) matched by name. The mine and borefield themselves are not mapped under the project name, so this pin marks the district anchor, not the mine footprint."
+    }
+   }
+  ],
+  "earlier_pin": {
+   "method": "est",
+   "error_km": 0
+  }
+ },
+ {
+  "project": "34203",
+  "name": "CBG Expansion",
+  "country": "Guinea",
+  "site_type": "Mine + 120 km rail + port",
+  "placed": true,
+  "error_km": 2.5,
+  "truth_inside_shape": false,
+  "shape": "Point",
+  "confidence": "low",
+  "reason": "Anchored on the Sangarédi town (OSM), where CBG's bauxite mining is based. The CBG mine itself and the expansion footprint were not found as mapped features (OSM mine search timed out), so this is a town-level pin, not a site outline.",
+  "anchor": "Sangarédi",
+  "anchor_source": "osm-nominatim",
+  "steps": [
+   "point"
+  ],
+  "text": "I placed a point at Sangarédi (OSM town, C3) and named it Area 1. Confidence is low. I couldn't find \"CBG\" as a named feature, and the mine search timed out, so this marks the town where CBG's bauxite operations are based, not the expansion footprint. The point is a proposal on the map.\n\nTwo things would tighten it:\n- **Retry the mine search.** Once the mine search works, I can check for a mapped CBG mine near Sangarédi and outline it.\n- **The 120 km rail line and the port.** Do you have the route or the port end point? Kamsar (C5) is the likely port for CBG, but I haven't confirmed the expansion uses it. If you have coordinates for the rail alignment, I can build it as a corridor.\n\nShould I retry the mine search, or do you have the rail and port locations?",
+  "usage": {
+   "input_tokens": 33955,
+   "output_tokens": 2216
+  },
+  "seconds": 333,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "CBG bauxite mine Guinea",
+     "country": "GN"
+    },
+    "n": 0
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Boké",
+     "country": "GN"
+    },
+    "n": 2
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Sangarédi",
+     "country": "GN"
+    },
+    "n": 1
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C1",
+     "feature_type": "mine or quarry",
+     "radius_km": 50
+    },
+    "error": "OpenStreetMap search failed: timed out after 45 s"
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C3",
+     "feature_type": "mine or quarry",
+     "radius_km": 20
+    },
+    "error": "OpenStreetMap search failed: timed out after 45 s"
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Kamsar",
+     "country": "GN"
+    },
+    "n": 2
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C3",
+     "feature_type": "mine or quarry",
+     "radius_km": 15
+    },
+    "error": "OpenStreetMap search failed: timed out after 45 s"
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C3",
+     "shape": "point",
+     "words": "CBG Expansion (Bauxite mining; Mine + 120 km rail + port), Guinea",
+     "confidence": "low",
+     "reason": "Anchored on the Sangarédi town (OSM), where CBG's bauxite mining is based. The CBG mine itself and the expansion footprint were not found as mapped features (OSM mine search timed out), so this is a town-level pin, not a site outline."
+    }
+   }
+  ],
+  "earlier_pin": {
+   "method": "osm",
+   "error_km": 2.5
+  }
+ },
+ {
+  "project": "24374",
+  "name": "Guinea Alumina Corporation",
+  "country": "Guinea",
+  "site_type": "Mine + rail + port",
+  "placed": true,
+  "error_km": 30.66,
+  "truth_inside_shape": false,
+  "shape": "Polygon",
+  "confidence": "medium",
+  "reason": "Company name only matched its Conakry office (C1). The Sangarédi bauxite mine area (C22, OpenStreetMap, ~26.8 km²) is the largest mine in the Sangarédi area, where GAC is known to operate; matched by type and location, not by name, so medium confidence.",
+  "anchor": "Mine de bauxite",
+  "anchor_source": "osm-overpass",
+  "steps": [
+   "outline of Mine de bauxite"
+  ],
+  "text": "I've marked **Area 1**, the mapped bauxite mine outline at Sangarédi, about 26.8 km², roughly 60 km from Boké. Confidence is medium.\n\n- The company name only matched its Conakry office in OpenStreetMap, so that isn't the site.\n- The largest mapped bauxite mine near Sangarédi is the one I outlined. Sangarédi is where GAC is known to operate, but that link comes from my background knowledge, not from a name match in the data.\n- The rail and port part of the project would run to the coast near Kamsar. I haven't mapped the port or rail line yet.\n\nIs the Sangarédi mine outline the site you meant, or should I look for the rail line or port next?",
+  "usage": {
+   "input_tokens": 57372,
+   "output_tokens": 3450
+  },
+  "seconds": 124,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Guinea Alumina Corporation",
+     "country": "GN"
+    },
+    "n": 1
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "GAC bauxite mine Guinea",
+     "country": "GN"
+    },
+    "n": 0
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Boké",
+     "country": "GN"
+    },
+    "n": 2
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Kamsar",
+     "country": "GN"
+    },
+    "n": 2
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Kamsar",
+     "feature_type": "mine or quarry",
+     "radius_km": 50
+    },
+    "error": "\"Kamsar\" isn't a candidate id from this conversation or a place name. Use find_place first."
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Kamsar",
+     "feature_type": "port or terminal",
+     "radius_km": 30
+    },
+    "error": "\"Kamsar\" isn't a candidate id from this conversation or a place name. Use find_place first."
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C4",
+     "feature_type": "mine or quarry",
+     "radius_km": 50
+    },
+    "n": 12
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C4",
+     "feature_type": "port or terminal",
+     "radius_km": 30
+    },
+    "n": 3
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Sangarédi",
+     "country": "GN"
+    },
+    "n": 1
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C21",
+     "feature_type": "mine or quarry",
+     "radius_km": 15
+    },
+    "n": 9
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C22",
+     "shape": "feature",
+     "words": "Guinea Alumina Corporation (Bauxite mining; Mine + rail + port), Guinea",
+     "confidence": "medium",
+     "reason": "Company name only matched its Conakry office (C1). The Sangarédi bauxite mine area (C22, OpenStreetMap, ~26.8 km²) is the largest mine in the Sangarédi area, where GAC is known to operate; matched by type and location, not by name, so medium confidence."
+    }
+   }
+  ],
+  "earlier_pin": {
+   "method": "est",
+   "error_km": 33.85
+  }
+ },
+ {
+  "project": "41009",
+  "name": "Tasiast Mauritania",
+  "country": "Mauritania",
+  "site_type": "Single mine site",
+  "placed": true,
+  "error_km": 242.8,
+  "truth_inside_shape": false,
+  "shape": "Point",
+  "confidence": "medium",
+  "reason": "Name matches a mapped 'Tasiast' feature (OSM viewpoint C3) in the mine area, and quarries lie within 30 km, but the mine site itself is not mapped as a feature, so the pin marks the site rather than its footprint.",
+  "anchor": "Tasiast تازيازت",
+  "anchor_source": "osm-nominatim",
+  "steps": [
+   "point"
+  ],
+  "text": "I've marked a proposed pin for Tasiast as \"Area 1\" on the map. Confidence is medium.\n\n- **Why this spot:** The mine itself isn't mapped under its name. The best match is an OpenStreetMap feature called \"Tasiast\" (C3), a viewpoint, which sits in the mine area. Several quarries lie within 30 km, which fits a mine complex.\n- **Caveat:** The pin marks the site, not the mine's footprint. The region \"Tâziâzet\" (C1) is a broader area about 2.5° further north, so I didn't use it.\n\nIs this pin where you expected the Tasiast mine, or would you like me to draw a footprint around it?",
+  "usage": {
+   "input_tokens": 27094,
+   "output_tokens": 1922
+  },
+  "seconds": 158,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Tasiast",
+     "country": "MR"
+    },
+    "n": 3
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C1",
+     "feature_type": "mine or quarry",
+     "radius_km": 50
+    },
+    "n": 5
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C3",
+     "feature_type": "mine or quarry",
+     "radius_km": 30
+    },
+    "error": "OpenStreetMap search failed: timed out after 45 s"
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C3",
+     "feature_type": "mine or quarry",
+     "radius_km": 30
+    },
+    "n": 6
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C3",
+     "shape": "point",
+     "words": "Tasiast Mauritania",
+     "confidence": "medium",
+     "reason": "Name matches a mapped 'Tasiast' feature (OSM viewpoint C3) in the mine area, and quarries lie within 30 km, but the mine site itself is not mapped as a feature, so the pin marks the site rather than its footprint."
+    }
+   }
+  ],
+  "earlier_pin": {
+   "method": "est",
+   "error_km": 2.57
+  }
+ },
+ {
+  "project": "33841",
+  "name": "Tobene",
+  "country": "Senegal",
+  "site_type": "Single site (4.5 ha)",
+  "placed": false,
+  "error_km": null,
+  "truth_inside_shape": false,
+  "text": "I found three villages named Tobène in Senegal, and the search didn't find a power plant near any of them, so I haven't placed the site yet.\n\n- **C3**: Tobène, Thiès region (Tivaouane department, Pambal arrondissement). This is the closest to the Tobène thermal plant I'd expect, but I haven't confirmed it against a mapped feature.\n- **C2**: Tobène, Kaolack region (Sibassor arrondissement).\n- **C1**: Tobène, Kaffrine region (Malem Hodar department).\n\nA search for the plant itself timed out for C3, so that result is unchecked. Which Tobène is the site? If you know the plant's coordinates or its region, I can use them instead. Once you confirm, I'll place a 4.5 ha square on that village.",
+  "usage": {
+   "input_tokens": 18367,
+   "output_tokens": 1656
+  },
+  "seconds": 167,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Tobene",
+     "country": "SN"
+    },
+    "n": 6
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Tobene",
+     "feature_type": "thermal power plant",
+     "radius_km": 15
+    },
+    "error": "\"Tobene\" isn't a candidate id from this conversation or a place name. Use find_place first."
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C3",
+     "feature_type": "power plant (any)",
+     "radius_km": 15
+    },
+    "error": "OpenStreetMap search failed: timed out after 45 s"
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C2",
+     "feature_type": "power plant (any)",
+     "radius_km": 15
+    },
+    "n": 0
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C1",
+     "feature_type": "power plant (any)",
+     "radius_km": 15
+    },
+    "n": 0
+   }
+  ],
+  "earlier_pin": {
+   "method": "osm",
+   "error_km": 8.1
+  }
+ }
+]
