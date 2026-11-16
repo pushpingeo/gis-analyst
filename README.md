@@ -1,4 +1,6 @@
-# GIS Analyst
+# Tobler
+
+*Formerly GIS Analyst. Named after Waldo Tobler, whose first law of geography says near things are more related than distant ones. Domains: asktobler.com, .ai, .io (not yet pointed at the site).*
 
 An AI geospatial analyst built the way you'd want one built: an agent that follows **skills** (written-down method), calls **tools** (deterministic spatial operations) and looks things up in a **catalogue** (what the data is, who publishes it, and on what terms).
 

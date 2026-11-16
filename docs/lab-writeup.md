@@ -1,4 +1,4 @@
-# GIS Analyst lab: does an NTR skill make an AI agent better?
+# Tobler lab: does an NTR skill make an AI agent better?
 
 *Write-up of the evaluation work on 15 November 2026. Repo: github.com/pushpingeo/gis-analyst. Live pages: [agent](https://pushpingeo.github.io/gis-analyst/), [lab results](https://pushpingeo.github.io/gis-analyst/lab.html), [tools without AI](https://pushpingeo.github.io/gis-analyst/tools.html).*
 
