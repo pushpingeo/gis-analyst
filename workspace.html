@@ -9,7 +9,7 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=6ceec591">
+<link rel="stylesheet" href="css/workspace.css?v=c8a15982">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
@@ -25,7 +25,7 @@
   "./js/tools.js": "./js/tools.js?v=084a3bd7",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=b5b54c7e",
+  "./js/workspace.js": "./js/workspace.js?v=e410fc16",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -71,34 +71,35 @@
 <section class="panel" id="panel" aria-label="Conversation">
   <button class="handle" id="handle" aria-expanded="true" aria-controls="conversation"><span class="sr">Show or hide the conversation</span></button>
   <header class="brand">
-    <h1><img class="mark" src="img/tobler.svg" alt="" width="30" height="30">Tobler</h1>
-    <p>Map, data and method in one conversation.</p>
+    <h1><img class="mark" src="img/tobler.svg" alt="" width="30" height="30">Hi, I'm Tobler</h1>
+    <p>Your GIS analyst, on call.</p>
   </header>
 
   <div class="conversation" id="conversation" aria-live="polite">
     <div class="msg analyst welcome">
-      <p>Mark an area on the map, or describe it in your own words, and say what you need.</p>
-      <p class="quiet">For example:</p>
+      <p class="lead">Pick a spot on Earth.</p>
+      <p>Tell me where, roughly is fine. I'll pin it down and show my working.</p>
       <ul class="examples">
-        <li><button data-example>A 3 km² square around the Jackdaw platform in the North Sea</button></li>
-        <li><button data-example>North Sea block 30/2</button></li>
-        <li><button data-example>A 5 km circle around Linlithgow Palace</button></li>
+        <li><button data-example>Box off 3 km² around Jackdaw</button></li>
+        <li><button data-example>Show me block 30/2</button></li>
+        <li><button data-example>5 km round Linlithgow Palace</button></li>
       </ul>
-      <p class="quiet">This is an early preview. Finding and defining areas works now; risk screening, net area and constraints are switched on next.</p>
     </div>
   </div>
 
   <div class="composer">
     <p class="activity" id="activity" role="status"></p>
     <div class="chips" role="group" aria-label="What to do">
-      <button class="chip" data-prompt="Screen this area for environmental and social risks">Screen for risks</button>
-      <button class="chip" data-prompt="How much of this area is free to develop?">Net developable area</button>
-      <button class="chip" data-prompt="What constrains this site, how would it be reached, and what is it close to?">Constraints and access</button>
       <button class="chip" data-prompt="Find ">Find a place</button>
+      <button class="chip" data-draw="polygon">Draw an area</button>
+      <button class="chip soon" data-soon aria-describedby="soon-note">Screen for risks <span>· soon</span></button>
+      <button class="chip soon" data-soon aria-describedby="soon-note">Net area <span>· soon</span></button>
+      <button class="chip soon" data-soon aria-describedby="soon-note">Constraints <span>· soon</span></button>
+      <span id="soon-note" class="sr">Coming soon</span>
     </div>
     <form class="ask" id="ask">
       <label for="say" class="sr">Message</label>
-      <textarea id="say" rows="1" placeholder="Ask Tobler: describe an area or ask a question" autocomplete="off"></textarea>
+      <textarea id="say" rows="1" placeholder="Where should we look?" autocomplete="off"></textarea>
       <button type="button" class="mic" id="mic" title="Speak" hidden>
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span class="sr">Speak</span></button>
       <button type="submit" class="send" title="Send">
@@ -159,6 +160,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=b5b54c7e"></script>
+<script type="module" src="js/workspace.js?v=e410fc16"></script>
 </body>
 </html>

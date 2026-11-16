@@ -578,7 +578,21 @@ function traceLine(ev) {
   }
 }
 
+// Chips: "Find a place" starts a request; "Draw an area" switches the map to drawing;
+// the "soon" chips answer locally (nothing goes to the model).
 document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => {
+  if (c.dataset.soon !== undefined) {
+    const m = el("div", null, "msg analyst");
+    m.append(el("p", "That's coming next. For now I can find and outline the area so it's ready."));
+    $("conversation").append(m); m.scrollIntoView({ block: "end", behavior: "smooth" });
+    return;
+  }
+  if (c.dataset.draw) {
+    if (!draw) return;
+    setMode(c.dataset.draw);
+    if (innerWidth <= 720) setSheet(false);
+    return;
+  }
   say.value = c.dataset.prompt; grow(); say.focus();
   say.setSelectionRange(say.value.length, say.value.length);
 }));
