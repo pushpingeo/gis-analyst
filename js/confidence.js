@@ -44,8 +44,12 @@ export function runCheck(siteLonLat, target, { expected_km, direction }) {
   const got = (turf.bearing(siteLonLat, target.lonlat) + 360) % 360;
   // Bearings mean little at very short range, so only test them beyond 2 km.
   const dirOk = want == null || actual < 2 || angleDiff(want, got) <= 45;
+  const pts = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"], pt = (deg) => pts[Math.round(deg / 45) % 8];
+  const km = Math.round(actual * 10) / 10, who = target.name || target.id;
   return {
-    against: target.name || target.id, expected_km, actual_km: Math.round(actual * 10) / 10,
+    against: who, expected_km, actual_km: km,
+    // Spelled out both ways, because "X is SE of the site" and "the site is SE of X" are easy to swap.
+    reads: `The site is ${km} km ${pt((got + 180) % 360)} of ${who}; ${who} is ${pt(got)} of the site.`,
     ...(want != null ? { direction: String(direction), actual_bearing_deg: Math.round(got) } : {}),
     pass: distOk && dirOk,
     ...(distOk && dirOk ? {} : { why: !distOk ? `${Math.round(actual * 10) / 10} km, not about ${expected_km} km` : `bearing ${Math.round(got)}°, not ${direction}` }),
