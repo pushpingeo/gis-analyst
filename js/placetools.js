@@ -164,7 +164,7 @@ export function createPlaceTools(host) {
       const r = await findFeaturesNear(a.lonlat, feature_type, radius_km, { name, fetchFn: host.fetchFn, headers: host.headers });
       const list = r.candidates.map((c) => cands.get(keep(c)));
       host.onCandidates?.(list);
-      return { anchor: a.label, feature_type, radius_km, found: r.total, wind_turbines: r.wind_turbines, candidates: list.map(compact) };
+      return { anchor: a.label, feature_type, radius_km, found: r.total, wind_turbines: r.wind_turbines, ...(r.note ? { note: r.note } : {}), candidates: list.map(compact) };
     },
 
     async make_place(i) {

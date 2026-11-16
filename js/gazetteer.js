@@ -15,16 +15,21 @@ const remembered = (key, fn) => {
 };
 
 // Overpass: start with the server that answered last time, and give each one 15 seconds.
+// If every server fails, say so at once for the next two minutes instead of waiting 45 seconds each time.
 let fastest = 0;
+let overpassDownUntil = 0;
+export class ServiceDown extends Error {}
 async function overpass(q, fetchFn, headers) {
+  if (Date.now() < overpassDownUntil) throw new ServiceDown("OpenStreetMap's Overpass service isn't answering right now (all three public servers failed a moment ago).");
   return remembered(`overpass:${q}`, async () => {
     let lastErr;
     for (let k = 0; k < OVERPASS_ENDPOINTS.length; k++) {
       const i = (fastest + k) % OVERPASS_ENDPOINTS.length;
-      try { const j = await fetchOverpass(q, OVERPASS_ENDPOINTS[i], fetchFn, 15000, headers); fastest = i; return j; }
+      try { const j = await fetchOverpass(q, OVERPASS_ENDPOINTS[i], fetchFn, 15000, headers); fastest = i; overpassDownUntil = 0; return j; }
       catch (e) { lastErr = e; }
     }
-    throw new Error(`OpenStreetMap search failed: ${lastErr?.message}`);
+    overpassDownUntil = Date.now() + 120000;
+    throw new ServiceDown(`OpenStreetMap's Overpass service isn't answering right now (all three public servers failed; last: ${lastErr?.message}).`);
   });
 }
 
@@ -149,9 +154,60 @@ export const FEATURE_TYPES = {
   "residential area": ['way["landuse"="residential"]'],
 };
 
+// When Overpass is down, everyday features can still be found through Nominatim's search phrases.
+const NOMINATIM_PHRASES = {
+  "school": { q: ["school"], keep: /^(amenity: (school|kindergarten|college|university))$/ },
+  "hospital or clinic": { q: ["hospital", "clinic"], keep: /^(amenity|healthcare): (hospital|clinic|doctors)$/ },
+  "place of worship": { q: ["place of worship"], keep: /^amenity: place of worship$/ },
+  "railway station": { q: ["railway station"], keep: /^railway: (station|halt)$/ },
+  "park or green space": { q: ["park"], keep: /^leisure: (park|nature reserve|recreation ground)$/ },
+  "cemetery": { q: ["cemetery"], keep: /^(landuse: cemetery|amenity: grave yard)$/ },
+};
+
+async function nearViaNominatim(lonlat, featureType, radiusKm, { fetchFn, headers, limit }) {
+  const ph = NOMINATIM_PHRASES[featureType];
+  const dLat = radiusKm / 111.32, dLon = radiusKm / (111.32 * Math.cos((lonlat[1] * Math.PI) / 180));
+  const box = [lonlat[0] - dLon, lonlat[1] + dLat, lonlat[0] + dLon, lonlat[1] - dLat].join(",");
+  const out = [];
+  for (const q of ph.q) {
+    const params = new URLSearchParams({ q, format: "jsonv2", limit: "40", viewbox: box, bounded: "1" });
+    const j = await remembered(`nominatim:${params}`, async () => {
+      const wait = lastNominatim + 1100 - Date.now();
+      if (wait > 0) await new Promise((ok) => setTimeout(ok, wait));
+      lastNominatim = Date.now();
+      const r = await fetchFn(`${NOMINATIM}?${params}`, { headers });
+      if (!r.ok) throw new Error(`Nominatim ${r.status}`);
+      return r.json();
+    });
+    for (const x of j) {
+      const type = `${x.category}: ${x.type}`.replace(/_/g, " ");
+      if (!ph.keep.test(type)) continue;
+      const c = candidate({
+        name: x.name || null, type, geometry: { type: "Point", coordinates: [+x.lon, +x.lat] },
+        source: { id: "osm-nominatim", title: "OpenStreetMap (Nominatim search, because Overpass was busy)", publisher: "OpenStreetMap contributors", licence: "ODbL 1.0", url: `https://www.openstreetmap.org/${x.osm_type}/${x.osm_id}` },
+        extra: { place: x.display_name },
+      });
+      c.distance_km = round(turf.distance(lonlat, c.lonlat), 2);
+      c.bearing = Math.round((turf.bearing(lonlat, c.lonlat) + 360) % 360);
+      if (c.distance_km <= radiusKm && !out.some((o) => o.source.url === c.source.url)) out.push(c);
+    }
+  }
+  out.sort((a, b) => a.distance_km - b.distance_km);
+  return { candidates: out.slice(0, limit), total: out.length, note: "Overpass was busy, so these came from Nominatim's search, which can miss unnamed or less prominent features." };
+}
+
 export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = null, fetchFn = fetch, limit = 15, headers = {} } = {}) {
   const parts = FEATURE_TYPES[featureType];
   if (!parts) throw new Error(`Unknown feature type. Use one of: ${Object.keys(FEATURE_TYPES).join(", ")}.`);
+  try { return await findFeaturesNearOverpass(lonlat, featureType, radiusKm, { name, fetchFn, limit, headers }); }
+  catch (e) {
+    if (e instanceof ServiceDown && NOMINATIM_PHRASES[featureType] && !name) return nearViaNominatim(lonlat, featureType, radiusKm, { fetchFn, headers, limit });
+    throw e;
+  }
+}
+
+async function findFeaturesNearOverpass(lonlat, featureType, radiusKm, { name, fetchFn, limit, headers }) {
+  const parts = FEATURE_TYPES[featureType];
   const r = Math.min(Math.max(radiusKm, 0.5), 50) * 1000;
   const nameFilter = name ? `["name"~"${name.replace(/["\\]/g, "")}",i]` : "";
   // Tags and bounding boxes only: cheap enough not to time out over a wide radius. Outlines are fetched later,

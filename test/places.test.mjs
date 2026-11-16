@@ -5,7 +5,7 @@ import * as turf from "../js/vendor/turf.js";
 import * as R from "../js/reference.js";
 import { createPlaceTools, placeToolDefs, projectSummary } from "../js/placetools.js";
 import { buildMessages, runTurn, parseSkill } from "../js/converse.js";
-import { BLOCK_REF } from "../js/gazetteer.js";
+import { BLOCK_REF, findFeaturesNear } from "../js/gazetteer.js";
 
 let passed = 0;
 const test = async (name, fn) => { await fn(); passed++; console.log("ok", name); };
@@ -113,6 +113,24 @@ await test("offer_choices passes the candidates and the recommendation to the pa
   assert.equal(out.offered, 2);
   assert.equal(shown.recommended.id, ids[1]);
   await assert.rejects(() => t.exec("offer_choices", { candidates: [ids[0], ids[1]], recommended: "C99", reason: "x" }), /must be one of the candidates/);
+});
+
+await test("when Overpass is down, schools come from Nominatim, nearest first, and the next call fails fast", async () => {
+  const seen = [];
+  const f = async (url) => {
+    seen.push(String(url));
+    if (/interpreter/.test(String(url))) return { ok: false, status: 502, text: async () => "Bad gateway", json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => [
+      { name: "Far School", category: "amenity", type: "school", lat: "55.97", lon: "-3.19", osm_type: "way", osm_id: 1 },
+      { name: "Near School", category: "amenity", type: "school", lat: "55.955", lon: "-3.19", osm_type: "way", osm_id: 2 },
+      { name: "A Cafe", category: "amenity", type: "cafe", lat: "55.954", lon: "-3.19", osm_type: "node", osm_id: 3 }] };
+  };
+  const r = await findFeaturesNear([-3.19, 55.953], "school", 3, { fetchFn: f });
+  assert.deepEqual(r.candidates.map((c) => c.name), ["Near School", "Far School"]);
+  assert.match(r.note, /Overpass was busy/);
+  const t0 = Date.now();
+  await assert.rejects(() => findFeaturesNear([-3.19, 55.953], "substation", 3, { fetchFn: f }), /isn't answering right now/);
+  assert.ok(Date.now() - t0 < 1000, "failed fast");
 });
 
 await test("unknown anchors give a useful error", async () => {
