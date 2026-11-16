@@ -9,7 +9,32 @@ const rows = csv.slice(1).map((l) => {
   const cells = l.match(/("([^"]|"")*"|[^,]*)(,|$)/g).map((c) => c.replace(/,$/, "").replace(/^"|"$/g, "").replace(/""/g, '"'));
   return Object.fromEntries(head.map((h, i) => [h, cells[i]]));
 });
-const SITES = [["Reko Diq", "mineral-extraction"], ["Nachtigal", "power-plant"], ["Kinguél", "power-plant"], ["Sal de Vida", "mineral-extraction"], ["Sierra Rutile", "mineral-extraction"], ["Kipoi", "mineral-extraction"]];
+const SITES = [["Reko Diq", "mineral-extraction"], ["Nachtigal", "power-plant"], ["Kingu", "power-plant"], ["Sal de Vida", "mineral-extraction"], ["Sierra Rutile", "mineral-extraction"], ["Kipoi", "mineral-extraction"]];
+const GLOBAL = { "power-plant": ["d228ce71e06bda1a", "56ee45db56ce4e75", "27f1cbda81fb0130"], "mineral-extraction": ["95a9d8c07654a13e", "dc3ea56104152fa5", "66fa20aaf55c5b33", "2f4f3281821ed435"] };
+const MODE = process.argv[2] || "targeted";
+if (MODE === "targeted") {
+  for (const id of [...GLOBAL["power-plant"], ...GLOBAL["mineral-extraction"]]) {
+    try { const d = await atlasCall("get_dataset", { id }); console.log(`\n[${id}] ${d.title} | ${d.publisher} | licence: ${d.licence} | endpoints: ${(d.endpoints || []).map((e) => `${e.protocol}:${(e.capabilities || []).join("+")}`).join(", ")}`); }
+    catch (e) { console.log(`[${id}] ${e.message.slice(0, 150)}`); }
+  }
+  for (const [name, concept] of SITES) {
+    const s = rows.find((r) => (r.name || "").includes(name));
+    if (!s) { console.log(`\n## ${name}: not in eval set`); continue; }
+    console.log(`\n## ${s.name} [${s.site_type}]`);
+    for (const id of GLOBAL[concept]) {
+      try {
+        const g = await atlasCall("fetch_features", { id, lon: +s.lon, lat: +s.lat, radius_km: 30, limit: 50 });
+        const fs = (g.features || []).map((f) => {
+          const p = f.properties || {}; const nm = Object.entries(p).find(([k, v]) => typeof v === "string" && /^(name|project|plant|site|mine|facility|unit)/i.test(k))?.[1] || "";
+          const c = f.geometry ? (f.geometry.type === "Point" ? f.geometry.coordinates : null) : null;
+          return `${String(nm).slice(0, 40)}${c ? ` @${c.map((x) => x.toFixed(3))}` : ` (${f.geometry?.type})`}`;
+        });
+        console.log(`   ${id}: ${fs.length} → ${JSON.stringify(fs.slice(0, 6))}`);
+      } catch (e) { console.log(`   ${id}: ${e.message.slice(0, 140)}`); }
+    }
+  }
+  process.exit(0);
+}
 for (const [name, concept] of SITES) {
   const s = rows.find((r) => (r.name || "").includes(name));
   if (!s) { console.log(`\n## ${name}: not in eval set`); continue; }
