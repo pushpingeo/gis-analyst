@@ -89,6 +89,7 @@ export function activityFor(name, input = {}) {
     case "find_features_near": return `Looking for ${input.feature_type} within ${input.radius_km} km of ${input.anchor}`;
     case "make_place": return "Building the area";
     case "edit_place": return `Changing ${input.place}`;
+    case "offer_choices": return "Laying out the options";
     case "get_place": return `Reading ${input.place}`;
     default: return `Running ${name}`;
   }

@@ -70,7 +70,8 @@ async function callClaude({ system, messages, tools }) {
 function memoryHost() {
   const list = [];
   return {
-    ref, anchors, headers: UA, list,
+    ref, anchors, headers: UA, list, offered: null,
+    offerChoices(o) { this.offered = o; },
     fetchFn: (url, opts = {}) => fetch(url, { ...opts, headers: { ...UA, ...(opts.headers || {}) } }),
     places: () => list,
     findPlace: (n) => list.find((p) => p.name.toLowerCase() === String(n).toLowerCase()),
@@ -83,8 +84,12 @@ function memoryHost() {
 
 const outDir = `eval/places/${LABEL}`;
 mkdirSync(outDir, { recursive: true });
-const results = [];
+// Resumable: sites already scored under this label are kept and skipped (errors are retried).
+let results = [];
+try { results = JSON.parse(readFileSync(`${outDir}/results.json`, "utf8")).filter((r) => !r.error); } catch { /* new label */ }
+const done = new Set(results.map((r) => r.case || r.project));
 for (const s of sites) {
+  if (done.has(s.id || s.project_number)) continue;
   const host = memoryHost();
   const tools = createPlaceTools(host);
   const userText = prompt(s);
@@ -92,14 +97,24 @@ for (const s of sites) {
   const t0 = Date.now();
   let rec;
   try {
-    const res = await runTurn({
+    const turn = async (recent, text) => runTurn({
       system: systemPrompt({ skills: [skill], comingSoon: [] }),
-      messages: buildMessages({ recent: [], summary: await projectSummary(ref, [], null), userText }),
+      messages: buildMessages({ recent, summary: await projectSummary(ref, host.list, null), userText: text }),
       tools: placeToolDefs([skill]),
       exec: (n, i) => tools.exec(n, i),
       callClaude,
       onEvent: (e) => { if (e.type === "tool" || e.type === "warning") events.push(e); },
     });
+    let res = await turn([], userText);
+    // If it offered choices instead of placing, take its recommendation (the "I'm feeling lucky" path).
+    let choseRecommended = false;
+    if (!host.list.length && host.offered) {
+      choseRecommended = true;
+      const first = res;
+      const rec = host.offered.recommended;
+      res = await turn([{ role: "user", text: userText }, { role: "assistant", text: first.text }], `Use ${rec.id}: ${rec.name || "the recommended one"}.`);
+      res.usage = { input_tokens: first.usage.input_tokens + res.usage.input_tokens, output_tokens: first.usage.output_tokens + res.usage.output_tokens };
+    }
     const p = host.list.at(-1);
     if (SET === "areas") {
       const ok = p && /Polygon/.test(p.feature.geometry.type);
@@ -109,6 +124,7 @@ for (const s of sites) {
         centre_error_km: p ? Math.round(turf.distance(turf.centroid(p.feature), turf.centroid(s.truth)) * 1000) / 1000 : null,
         area_ratio: ok ? Math.round((turf.area(p.feature) / turf.area(s.truth)) * 1000) / 1000 : null,
         anchor: p?.origin.anchor?.name, anchor_source: p?.origin.anchor?.source?.id, steps: p?.origin.steps, confidence: p?.origin.confidence,
+        offered_choices: host.offered ? host.offered.choices.length : 0, chose_recommended: choseRecommended,
         text: res.text, usage: res.usage, seconds: Math.round((Date.now() - t0) / 1000),
         tools: events.map((e) => ({ name: e.name, input: e.input, error: e.error, n: e.output?.candidates?.length })),
       };
@@ -125,13 +141,14 @@ for (const s of sites) {
       placed: !!p, error_km: at ? Math.round(turf.distance(at, truth) * 100) / 100 : null, truth_inside_shape: inside,
       shape: p?.feature.geometry.type, confidence: p?.origin.confidence, reason: p?.origin.reason,
       anchor: p?.origin.anchor?.name, anchor_source: p?.origin.anchor?.source?.id, steps: p?.origin.steps,
+      offered_choices: host.offered ? host.offered.choices.length : 0, chose_recommended: choseRecommended,
       text: res.text, usage: res.usage, seconds: Math.round((Date.now() - t0) / 1000),
       tools: events.map((e) => ({ name: e.name, input: e.input, error: e.error, n: e.output?.candidates?.length })),
       earlier_pin: { method: s.pin_method, error_km: s.pin_error_km === "" ? null : +s.pin_error_km },
       ...(SET === "described" ? { description: s.described.description, enough_to_locate: s.described.enough_to_locate } : {}),
     };
   } catch (e) {
-    rec = { project: s.project_number, name: s.name, error: e.message, tools: events.map((x) => ({ name: x.name, error: x.error })) };
+    rec = { project: s.project_number, case: s.id, name: s.name, error: e.message, tools: events.map((x) => ({ name: x.name, error: x.error })) };
   }
   results.push(rec);
   console.log(`${s.name}: ${rec.error || (rec.placed ? `${rec.error_km} km, ${rec.confidence}` : "not placed")}`);

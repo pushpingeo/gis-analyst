@@ -15,14 +15,14 @@ concurrency: place-evaluation
 jobs:
   eval:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 200
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm ci || npm install
       - name: Run place-finding evaluation
-        timeout-minutes: 80
+        timeout-minutes: 190
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

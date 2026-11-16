@@ -106,6 +106,28 @@
   </article>
 </template>
 
+<template id="choice-card">
+  <article class="msg analyst choices" aria-roledescription="carousel">
+    <p class="question"></p>
+    <div class="option" aria-live="polite">
+      <p class="rec" hidden><span class="badge">Recommended</span> <span class="why"></span></p>
+      <h2></h2>
+      <p class="kind"></p>
+      <p class="src"></p>
+      <p class="detail"></p>
+    </div>
+    <div class="nav">
+      <button data-op="prev" aria-label="Previous option">‹</button>
+      <span class="count"></span>
+      <button data-op="next" aria-label="Next option">›</button>
+    </div>
+    <div class="pick">
+      <button data-op="use" class="primary">Use this one</button>
+      <button data-op="lucky">Use the recommended one</button>
+    </div>
+  </article>
+</template>
+
 <script type="module" src="js/workspace.js"></script>
 </body>
 </html>

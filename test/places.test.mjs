@@ -22,6 +22,7 @@ const fetchFn = async (url) => {
   const u = decodeURIComponent(String(url));
   const json = (j) => ({ ok: true, status: 200, json: async () => j, text: async () => JSON.stringify(j) });
   if (u.includes("nominatim")) return json([]);
+  if (u.includes("Offshore_hydrocarbon_fields") && u.includes("JACKDAW")) return json({ type: "FeatureCollection", features: [{ type: "Feature", geometry: turf.bboxPolygon([2.33, 56.86, 2.43, 56.93]).geometry, properties: { FIELDNAME: "JACKDAW", FIELDTYPE: "GAS" } }] });
   if (u.includes("surface points") && u.includes("JACKDAW")) return json({ type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: [2.37924, 56.90038] }, properties: { NAME: "JACKDAW", INF_TYPE: "PLATFORM", CRS_NAME: "TM 0 N, ED50" } }] });
   if (u.includes("UKCS_blocks") && u.includes("'30/2'")) return json({ type: "FeatureCollection", features: [{ type: "Feature", geometry: turf.bboxPolygon([2.1985, 56.8327, 2.3985, 56.9994]).geometry, properties: { BLOCK_REF: "30/2", TYPE: "OFFSHORE" } }] });
   return json({ type: "FeatureCollection", features: [] });
@@ -98,6 +99,20 @@ await test("offset and circle", async () => {
   near(turf.distance(c, [2.37924, 56.90038]), 10, 0.05, "10 km away");
   near(turf.bearing([2.37924, 56.90038], c), 0, 1, "to the north");
   near(turf.area(host.list[0].feature) / 1e6, Math.PI * 4, 0.1, "area of a 2 km circle");
+});
+
+await test("offer_choices passes the candidates and the recommendation to the page", async () => {
+  const host = memoryHost();
+  let shown = null;
+  host.offerChoices = (o) => { shown = o; };
+  const t = createPlaceTools(host);
+  await t.exec("find_place", { query: "Jackdaw" });
+  const ids = [...t.candidates.keys()];
+  assert.ok(ids.length >= 2, "Jackdaw platform and field found");
+  const out = await t.exec("offer_choices", { candidates: ids.slice(0, 2), recommended: ids[1], reason: "the field outline" });
+  assert.equal(out.offered, 2);
+  assert.equal(shown.recommended.id, ids[1]);
+  await assert.rejects(() => t.exec("offer_choices", { candidates: [ids[0], ids[1]], recommended: "C99", reason: "x" }), /must be one of the candidates/);
 });
 
 await test("unknown anchors give a useful error", async () => {

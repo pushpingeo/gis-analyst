@@ -62,6 +62,20 @@ export function placeToolDefs(skills) {
       },
     },
     {
+      name: "offer_choices",
+      description: "When several found candidates could be what the person means and the difference matters, show them as choices: the person flicks through them on the map, each with its source, and picks one or takes your recommendation. Give two to five candidate ids in order of preference, the one you recommend, and a one-line reason. Then end your turn with a short question; their pick comes back as their next message.",
+      input_schema: {
+        type: "object",
+        properties: {
+          candidates: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 5 },
+          recommended: { type: "string", description: "The candidate id you recommend" },
+          reason: { type: "string", description: "One line: why you recommend it" },
+          question: { type: "string", description: "Optional: what the person is choosing, e.g. 'Which Linlithgow Palace do you mean?'" },
+        },
+        required: ["candidates", "recommended", "reason"],
+      },
+    },
+    {
       name: "edit_place",
       description: "Change a place: rotate (degrees clockwise), resize to an area (km²) or length (km), move (km along a bearing) or rename. Rotation and resizing keep the centre and are done on the ground, not on the map projection.",
       input_schema: {
@@ -202,6 +216,15 @@ export function createPlaceTools(host) {
       };
       const p = host.addPlace({ feature: f, origin });
       return { ...(await placeSummary(p)), how: steps.join(", then "), next: "Shown on the map as a proposal. Ask the person if it's what they meant." };
+    },
+
+    async offer_choices({ candidates, recommended, reason, question }) {
+      const list = (candidates || []).map((id) => cands.get(String(id).trim().toUpperCase())).filter(Boolean);
+      if (list.length < 2) throw new Error("Give at least two candidate ids from this conversation.");
+      const rec = cands.get(String(recommended).trim().toUpperCase());
+      if (!rec || !list.includes(rec)) throw new Error("The recommended id must be one of the candidates.");
+      host.offerChoices?.({ choices: list, recommended: rec, reason, question });
+      return { offered: list.length, recommended: rec.id, next: "Shown to the person. End your turn with one short question; don't build a place until they choose." };
     },
 
     async edit_place(i) {

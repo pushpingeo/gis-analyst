@@ -127,6 +127,24 @@ a { color: var(--sea); }
 .origin .words { font-style: italic; }
 .origin .quiet { color: var(--ink-2); }
 
+/* choices: a carousel of candidates, each with its source */
+.choices { border: 1px solid var(--rule); border-radius: 14px; padding: 12px 14px; }
+.choices .question { font-weight: 650; margin: 0 0 8px; }
+.choices .option { min-height: 96px; }
+.choices h2 { margin: 2px 0; font-size: 16px; }
+.choices .kind, .choices .detail { margin: 0 0 2px; font-size: 13.5px; color: var(--ink-2); }
+.choices .src { margin: 0 0 2px; font-size: 13px; }
+.choices .rec { margin: 0 0 4px; font-size: 13px; }
+.choices .rec .badge { display: inline-block; background: var(--ink); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 650; }
+.choices .nav { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.choices .nav button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--rule); background: var(--panel); font-size: 18px; line-height: 1; }
+.choices .count { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.choices .pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.choices .pick button { border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 5px 12px; font-size: 13.5px; }
+.choices .pick .primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+.choices.done .nav, .choices.done .pick { display: none; }
+.choices.done { opacity: .75; }
+
 /* the analyst's replies */
 .msg.analyst ul { margin: 4px 0 6px; padding-left: 20px; }
 .msg.analyst li { margin: 2px 0; }

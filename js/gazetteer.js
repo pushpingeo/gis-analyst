@@ -7,6 +7,27 @@ import { fetchOverpass, OVERPASS_ENDPOINTS } from "./tools.js";
 
 const round = (v, d = 4) => Math.round(v * 10 ** d) / 10 ** d;
 
+// Searches are remembered for the session, so a re-run or a follow-up doesn't ask the same server again.
+const memo = new Map();
+const remembered = (key, fn) => {
+  if (!memo.has(key)) memo.set(key, fn().catch((e) => { memo.delete(key); throw e; }));
+  return memo.get(key);
+};
+
+// Overpass: start with the server that answered last time, and give each one 15 seconds.
+let fastest = 0;
+async function overpass(q, fetchFn, headers) {
+  return remembered(`overpass:${q}`, async () => {
+    let lastErr;
+    for (let k = 0; k < OVERPASS_ENDPOINTS.length; k++) {
+      const i = (fastest + k) % OVERPASS_ENDPOINTS.length;
+      try { const j = await fetchOverpass(q, OVERPASS_ENDPOINTS[i], fetchFn, 15000, headers); fastest = i; return j; }
+      catch (e) { lastErr = e; }
+    }
+    throw new Error(`OpenStreetMap search failed: ${lastErr?.message}`);
+  });
+}
+
 // A candidate keeps its full geometry here; the model only ever sees a compact description.
 export function candidate({ name, type, geometry, source, extra = {} }) {
   const f = { type: "Feature", properties: {}, geometry };
@@ -68,16 +89,18 @@ const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 let lastNominatim = 0;
 
 export async function searchNominatim(term, { near = null, country = null, fetchFn = fetch, limit = 6, headers = {} } = {}) {
-  // Nominatim's policy is at most one request a second.
-  const wait = lastNominatim + 1100 - Date.now();
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  lastNominatim = Date.now();
   const q = new URLSearchParams({ q: term, format: "jsonv2", limit: String(limit), polygon_geojson: "1", polygon_threshold: "0.0005", addressdetails: "1" });
   if (country) q.set("countrycodes", country.toLowerCase());
   if (near) q.set("viewbox", [near[0] - 1, near[1] + 1, near[0] + 1, near[1] - 1].join(","));
-  const r = await fetchFn(`${NOMINATIM}?${q}`, { headers });
-  if (!r.ok) throw new Error(`Nominatim ${r.status}`);
-  const j = await r.json();
+  const j = await remembered(`nominatim:${q}`, async () => {
+    // Nominatim's policy is at most one request a second.
+    const wait = lastNominatim + 1100 - Date.now();
+    if (wait > 0) await new Promise((ok) => setTimeout(ok, wait));
+    lastNominatim = Date.now();
+    const r = await fetchFn(`${NOMINATIM}?${q}`, { headers });
+    if (!r.ok) throw new Error(`Nominatim ${r.status}`);
+    return r.json();
+  });
   return j.map((x) => candidate({
     name: x.name || x.display_name.split(",")[0],
     type: `${x.category}: ${x.type}`.replace(/_/g, " "),
@@ -126,12 +149,8 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
   const nameFilter = name ? `["name"~"${name.replace(/["\\]/g, "")}",i]` : "";
   // Tags and bounding boxes only: cheap enough not to time out over a wide radius. Outlines are fetched later,
   // only for the feature that's actually used (featureOutline).
-  const q = `[out:json][timeout:25];(${parts.map((p) => `${p}${nameFilter}(around:${r},${lonlat[1]},${lonlat[0]});`).join("")});out tags bb 150;`;
-  let json, lastErr;
-  for (const ep of OVERPASS_ENDPOINTS) {
-    try { json = await fetchOverpass(q, ep, fetchFn, 30000, headers); break; } catch (e) { lastErr = e; }
-  }
-  if (!json) throw new Error(`OpenStreetMap search failed: ${lastErr?.message}`);
+  const q = `[out:json][timeout:14];(${parts.map((p) => `${p}${nameFilter}(around:${r},${lonlat[1]},${lonlat[0]});`).join("")});out tags bb 150;`;
+  const json = await overpass(q, fetchFn, headers);
   const cands = [];
   let turbines = 0;
   for (const el of json.elements || []) {
@@ -159,12 +178,7 @@ const sameXY = (a, b) => a.lat === b.lat && a.lon === b.lon;
 
 // The real outline of one OpenStreetMap way or relation, fetched when a place is built from it.
 export async function featureOutline(osm, { fetchFn = fetch, headers = {} } = {}) {
-  const q = `[out:json][timeout:25];${osm.type}(${osm.id});out geom;`;
-  let json, lastErr;
-  for (const ep of OVERPASS_ENDPOINTS) {
-    try { json = await fetchOverpass(q, ep, fetchFn, 30000, headers); break; } catch (e) { lastErr = e; }
-  }
-  if (!json) throw new Error(`Couldn't fetch the outline: ${lastErr?.message}`);
+  const json = await overpass(`[out:json][timeout:14];${osm.type}(${osm.id});out geom;`, fetchFn, headers);
   const el = json.elements?.[0];
   if (el?.type === "way" && el.geometry?.length > 3 && sameXY(el.geometry[0], el.geometry.at(-1))) return { type: "Polygon", coordinates: [el.geometry.map((p) => [p.lon, p.lat])] };
   if (el?.type === "way" && el.geometry) return { type: "LineString", coordinates: el.geometry.map((p) => [p.lon, p.lat]) };
@@ -178,10 +192,13 @@ export async function featureOutline(osm, { fetchFn = fetch, headers = {} } = {}
 // ---- Wikidata: named assets (mines, dams, power plants, ports) with coordinates ------------------
 const WD = "https://www.wikidata.org/w/api.php";
 export async function searchWikidata(term, { fetchFn = fetch, headers = {}, limit = 8 } = {}) {
-  const get = async (params) => {
-    const r = await fetchFn(`${WD}?${new URLSearchParams({ format: "json", origin: "*", ...params })}`, { headers });
-    if (!r.ok) throw new Error(`Wikidata ${r.status}`);
-    return r.json();
+  const get = (params) => {
+    const url = `${WD}?${new URLSearchParams({ format: "json", origin: "*", ...params })}`;
+    return remembered(url, async () => {
+      const r = await fetchFn(url, { headers });
+      if (!r.ok) throw new Error(`Wikidata ${r.status}`);
+      return r.json();
+    });
   };
   const found = await get({ action: "wbsearchentities", search: term, language: "en", uselang: "en", type: "item", limit: String(limit) });
   const ids = (found.search || []).map((x) => x.id);

@@ -257,6 +257,7 @@ const host = {
   findPlace: placeByName,
   skillText: (name) => skills[name]?.body || "",
   onCandidates: showCandidates,
+  offerChoices: (o) => makeChoiceCard(o),
   addPlace({ feature, origin }) {
     const id = crypto.randomUUID();
     const mode = feature.geometry.type === "Point" ? "point" : /LineString/.test(feature.geometry.type) ? "linestring" : "polygon";
@@ -344,6 +345,46 @@ function makeCard(p) {
   card.scrollIntoView({ block: "end", behavior: "smooth" });
   expandSheet();
   return card;
+}
+
+// A carousel of candidates: flick through them on the map, each with its source; the pick is your reply.
+function makeChoiceCard({ choices, recommended, reason, question }) {
+  const card = $("choice-card").content.firstElementChild.cloneNode(true);
+  let i = 0;
+  card.querySelector(".question").textContent = question || "Which one do you mean?";
+  const show = () => {
+    const c = choices[i];
+    card.querySelector("h2").textContent = c.name || c.id;
+    card.querySelector(".kind").textContent = c.type || "";
+    const src = card.querySelector(".src");
+    src.replaceChildren(document.createTextNode("Source: "), Object.assign(el("a", `${c.source.publisher}, ${c.source.title}`), { href: c.source.url, target: "_blank", rel: "noopener" }), document.createTextNode(` (${c.source.licence})`));
+    const bits = [c.extra?.place || c.extra?.description, c.extra?.country, c.area_km2 != null ? R.fmtArea(c.area_km2) : null, c.distance_km != null ? `${R.fmtNum(c.distance_km)} km from the reference` : null].filter(Boolean);
+    card.querySelector(".detail").textContent = bits.join(" · ");
+    const isRec = c === recommended;
+    card.querySelector(".rec").hidden = !isRec;
+    card.querySelector(".why").textContent = isRec ? reason : "";
+    card.querySelector('[data-op="lucky"]').hidden = isRec;
+    card.querySelector(".count").textContent = `${i + 1} of ${choices.length}`;
+    showCandidates([c]);
+    const f = { type: "Feature", properties: {}, geometry: c.geometry };
+    if (c.geometry.type === "Point") map.flyTo({ center: c.geometry.coordinates, zoom: Math.max(map.getZoom(), 12), padding: fitPadding() });
+    else map.fitBounds(turf.bbox(f), { padding: fitPadding(), maxZoom: 14 });
+  };
+  card.querySelector('[data-op="prev"]').addEventListener("click", () => { i = (i - 1 + choices.length) % choices.length; show(); });
+  card.querySelector('[data-op="next"]').addEventListener("click", () => { i = (i + 1) % choices.length; show(); });
+  card.addEventListener("keydown", (e) => { if (e.key === "ArrowLeft") card.querySelector('[data-op="prev"]').click(); if (e.key === "ArrowRight") card.querySelector('[data-op="next"]').click(); });
+  const pick = (c) => {
+    if (busy) return;
+    card.classList.add("done");
+    send(`Use ${c.id}: ${c.name || "that one"} (${c.source.publisher}).`);
+  };
+  card.querySelector('[data-op="use"]').addEventListener("click", () => pick(choices[i]));
+  card.querySelector('[data-op="lucky"]').addEventListener("click", () => pick(recommended));
+  if (pendingReply?.isConnected) $("conversation").insertBefore(card, pendingReply);
+  else $("conversation").append(card);
+  i = Math.max(0, choices.indexOf(recommended));
+  show();
+  expandSheet();
 }
 
 function paintStatus(p, card = p.card) {
