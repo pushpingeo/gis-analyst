@@ -20,7 +20,8 @@ export const ATLAS_CONCEPTS = {
   "settlement": { concept: "settlement" },
 };
 
-const AUTHORITATIVE_PUBLISHERS = new Set(["government", "intergovernmental", "national-mapping-agency", "regulator"]);
+// The atlas's publisher types for official bodies: "central-gov", "local-gov", "public-body", "intergovernmental"…
+const AUTHORITATIVE = /gov|public-body|intergov|regulator|mapping-agency/i;
 const NAME_KEYS = /^(name|site_?name|plant_?name|plant___project_name|project_?name|mine_?name|facility_?name|dep_?name|title|label|nom|nombre|naam|bezeichnung)$/i;
 const NAMEISH = /name|project|plant|site|mine|facility|title/i;
 const TYPEISH = /^(type|.*_?type|commod.*|fuel|technology|source|status|primary_fuel|dep_type)$/i;
@@ -35,7 +36,7 @@ function pickType(p) {
 }
 
 // call(tool, args) → structuredContent. Returns { candidates, total, checked: [ { dataset, publisher, returned | error } ] }.
-export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, name = null, limit = 15, maxDatasets = 5 } = {}) {
+export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, name = null, limit = 15, maxDatasets = 8 } = {}) {
   const map = ATLAS_CONCEPTS[featureType];
   if (!map) return null; // not a kind of thing the atlas indexes; OpenStreetMap only
   const r = Math.min(Math.max(radiusKm, 0.5), 50);
@@ -61,7 +62,7 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
           c = candidate({
             name: nm, type: ty || d.title, geometry: f.geometry,
             source: { id: "atlas", atlas_id: d.id, title: d.title, publisher: d.publisher, publisher_type: d.publisher_type,
-              authoritative: AUTHORITATIVE_PUBLISHERS.has(d.publisher_type), licence: d.licence || "not stated" },
+              authoritative: AUTHORITATIVE.test(d.publisher_type || ""), licence: d.licence || "not stated" },
             extra: {},
           });
         } catch { continue; }

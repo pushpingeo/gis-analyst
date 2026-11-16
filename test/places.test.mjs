@@ -251,7 +251,7 @@ await test("feature search uses the atlas, and reports OpenStreetMap as not chec
   const call = async (tool, args) => {
     calls.push(tool);
     if (tool === "find_datasets") return { results: [
-      { id: "mrds", title: "Minerals Resource Data System", publisher: "U.S. Geological Survey", publisher_type: "government", licence: "public domain" },
+      { id: "mrds", title: "Minerals Resource Data System", publisher: "U.S. Geological Survey", publisher_type: "public-body", licence: "public domain" },
       { id: "fake", title: "Pennsylvania mines", publisher: "PSU", publisher_type: "academic", extent_may_be_overstated: true },
       { id: "broken", title: "Global mining polygons", publisher: "WMU", publisher_type: "academic" },
     ] };
