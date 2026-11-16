@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GIS Analyst</title>
+<meta name="description" content="Mark an area on the map or describe it, and an AI analyst works through it with open data and written-down GIS methods.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="js/vendor/maplibre-gl.css">
+<link rel="stylesheet" href="css/workspace.css">
+<script src="js/vendor/maplibre-gl.js"></script>
+</head>
+<body>
+<div id="map" aria-label="Map"></div>
+
+<nav class="tools" aria-label="Drawing tools">
+  <button data-mode="select" aria-pressed="false" title="Select and edit">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 1.6L10 19z"/></svg><span class="sr">Select and edit</span></button>
+  <button data-mode="point" aria-pressed="false" title="Drop a point">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-6.2-6-11a6 6 0 0112 0c0 4.8-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg><span class="sr">Drop a point</span></button>
+  <button data-mode="linestring" aria-pressed="false" title="Draw a line">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l6-8 4 4 6-9"/><circle cx="4" cy="18" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="14" cy="14" r="1.6"/><circle cx="20" cy="5" r="1.6"/></svg><span class="sr">Draw a line</span></button>
+  <button data-mode="polygon" aria-pressed="false" title="Draw an area">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7l8-3 7 6-3 9-11-2z"/></svg><span class="sr">Draw an area</span></button>
+  <button data-mode="rectangle" aria-pressed="false" title="Draw a rectangle">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="12"/></svg><span class="sr">Draw a rectangle</span></button>
+  <button data-mode="circle" aria-pressed="false" title="Draw a circle">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.2"/></svg><span class="sr">Draw a circle</span></button>
+  <span class="tools-gap"></span>
+  <button data-action="delete" title="Delete the selected shape" disabled>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg><span class="sr">Delete the selected shape</span></button>
+</nav>
+
+<p class="hint" id="hint" hidden></p>
+
+<section class="panel" id="panel" aria-label="Conversation">
+  <button class="handle" id="handle" aria-expanded="true" aria-controls="conversation"><span class="sr">Show or hide the conversation</span></button>
+  <header class="brand">
+    <h1>GIS Analyst</h1>
+    <p>Map, data and method in one conversation.</p>
+  </header>
+
+  <div class="conversation" id="conversation" aria-live="polite">
+    <div class="msg analyst welcome">
+      <p>Mark an area on the map, or describe it, and say what you need.</p>
+      <p class="quiet">This is an early preview: draw and edit shapes and I'll tell you where they are and how big they are. Risk screening, net area and constraints are switched on next.</p>
+    </div>
+  </div>
+
+  <div class="composer">
+    <p class="activity" id="activity" role="status"></p>
+    <div class="chips" role="group" aria-label="What to do">
+      <button class="chip" data-prompt="Screen this area for environmental and social risks">Screen for risks</button>
+      <button class="chip" data-prompt="How much of this area is free to develop?">Net developable area</button>
+      <button class="chip" data-prompt="What constrains this site, how would it be reached, and what is it close to?">Constraints and access</button>
+      <button class="chip" data-prompt="Find ">Find a place</button>
+    </div>
+    <form class="ask" id="ask">
+      <label for="say" class="sr">Message</label>
+      <textarea id="say" rows="1" placeholder="Describe an area or ask a question" autocomplete="off"></textarea>
+      <button type="button" class="mic" id="mic" title="Speak" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span class="sr">Speak</span></button>
+      <button type="submit" class="send" title="Send">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg><span class="sr">Send</span></button>
+    </form>
+    <p class="links"><a href="lab.html">How the risk screening was tested</a><a href="index.html">Earlier agent page</a><a href="https://github.com/pushpingeo/gis-analyst">Code</a></p>
+  </div>
+</section>
+
+<template id="shape-card">
+  <article class="msg analyst shape">
+    <header>
+      <h2></h2>
+      <div class="scale" role="radiogroup" aria-label="Scale of work">
+        <button role="radio" data-scale="local">Local</button>
+        <button role="radio" data-scale="regional">Regional</button>
+        <button role="radio" data-scale="global">Global</button>
+      </div>
+    </header>
+    <p class="summary"></p>
+    <dl class="facts"></dl>
+    <div class="edit">
+      <button data-op="zoom">Zoom to</button>
+      <button data-op="rotate" data-deg="-15" title="Rotate 15° anticlockwise" aria-label="Rotate 15 degrees anticlockwise">↺ 15°</button>
+      <button data-op="rotate" data-deg="15" title="Rotate 15° clockwise" aria-label="Rotate 15 degrees clockwise">↻ 15°</button>
+      <form class="resize"><label><span class="sr">New size</span><input type="number" min="0" step="any" inputmode="decimal"></label><span class="unit"></span><button>Resize</button></form>
+    </div>
+    <ol class="history"></ol>
+  </article>
+</template>
+
+<script type="module" src="js/workspace.js"></script>
+</body>
+</html>

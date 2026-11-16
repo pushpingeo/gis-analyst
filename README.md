@@ -13,6 +13,15 @@ Milestone 1: the skill text, the concept catalogue and the spatial tools. No AI 
 - `index.html`: a page to run the tools on any evaluation site and see the results on a map.
 - `data/eval-sites.json`: the 45 evaluation sites, with IFC's own answers for checking.
 
+## Workspace (in progress)
+`workspace.html` is the new public interface: a map and a conversation in one place, where you mark or describe an area and the agent works through it. The plan is in the project notes; it's being built in steps.
+
+- **Step 1 (this):** the layout, drawing and editing tools (point, line, area, rectangle, circle; move, reshape, add or remove corners, rotate, resize), and reference data from Natural Earth that says where a shape is, how big it is and what scale of work it looks like. No AI yet.
+- `js/geometry.js`: deterministic shape operations (rotate, resize, square or circle of a given area). The agent will use the same functions.
+- `js/reference.js`: country, coast distance, nearby towns and scale for any shape.
+- `data/ref/`: Natural Earth layers, built by `scripts/build-reference.mjs`.
+- `js/vendor/`, `fonts/`: MapLibre, Terra Draw, Turf and Public Sans, bundled by `scripts/build-vendor.mjs` so the page doesn't depend on CDNs.
+
 ## Run the tests
 ```
 npm install

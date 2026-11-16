@@ -2,6 +2,18 @@
   "name": "gis-analyst",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node test/tools.test.mjs && node test/agent.test.mjs" },
-  "devDependencies": { "@turf/turf": "^7.2.0", "osmtogeojson": "^3.0.0-beta.5" }
+  "scripts": {
+    "test": "node test/tools.test.mjs && node test/agent.test.mjs && node test/workspace.test.mjs"
+  },
+  "devDependencies": {
+    "@fontsource-variable/public-sans": "^5.3.0",
+    "@turf/turf": "^7.2.0",
+    "esbuild": "^0.28.2",
+    "maplibre-gl": "^4.7.1",
+    "mapshaper": "^0.8.1",
+    "osmtogeojson": "^3.0.0-beta.5",
+    "playwright-core": "^1.65.1",
+    "terra-draw": "^1.40.0",
+    "terra-draw-maplibre-gl-adapter": "^1.5.0"
+  }
 }
