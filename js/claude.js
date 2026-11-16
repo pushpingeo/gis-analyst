@@ -29,7 +29,9 @@ export async function callClaude(args) {
 }
 
 async function callOnce({ system, messages, tools }) {
-  const body = { model: CONFIG.model, max_tokens: CONFIG.maxTokens, system, messages, tools };
+  // Cache the system prompt and tool definitions: every round of a turn sends them unchanged.
+  const cachedTools = tools?.length ? tools.map((t, i) => (i === tools.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t)) : tools;
+  const body = { model: CONFIG.model, max_tokens: CONFIG.maxTokens, system: typeof system === "string" ? [{ type: "text", text: system, cache_control: { type: "ephemeral" } }] : system, messages, tools: cachedTools };
   const key = getUserKey();
   const size = JSON.stringify(body).length;
   if (size > 100000) console.warn(`Claude request is ${Math.round(size / 1000)} kB; the Worker refuses over 120 kB.`);

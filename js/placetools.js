@@ -148,12 +148,15 @@ export function createPlaceTools(host) {
       const nearAt = near ? resolve(near).lonlat : null;
       const results = [];
       const errors = [];
-      const anchors = await searchAnchors(host.anchors, query, { near: nearAt, fetchFn: host.fetchFn });
-      for (const a of anchors) (a.error ? errors.push(a.error) : results.push(a));
-      try { results.push(...(await searchNominatim(query, { near: nearAt, country, fetchFn: host.fetchFn, headers: host.headers }))); }
-      catch (e) { errors.push(`OpenStreetMap search: ${e.message}`); }
-      try { results.push(...(await searchWikidata(query, { fetchFn: host.fetchFn, headers: host.headers }))); }
-      catch (e) { errors.push(`Wikidata search: ${e.message}`); }
+      // All sources at once; results keep this order (authoritative layers first).
+      const [an, nom, wd] = await Promise.allSettled([
+        searchAnchors(host.anchors, query, { near: nearAt, fetchFn: host.fetchFn }),
+        searchNominatim(query, { near: nearAt, country, fetchFn: host.fetchFn, headers: host.headers }),
+        searchWikidata(query, { fetchFn: host.fetchFn, headers: host.headers }),
+      ]);
+      if (an.status === "fulfilled") for (const a of an.value) (a.error ? errors.push(a.error) : results.push(a));
+      if (nom.status === "fulfilled") results.push(...nom.value); else errors.push(`OpenStreetMap search: ${nom.reason?.message}`);
+      if (wd.status === "fulfilled") results.push(...wd.value); else errors.push(`Wikidata search: ${wd.reason?.message}`);
       try { results.push(...searchNaturalEarth(await host.ref.get("places"), query)); } catch { /* reference not loaded */ }
       const list = results.map((c) => {
         if (nearAt) { c.distance_km = round(turf.distance(nearAt, c.lonlat), 1); c.bearing = Math.round((turf.bearing(nearAt, c.lonlat) + 360) % 360); }

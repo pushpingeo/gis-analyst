@@ -9,7 +9,7 @@ export function parseSkill(text) {
   return { name: meta.name, version: meta.version, description: meta.description, body: fm ? text.slice(fm[0].length) : text };
 }
 
-export function systemPrompt({ skills, comingSoon = [] }) {
+export function systemPrompt({ skills, comingSoon = [], loaded = [] }) {
   return `You are Tobler, a geospatial analyst (the product is named after the geographer Waldo Tobler; you are not him) working with a person in a web workspace: a map with drawing tools beside this conversation. The person can draw and edit shapes themselves; you can find places and build areas with tools.
 
 How you work:
@@ -23,7 +23,10 @@ How you work:
 - If a request is ambiguous in a way that would change the result, ask before building. If it's clear, build it and ask the person to check.
 ${comingSoon.length ? `- Not available yet in this preview: ${comingSoon.join("; ")}. If asked, say it's coming next and offer what you can do now (finding and defining the area).` : ""}
 
-Skills: ${skills.map((s) => `${s.name}: ${s.description}`).join("\n")}`;
+Skills: ${skills.map((s) => `${s.name}: ${s.description}`).join("\n")}${loaded.length ? `
+
+Already loaded earlier in this conversation (follow them; don't load them again):
+${loaded.map((s) => `<skill name="${s.name}">\n${s.body}\n</skill>`).join("\n")}` : ""}`;
 }
 
 // Earlier assistant messages in this turn lose their thinking blocks (signed to the system prompt).

@@ -515,6 +515,8 @@ function grow() { say.style.height = "auto"; say.style.height = Math.min(say.scr
 
 let busy = false;
 let pendingReply = null;
+// Once a skill is loaded, later turns carry it in the system prompt instead of spending a round on load_skill.
+const loadedSkills = new Set();
 $("ask").addEventListener("submit", (e) => { e.preventDefault(); send(say.value.trim()); });
 document.querySelectorAll("[data-example]").forEach((b) => b.addEventListener("click", () => send(b.textContent.trim())));
 
@@ -536,13 +538,14 @@ async function send(text) {
     const summary = await projectSummary(ref, host.places(), focusName, viewBounds());
     const skillList = Object.values(skills);
     const res = await runTurn({
-      system: systemPrompt({ skills: skillList, comingSoon: ["risk screening (NTR), net developable area and constraints-and-access analysis"] }),
+      system: systemPrompt({ skills: skillList, loaded: skillList.filter((s) => loadedSkills.has(s.name)), comingSoon: ["risk screening (NTR), net developable area and constraints-and-access analysis"] }),
       messages: buildMessages({ recent, summary, userText: text }),
       tools: placeToolDefs(skillList),
       exec: (name, input) => tools.exec(name, input),
       callClaude,
       onEvent: (ev) => {
         if (ev.type === "tool_start") activity(`${activityFor(ev.name, ev.input)}…`, true);
+        if (ev.type === "tool" && ev.name === "load_skill" && !ev.error) loadedSkills.add(ev.input?.name);
         if (ev.type === "tool") {
           steps.append(el("li", traceLine(ev), ev.error ? "err" : ""));
           activity("Thinking…", true);
