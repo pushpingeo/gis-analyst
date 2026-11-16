@@ -7,16 +7,19 @@ import * as G from "./geometry.js";
 import * as R from "./reference.js";
 import { placeToolDefs, createPlaceTools, projectSummary } from "./placetools.js";
 import { parseSkill, systemPrompt, buildMessages, runTurn, activityFor } from "./converse.js";
-import { callClaude, LimitReached } from "./claude.js?v=t1";
+import { callClaude, LimitReached } from "./claude.js";
 
 const $ = (id) => document.getElementById(id);
+// Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
+const ASSETS = (() => { try { return JSON.parse($("asset-versions")?.textContent || "{}"); } catch { return {}; } })();
+const asset = (path) => ASSETS[path] || path;
 const C = { ink: "#15303c", pole: "#d1352a", white: "#ffffff", sea: "#2b6a80" };
 const BASEMAP = "https://tiles.openfreemap.org/styles/positron";
 
 // ---- reference data -------------------------------------------------------------
 const ref = R.createReference(async (name) => {
   activity(`Loading ${name === "places" ? "towns and cities" : name}…`, true);
-  const r = await fetch(`data/ref/${name}.json`);
+  const r = await fetch(asset(`data/ref/${name}.json`));
   if (!r.ok) throw new Error(`Couldn't load the ${name} layer (${r.status}).`);
   return r.json();
 });
@@ -289,8 +292,8 @@ const host = {
 const tools = createPlaceTools(host);
 
 Promise.all([
-  fetch("skills/place-finding/SKILL.md").then((r) => r.text()).then((t) => { const s = parseSkill(t); skills[s.name] = s; }),
-  fetch("catalogue/anchors.json").then((r) => r.json()).then((j) => { anchors = j.sources; }),
+  fetch(asset("skills/place-finding/SKILL.md")).then((r) => r.text()).then((t) => { const s = parseSkill(t); skills[s.name] = s; }),
+  fetch(asset("catalogue/anchors.json")).then((r) => r.json()).then((j) => { anchors = j.sources; }),
 ]).catch((e) => note(`Something the analyst needs didn't load: ${e.message}`));
 
 // ---- cards ----------------------------------------------------------------------------

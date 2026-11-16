@@ -9,10 +9,40 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=5e8c8f4">
+<link rel="stylesheet" href="css/workspace.css?v=6ceec591">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
-{ "imports": { "@turf/turf": "./js/vendor/turf.js", "osmtogeojson": "./js/vendor/osmtogeojson.js" } }
+{
+ "imports": {
+  "./js/claude.js": "./js/claude.js?v=b96d5f45",
+  "./js/config.js": "./js/config.js?v=3830d203",
+  "./js/config.js?v=m2b": "./js/config.js?v=3830d203",
+  "./js/converse.js": "./js/converse.js?v=9e9e9295",
+  "./js/gazetteer.js": "./js/gazetteer.js?v=ec947d39",
+  "./js/geometry.js": "./js/geometry.js?v=84ae2f30",
+  "./js/placetools.js": "./js/placetools.js?v=b0ef4898",
+  "./js/reference.js": "./js/reference.js?v=3840a755",
+  "./js/tools.js": "./js/tools.js?v=084a3bd7",
+  "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
+  "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
+  "./js/workspace.js": "./js/workspace.js?v=4bcc7304",
+  "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
+  "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
+ }
+}
+</script>
+<script type="application/json" id="asset-versions">
+{
+ "skills/ntr-screening/SKILL.md": "skills/ntr-screening/SKILL.md?v=f5c4904b",
+ "skills/place-finding/SKILL.md": "skills/place-finding/SKILL.md?v=d586c994",
+ "catalogue/anchors.json": "catalogue/anchors.json?v=4239096c",
+ "catalogue/catalogue.json": "catalogue/catalogue.json?v=1fae6aef",
+ "data/ref/coastline.json": "data/ref/coastline.json?v=e913d7a4",
+ "data/ref/countries.json": "data/ref/countries.json?v=bd02bffd",
+ "data/ref/lakes.json": "data/ref/lakes.json?v=819467cc",
+ "data/ref/places.json": "data/ref/places.json?v=d095bb9f",
+ "data/ref/rivers.json": "data/ref/rivers.json?v=a6c03938"
+}
 </script>
 </head>
 <body>
@@ -129,6 +159,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=5e8c8f4"></script>
+<script type="module" src="js/workspace.js?v=4bcc7304"></script>
 </body>
 </html>
