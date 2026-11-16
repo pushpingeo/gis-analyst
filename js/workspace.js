@@ -30,14 +30,16 @@ if (!phone) map.addControl(new maplibregl.NavigationControl({ showCompass: false
 map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
 
 // If the basemap can't be reached, fall back to the reference countries on a plain background so the tools still work.
+// Start on "style.load", not "load": a hidden tab doesn't render, so "load" may never come (lesson from demo 1).
 let started = false, fellBack = false;
-const fallbackTimer = setTimeout(useFallbackBasemap, 9000);
+const fallbackTimer = setTimeout(useFallbackBasemap, 15000);
 map.on("error", (e) => { if (!started && /style|fetch|Failed|NetworkError/i.test(String(e?.error?.message || ""))) useFallbackBasemap(); });
-map.once("load", start);
+map.once("style.load", start);
 
 async function useFallbackBasemap() {
-  if (started || fellBack) return;
+  if (started || fellBack || map.isStyleLoaded()) return;
   fellBack = true;
+  map.off("style.load", start);
   const countries = await ref.get("countries").catch(() => null);
   map.setStyle({
     version: 8, sources: countries ? { ne: { type: "geojson", data: countries, attribution: "Natural Earth" } } : {},
