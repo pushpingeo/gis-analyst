@@ -1,0 +1,461 @@
+[
+ {
+  "project": "46824",
+  "name": "Reko Diq Copper",
+  "country": "Pakistan",
+  "site_type": "Mine + borefield",
+  "placed": true,
+  "error_km": 40.69,
+  "truth_inside_shape": false,
+  "shape": "Point",
+  "confidence": "high",
+  "reason": "Reko Diq Mine matched by name and type in Wikidata (CC0), and the Reko Diq Airport and mountain results sit within about 300 m of it. No mapped mine outline was retrieved (OSM search timed out twice).",
+  "anchor": "Reko Diq Mine",
+  "anchor_source": "wikidata",
+  "steps": [
+   "point"
+  ],
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've marked the Reko Diq Mine as a proposed point (Area 1). It matches by name and type in Wikidata, and the Reko Diq Airport and mountain results fall within about 300 m of it. Confidence is high. I didn't get a mapped mine outline because the OpenStreetMap search timed out twice.\n\nI haven't marked the borefield. I couldn't find it as a separate feature, and I didn't want to guess its extent. Should I try to locate it, or draw a rough area around the mine?",
+  "usage": {
+   "input_tokens": 28373,
+   "output_tokens": 1439
+  },
+  "seconds": 101,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Reko Diq",
+     "country": "PK"
+    },
+    "n": 4
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C4",
+     "feature_type": "mine or quarry",
+     "radius_km": 5
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C4",
+     "feature_type": "mine or quarry",
+     "radius_km": 5
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C4",
+     "shape": "point",
+     "words": "Reko Diq Copper, Mine",
+     "confidence": "high",
+     "reason": "Reko Diq Mine matched by name and type in Wikidata (CC0), and the Reko Diq Airport and mountain results sit within about 300 m of it. No mapped mine outline was retrieved (OSM search timed out twice)."
+    }
+   }
+  ],
+  "earlier_pin": {
+   "method": "est",
+   "error_km": 0
+  }
+ },
+ {
+  "project": "34203",
+  "name": "CBG Expansion",
+  "country": "Guinea",
+  "site_type": "Mine + 120 km rail + port",
+  "placed": true,
+  "error_km": 2.5,
+  "truth_inside_shape": false,
+  "shape": "Point",
+  "confidence": "low",
+  "reason": "Anchored on Sangarédi town (OSM), the CBG mining town in Boké prefecture; it coincides with the Sangarédi railway station (C4). The mine itself wasn't matched: the Wikidata mine point (C5) duplicates the sub-prefecture centroid, and nearby mine search timed out. Port end is Kamsar (Boké), about 130 km by rail (from my own knowledge, not checked against a mapped line).",
+  "anchor": "Sangarédi",
+  "anchor_source": "osm-nominatim",
+  "steps": [
+   "point"
+  ],
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've marked a proposed point, \"CBG Expansion (Sangarédi)\", at the mine town of Sangarédi in Guinea's Boké prefecture. Confidence is low.\n\n- **What I used:** the OpenStreetMap town point for Sangarédi, which matches the Sangarédi railway station in Wikidata.\n- **What's missing:** the mine itself wasn't matched. The Wikidata mine entry sits on the sub-prefecture centre, not on a mine footprint. The nearby-feature searches timed out, so I couldn't find the mine outline or the rail line.\n- **Port end:** Kamsar is the likely port (from my own knowledge, not checked on the map). The rail run from Sangarédi to Kamsar is about 130 km, which fits the 120 km in the project description.\n\nShould I keep this point as the site, or do you have the mine's outline or coordinates? If you give me the mine footprint, I can draw it in place of the point.",
+  "usage": {
+   "input_tokens": 61583,
+   "output_tokens": 2908
+  },
+  "seconds": 147,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "CBG bauxite mine Guinea",
+     "country": "GN"
+    },
+    "n": 0
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Compagnie des Bauxites de Guinée"
+    },
+    "n": 0
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Sangarédi",
+     "country": "GN"
+    },
+    "n": 5
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Kamsar",
+     "country": "GN"
+    },
+    "n": 4
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C1",
+     "feature_type": "mine or quarry",
+     "radius_km": 15
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C5",
+     "feature_type": "mine or quarry",
+     "radius_km": 15
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C5",
+     "feature_type": "mine or quarry",
+     "radius_km": 10
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Sangarédi bauxite mine"
+    },
+    "n": 0
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C1",
+     "shape": "point",
+     "words": "CBG Expansion (Bauxite mining; Mine + 120 km rail + port), Guinea",
+     "confidence": "low",
+     "reason": "Anchored on Sangarédi town (OSM), the CBG mining town in Boké prefecture; it coincides with the Sangarédi railway station (C4). The mine itself wasn't matched: the Wikidata mine point (C5) duplicates the sub-prefecture centroid, and nearby mine search timed out. Port end is Kamsar (Boké), about 130 km by rail (from my own knowledge, not checked against a mapped line)."
+    }
+   },
+   {
+    "name": "edit_place",
+    "input": {
+     "place": "Area 1",
+     "rename": "CBG Expansion (Sangarédi)"
+    }
+   }
+  ],
+  "earlier_pin": {
+   "method": "osm",
+   "error_km": 2.5
+  }
+ },
+ {
+  "project": "24374",
+  "name": "Guinea Alumina Corporation",
+  "country": "Guinea",
+  "site_type": "Mine + rail + port",
+  "placed": true,
+  "error_km": 31.98,
+  "truth_inside_shape": false,
+  "shape": "Point",
+  "confidence": "low",
+  "reason": "Wikidata mine record (Q24848822) at Sangarédi, Boké, the GAC bauxite mining area (from my own knowledge of GAC's operations). It is unnamed and sits exactly on the Sangarédi sub-prefecture centre, so the point is rough. The company's OSM entry is only its Conakry office, and the nearby mine search timed out.",
+  "anchor": "Q24848822",
+  "anchor_source": "wikidata",
+  "steps": [
+   "point"
+  ],
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've placed a point, **Area 1**, at Sangarédi in Boké prefecture, about 60 km from Boké town. Confidence is **low**.\n\n- The OpenStreetMap entry for Guinea Alumina Corporation is its Conakry office, which isn't the site.\n- The point comes from a Wikidata mine record (Q24848822) at Sangarédi. It's unnamed and sits on the sub-prefecture centre, so it may be rough.\n- From my own knowledge, GAC's bauxite mining is around Sangarédi, with a rail line to a coastal port. Nearby mine searches timed out, so I couldn't check the mine's extent or the port.\n\nIs the Sangarédi point the mine you mean, and do you want the port marked as a separate place?",
+  "usage": {
+   "input_tokens": 47127,
+   "output_tokens": 3136
+  },
+  "seconds": 144,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Guinea Alumina Corporation",
+     "country": "GN"
+    },
+    "n": 1
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Boké",
+     "country": "GN"
+    },
+    "n": 7
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "GAC bauxite mine Guinea"
+    },
+    "n": 0
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C3",
+     "feature_type": "mine or quarry",
+     "radius_km": 50
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Sangarédi",
+     "country": "GN"
+    },
+    "n": 5
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C10",
+     "feature_type": "mine or quarry",
+     "radius_km": 15
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C13",
+     "feature_type": "mine or quarry",
+     "radius_km": 10
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C13",
+     "shape": "point",
+     "words": "Guinea Alumina Corporation (Bauxite mining; Mine + rail + port), Guinea",
+     "confidence": "low",
+     "reason": "Wikidata mine record (Q24848822) at Sangarédi, Boké, the GAC bauxite mining area (from my own knowledge of GAC's operations). It is unnamed and sits exactly on the Sangarédi sub-prefecture centre, so the point is rough. The company's OSM entry is only its Conakry office, and the nearby mine search timed out."
+    }
+   }
+  ],
+  "earlier_pin": {
+   "method": "est",
+   "error_km": 33.85
+  }
+ },
+ {
+  "project": "41009",
+  "name": "Tasiast Mauritania",
+  "country": "Mauritania",
+  "site_type": "Single mine site",
+  "placed": true,
+  "error_km": 1.61,
+  "truth_inside_shape": false,
+  "shape": "Point",
+  "confidence": "high",
+  "reason": "Matched by name and type (mine) in Wikidata as the Tasiast Gold Mine in Mauritania; no other clue contradicts it. The OSM \"Tâziâzet\" and bus-stop hits are a region and a stop, not the site. Feature-level outline not checked because the OSM mine search timed out.",
+  "anchor": "Tasiast Gold Mine",
+  "anchor_source": "wikidata",
+  "steps": [
+   "point"
+  ],
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've marked the Tasiast Gold Mine as \"Area 1\", a point in Mauritania about 149 km from Akjoujt. It matches the Wikidata entry for the open-pit gold mine by name and type, and no other clue contradicts it. The OpenStreetMap hits for \"Tasiast\" were a region, a bus stop and a viewpoint, so I didn't use them. The mine search for its outline timed out, so this is a point, not the mine's footprint.\n\nDo you want me to try the outline again, or is the point enough?",
+  "usage": {
+   "input_tokens": 22247,
+   "output_tokens": 1077
+  },
+  "seconds": 39,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Tasiast",
+     "country": "MR"
+    },
+    "n": 4
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C4",
+     "feature_type": "mine or quarry",
+     "radius_km": 15
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C4",
+     "shape": "point",
+     "words": "Tasiast Mauritania, gold mining, single mine site",
+     "confidence": "high",
+     "reason": "Matched by name and type (mine) in Wikidata as the Tasiast Gold Mine in Mauritania; no other clue contradicts it. The OSM \"Tâziâzet\" and bus-stop hits are a region and a stop, not the site. Feature-level outline not checked because the OSM mine search timed out."
+    }
+   }
+  ],
+  "earlier_pin": {
+   "method": "est",
+   "error_km": 2.57
+  }
+ },
+ {
+  "project": "33841",
+  "name": "Tobene",
+  "country": "Senegal",
+  "site_type": "Single site (4.5 ha)",
+  "placed": true,
+  "error_km": 0.13,
+  "truth_inside_shape": false,
+  "shape": "Polygon",
+  "confidence": "medium",
+  "reason": "Wikidata thermal power station (Q56372845) in Senegal, about 8 km from Tobène village (OSM, Pambal, Thiès); the record has no name, and mapped thermal-plant searches timed out, so position is from the Wikidata point. 4.5 ha square centred on it is an assumed footprint.",
+  "anchor": "Q56372845",
+  "anchor_source": "wikidata",
+  "steps": [
+   "square of 0.045 km² centred there"
+  ],
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've marked a 4.5 ha square as Area 1, centred on a Wikidata thermal power station (Q56372845) in Senegal. Confidence is medium.\n\n- **Why this point:** the Wikidata record is a thermal power station in Senegal, about 8 km from the Tobène village in Thiès region. The record has no name, so the match rests on type, country and proximity, not on the name \"Tobene\".\n- **What I couldn't check:** searches for mapped thermal plants near Tobène timed out, so I couldn't confirm the plant from OpenStreetMap.\n- **Other Tobène matches:** there are other villages called Tobène in Kaolack and Kaffrine regions, but none has a thermal plant in the sources I found.\n- **Footprint:** the 4.5 ha square is an assumed shape centred on the point, not a surveyed outline.\n\nIs the plant near Tobène village in Thiès region the one you mean, or should I look at the Kaolack or Kaffrine Tobène instead?",
+  "usage": {
+   "input_tokens": 45600,
+   "output_tokens": 2202
+  },
+  "seconds": 122,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Tobene",
+     "country": "SN"
+    },
+    "n": 8
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Tobene thermal power plant"
+    },
+    "n": 0
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C3",
+     "feature_type": "thermal power plant",
+     "radius_km": 15
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C8",
+     "feature_type": "power plant (any)",
+     "radius_km": 3
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "C8",
+     "feature_type": "thermal power plant",
+     "radius_km": 5
+    },
+    "error": "OpenStreetMap search failed: timed out after 15 s"
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Centrale thermique Tobène",
+     "near": "C8"
+    },
+    "n": 0
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C8",
+     "shape": "square",
+     "area_km2": 0.045,
+     "words": "Tobene (Thermal power (HFO); Single site (4.5 ha)), Senegal",
+     "confidence": "medium",
+     "reason": "Wikidata thermal power station (Q56372845) in Senegal, about 8 km from Tobène village (OSM, Pambal, Thiès); the record has no name, and mapped thermal-plant searches timed out, so position is from the Wikidata point. 4.5 ha square centred on it is an assumed footprint."
+    }
+   }
+  ],
+  "earlier_pin": {
+   "method": "osm",
+   "error_km": 8.1
+  }
+ }
+]

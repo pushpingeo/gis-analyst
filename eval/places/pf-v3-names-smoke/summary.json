@@ -1,0 +1,46 @@
+{
+ "label": "pf-v3-names-smoke",
+ "set": "names",
+ "model": "claude-haiku-5-5",
+ "skill_version": "3",
+ "created": "2026-11-16T11:21:36.129Z",
+ "sites": 5,
+ "placed": 5,
+ "errors": 0,
+ "median_error_km": 2.5,
+ "within_1km": 20,
+ "within_5km": 60,
+ "within_10km": 60,
+ "truth_inside_shape": 0,
+ "by_confidence": {
+  "high": {
+   "n": 2,
+   "median_km": 21.15,
+   "within_1km": 0,
+   "within_10km": 50
+  },
+  "medium": {
+   "n": 1,
+   "median_km": 0.13,
+   "within_1km": 100,
+   "within_10km": 100
+  },
+  "low": {
+   "n": 2,
+   "median_km": 17.240000000000002,
+   "within_1km": 0,
+   "within_10km": 50
+  }
+ },
+ "earlier_pins": {
+  "note": "The original pins in the evaluation set, before Rob checked them against imagery",
+  "n": 5,
+  "median_error_km": 2.57,
+  "within_1km": 20,
+  "within_10km": 80
+ },
+ "tokens": {
+  "input": 204930,
+  "output": 10762
+ }
+}

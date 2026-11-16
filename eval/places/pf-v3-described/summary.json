@@ -1,0 +1,46 @@
+{
+ "label": "pf-v3-described",
+ "set": "described",
+ "model": "claude-haiku-5-5",
+ "skill_version": "3",
+ "created": "2026-11-16T13:26:43.090Z",
+ "sites": 48,
+ "placed": 43,
+ "errors": 0,
+ "median_error_km": 1.61,
+ "within_1km": 44,
+ "within_5km": 74,
+ "within_10km": 86,
+ "truth_inside_shape": 5,
+ "by_confidence": {
+  "high": {
+   "n": 12,
+   "median_km": 1.29,
+   "within_1km": 50,
+   "within_10km": 67
+  },
+  "medium": {
+   "n": 21,
+   "median_km": 1,
+   "within_1km": 52,
+   "within_10km": 90
+  },
+  "low": {
+   "n": 10,
+   "median_km": 3.84,
+   "within_1km": 20,
+   "within_10km": 100
+  }
+ },
+ "earlier_pins": {
+  "note": "The original pins in the evaluation set, before Rob checked them against imagery",
+  "n": 48,
+  "median_error_km": 0.535,
+  "within_1km": 56,
+  "within_10km": 83
+ },
+ "tokens": {
+  "input": 2211630,
+  "output": 133594
+ }
+}
