@@ -59,7 +59,8 @@ export async function searchAnchors(sources, term, { near = null, fetchFn = fetc
       if (!block) continue;
       where = `${s.name_field} = '${block[1]}/${block[2]}'`;
     } else {
-      const words = term.replace(BLOCK_REF, "").replace(/\b(platform|field|installation|fpso|the)\b/gi, " ").trim();
+      // Search on the distinctive name: drop words that describe the kind of thing.
+      const words = term.replace(BLOCK_REF, "").replace(/\b(offshore|onshore|wind ?farms?|wind|farm|project|site|lease|area|platform|gas|oil|field|installation|fpso|the)\b/gi, " ").replace(/\s+/g, " ").trim();
       if (words.length < 3) continue;
       where = `UPPER(${s.name_field}) LIKE '%${esc(words)}%'`;
     }

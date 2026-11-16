@@ -1,6 +1,6 @@
 ---
 name: place-finding
-version: 3
+version: 3.1
 description: Turn words into a place on the map. Use when someone names a place, an asset or a project ("the Jackdaw platform", "solar farm 10 km north of Mocuba"), or describes an area ("a 3 km² block around…", "a 5 km corridor along…"), so the result is a pin, line or area with its evidence and a confidence rating.
 ---
 
@@ -15,7 +15,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
    - **Decide what the main site is.** Many projects have several parts: a mine with a railway and a port, a dam with a power station and transmission line, a plant with a pipeline. Unless the person says otherwise, the main site is where the land is taken and the asset operates: the mine, the dam or reservoir, the plant or solar or wind farm. A port, an office, a capital city or a company's head office is not the site.
 2. **Find the anchor** with `find_place`. Search for the asset itself before the nearest town: *an asset matched as a mapped feature is far more precise than a settlement.*
    - Try the asset's own name in a few forms: the distinctive word alone ("Tasiast"), with its type ("Tasiast mine", "Nachtigal dam"), and the operator if it's a company name. Wikidata often has named mines, dams, power plants and ports with coordinates; OpenStreetMap often doesn't name them.
-   - Prefer authoritative sources where they exist (e.g. NSTA installations, fields and blocks on the UK Continental Shelf), then a Wikidata or OpenStreetMap item **of the right type** (a mine for a mine, a dam or reservoir for hydro). Say which you used.
+   - Prefer authoritative sources where they exist (e.g. NSTA installations, fields and blocks on the UK Continental Shelf; The Crown Estate and Crown Estate Scotland offshore wind lease areas), then a Wikidata or OpenStreetMap item **of the right type** (a mine for a mine, a dam or reservoir for hydro). Say which you used.
    - A result of the wrong type (an airport, a viewpoint, an office, a village that shares the name) is only a clue for where to look next, never the site itself.
    - If the asset isn't found by name, find the town or feature it's described from, then use `find_features_near` to look for the asset by type around it (e.g. solar farms within 15 km of Mocuba). A feature of the right type, size and bearing is strong evidence. For big assets (mines, dams, large plants), the largest feature of the right type near the named place is usually the one.
    - You may use what you already know (for example that a company mines near a particular town) to decide **where to search**, but the place itself must come from a found feature. Say when a clue came from your own knowledge.
@@ -33,6 +33,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
 
 ## Ambiguity: ask, don't guess
 - **Several candidates fit** (two platforms of the same name, a town name in several countries, the same landmark in two sources): call `offer_choices` with the two to five best, in order, mark the one you recommend and give a one-line reason. The person flicks through them on the map, each with its source, and picks one or takes your recommendation. Don't build a place until they've chosen. Only offer choices when the difference matters: if two sources give the same thing within a few hundred metres, use the more authoritative one and say so.
+- **One name, several parts:** a wind farm or field often comes as phases or parts (Dogger Bank A, B and C; extensions; a later leasing round nearby). Offer the choice of one part or all of them joined (`make_place` with `shape: "feature"` and the other parts in `also`), and say which parts are built, under construction or only proposed.
 - **Words with two meanings:** in UK offshore work, "block" can mean a licensing block (e.g. 30/2). If someone says "the block around X" near a licensed area, offer both: the square they described and the licensing block the anchor sits in.
 - **Only one vague anchor** (a district or region name) for something that needs a precise site: say the site can't be located from that, give the region as a low-confidence area if useful, and say what would pin it down.
 - Never invent a location, and never move a pin to "where it probably is" without a found feature.

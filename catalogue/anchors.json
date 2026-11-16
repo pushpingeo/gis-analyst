@@ -1,5 +1,5 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "note": "Named-feature sources the place-finding tools search for anchors, besides OpenStreetMap (Nominatim) and Natural Earth. Each entry is a dataset in the AI Living World Atlas (atlas_id), with the fields needed to search it by name or reference. Licence is as the atlas records it; empty means the atlas record doesn't state one.",
   "atlas": "https://github.com/pushpingeo/ai-living-world-atlas",
   "sources": [
@@ -11,12 +11,22 @@
       "licence": "",
       "landing_page": "https://open-data-ukcs-transition.hub.arcgis.com/datasets/UKCS-transition::ukcs-offshore-infrastructure-surface-points-wgs84",
       "url": "https://services-eu1.arcgis.com/OZMfUznmLTnWccBc/arcgis/rest/services/UKCS%20offshore%20infrastructure%20surface%20points%20WGS84/FeatureServer/1",
-      "coverage": [-25, 47, 4, 64],
+      "coverage": [
+        -25,
+        47,
+        4,
+        64
+      ],
       "kind": "offshore installation",
       "search": "name",
       "name_field": "NAME",
       "type_field": "INF_TYPE",
-      "extra_fields": ["DESCRIPTIO", "REP_GROUP", "STATUS", "CRS_NAME"],
+      "extra_fields": [
+        "DESCRIPTIO",
+        "REP_GROUP",
+        "STATUS",
+        "CRS_NAME"
+      ],
       "where": "CURR_ROW = 'Y'"
     },
     {
@@ -27,12 +37,20 @@
       "licence": "NSTA Open User Licence",
       "landing_page": "https://open-data-ukcs-transition.hub.arcgis.com/datasets/UKCS-transition::ukcs-offshore-hydrocarbon-fields-wgs84",
       "url": "https://services-eu1.arcgis.com/OZMfUznmLTnWccBc/arcgis/rest/services/Offshore_hydrocarbon_fields_(WGS84)/FeatureServer/0",
-      "coverage": [-25, 47, 4, 64],
+      "coverage": [
+        -25,
+        47,
+        4,
+        64
+      ],
       "kind": "oil or gas field",
       "search": "name",
       "name_field": "FIELDNAME",
       "type_field": "FIELDTYPE",
-      "extra_fields": ["STATUS", "CURR_OPER"]
+      "extra_fields": [
+        "STATUS",
+        "CURR_OPER"
+      ]
     },
     {
       "id": "nsta-blocks",
@@ -42,12 +60,66 @@
       "licence": "",
       "landing_page": "https://open-data-ukcs-transition.hub.arcgis.com/datasets/UKCS-transition::ukcs-blocks-wgs84",
       "url": "https://services-eu1.arcgis.com/OZMfUznmLTnWccBc/arcgis/rest/services/UKCS_blocks_(WGS84)/FeatureServer/0",
-      "coverage": [-25, 47, 4, 64],
+      "coverage": [
+        -25,
+        47,
+        4,
+        64
+      ],
       "kind": "UK offshore licensing block",
       "search": "block_ref",
       "name_field": "BLOCK_REF",
       "type_field": "TYPE",
       "extra_fields": []
+    },
+    {
+      "id": "tce-wind-sites",
+      "atlas_id": "4d4f3f1290943689",
+      "title": "Wind Site Agreements (England, Wales & NI)",
+      "publisher": "The Crown Estate",
+      "licence": "The Crown Estate Open Data Licence (GIS) v1.1. Attribution: Contains data provided by The Crown Estate that is protected by copyright and database rights.",
+      "landing_page": "https://opendata-thecrownestate.opendata.arcgis.com/",
+      "url": "https://services2.arcgis.com/PZklK9Q45mfMFuZs/arcgis/rest/services/WindSite_EngWalNI_TheCrownEstate/FeatureServer/0",
+      "coverage": [
+        -12,
+        49,
+        4,
+        56.5
+      ],
+      "kind": "offshore wind farm lease area",
+      "search": "name",
+      "name_field": "Name_Prop",
+      "type_field": "Inf_Status",
+      "extra_fields": [
+        "Name_Ten",
+        "Wind_Round",
+        "Lease_Stat",
+        "km2"
+      ]
+    },
+    {
+      "id": "ces-offshore-wind",
+      "atlas_id": "4e485998501cde5f",
+      "title": "Offshore Wind (Crown Estate Scotland)",
+      "publisher": "Crown Estate Scotland",
+      "licence": "",
+      "landing_page": "https://www.crownestatescotland.com/",
+      "url": "https://services3.arcgis.com/nGV4jiurzcahJ9LV/arcgis/rest/services/Offshore_Wind_Crown_Estate_Scotland/FeatureServer/0",
+      "coverage": [
+        -14,
+        54.5,
+        2.5,
+        61.5
+      ],
+      "kind": "offshore wind farm lease area (Scotland)",
+      "search": "name",
+      "name_field": "Property_Description",
+      "type_field": "Project_Phase",
+      "extra_fields": [
+        "Tenant_Name",
+        "Lease_Type_Description",
+        "Capacity_MW"
+      ]
     }
   ]
 }

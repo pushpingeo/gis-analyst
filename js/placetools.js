@@ -17,7 +17,7 @@ export function placeToolDefs(skills) {
     },
     {
       name: "find_place",
-      description: "Search for a named place, asset or feature: authoritative named-feature layers from the atlas (e.g. NSTA offshore installations, fields and licensing blocks on the UK Continental Shelf), OpenStreetMap (Nominatim), Wikidata (good for named mines, dams, power plants and ports) and Natural Earth towns. Returns candidates with ids (C1, C2…), type, source, position and size. Give a block reference like 30/2 to find a UK licensing block.",
+      description: "Search for a named place, asset or feature: authoritative named-feature layers from the atlas (NSTA offshore installations, fields and licensing blocks; The Crown Estate and Crown Estate Scotland offshore wind farm lease areas), OpenStreetMap (Nominatim), Wikidata (good for named mines, dams, power plants and ports) and Natural Earth towns. Returns candidates with ids (C1, C2…), type, source, position and size. Give a block reference like 30/2 to find a UK licensing block.",
       input_schema: {
         type: "object",
         properties: {
@@ -49,6 +49,7 @@ export function placeToolDefs(skills) {
         type: "object",
         properties: {
           anchor: { type: "string", description: "Candidate id or existing place name" },
+          also: { type: "array", items: { type: "string" }, description: "With shape 'feature': more candidate ids whose outlines are joined with the anchor's, e.g. the A, B and C parts of one wind farm" },
           shape: { type: "string", enum: ["point", "square", "circle", "rectangle", "feature", "buffer"] },
           area_km2: { type: "number" }, side_km: { type: "number" }, radius_km: { type: "number" },
           width_km: { type: "number", description: "East–west size before rotation" }, height_km: { type: "number", description: "North–south size before rotation" },
@@ -198,8 +199,16 @@ export function createPlaceTools(host) {
             else steps.push("outline unavailable, so its bounding box was used");
           }
           f = JSON.parse(JSON.stringify(a.feature));
+          if (i.also?.length) {
+            const parts = i.also.map(resolve);
+            for (const p of parts) {
+              if (!/Polygon/.test(p.feature.geometry.type) || !/Polygon/.test(f.geometry.type)) throw new Error("Only outlines (polygons) can be joined.");
+              f = turf.union(turf.featureCollection([f, p.feature])) || f;
+            }
+            steps.push(`outlines of ${[a.label, ...parts.map((p) => p.label)].join(", ")}, joined`);
+          } else steps.push(`outline of ${a.label}`);
           if (i.offset_km) f = G.move(f, i.offset_km, i.bearing_deg ?? 0);
-          steps.push(`outline of ${a.label}`); break;
+          break;
         case "buffer":
           if (!i.buffer_km) throw new Error("A buffer needs buffer_km.");
           f = turf.buffer(i.offset_km ? G.move(a.feature, i.offset_km, i.bearing_deg ?? 0) : a.feature, i.buffer_km, { units: "kilometers", steps: 16 });
