@@ -11,6 +11,7 @@ import * as turf from "@turf/turf";
 import * as R from "../js/reference.js";
 import { createPlaceTools, placeToolDefs, projectSummary } from "../js/placetools.js";
 import { parseSkill, systemPrompt, buildMessages, runTurn } from "../js/converse.js";
+import { probeOverpass } from "./probe-overpass.mjs";
 
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || "").split("=")[1] || d;
 const LABEL = arg("label", "pf-dev");
@@ -88,6 +89,11 @@ mkdirSync(outDir, { recursive: true });
 let results = [];
 try { results = JSON.parse(readFileSync(`${outDir}/results.json`, "utf8")).filter((r) => !r.error); } catch { /* new label */ }
 const done = new Set(results.map((r) => r.case || r.project));
+// Before starting: can OpenStreetMap's Overpass be reached from here? (In v3 it couldn't, which no one saw until afterwards.)
+const overpassAtStart = await probeOverpass({ timeoutMs: 15000 }).then((r) => r.filter((x) => x.query === "tiny"));
+const overpassUp = overpassAtStart.some((x) => x.ok);
+console.log(`Overpass at start: ${overpassUp ? "reachable" : "NOT reachable from here; feature searches will fail"} (${overpassAtStart.map((x) => `${new URL(x.endpoint).host} ${x.ok ? "ok" : "failed"}`).join(", ")})`);
+
 for (const s of sites) {
   if (done.has(s.id || s.project_number)) continue;
   const host = memoryHost();
@@ -139,7 +145,7 @@ for (const s of sites) {
     rec = {
       project: s.project_number, name: s.name, country: s.country, site_type: s.site_type,
       placed: !!p, error_km: at ? Math.round(turf.distance(at, truth) * 100) / 100 : null, truth_inside_shape: inside,
-      shape: p?.feature.geometry.type, confidence: p?.origin.confidence, reason: p?.origin.reason,
+      shape: p?.feature.geometry.type, confidence: p?.origin.confidence, confidence_rules: p?.origin.confidence_rules, match: p?.origin.match, checks: p?.origin.checks, reason: p?.origin.reason,
       anchor: p?.origin.anchor?.name, anchor_source: p?.origin.anchor?.source?.id, steps: p?.origin.steps,
       offered_choices: host.offered ? host.offered.choices.length : 0, chose_recommended: choseRecommended,
       text: res.text, usage: res.usage, seconds: Math.round((Date.now() - t0) / 1000),
@@ -159,6 +165,7 @@ for (const s of sites) {
 if (SET === "areas") {
   const ok = results.filter((r) => r.placed);
   const summary = { label: LABEL, set: SET, model: MODEL, skill_version: skill.version, created: new Date().toISOString(), cases: results.length, placed: ok.length,
+    overpass_reachable_at_start: overpassUp,
     iou_at_least_0_8: ok.filter((r) => r.iou >= 0.8).length, mean_iou: Math.round((ok.reduce((a, r) => a + (r.iou || 0), 0) / (ok.length || 1)) * 1000) / 1000,
     per_case: results.map((r) => ({ case: r.case, iou: r.iou, centre_error_km: r.centre_error_km, area_ratio: r.area_ratio, error: r.error })) };
   writeFileSync(`${outDir}/summary.json`, JSON.stringify(summary, null, 1));
@@ -180,6 +187,8 @@ const summary = {
   median_error_km: med(errs), within_1km: share(errs, 1), within_5km: share(errs, 5), within_10km: share(errs, 10),
   truth_inside_shape: placed.filter((r) => r.truth_inside_shape).length,
   by_confidence: byConf,
+  overpass: { reachable_at_start: overpassUp, feature_searches: results.reduce((a, r) => a + (r.tools || []).filter((t) => t.name === "find_features_near").length, 0), feature_searches_failed: results.reduce((a, r) => a + (r.tools || []).filter((t) => t.name === "find_features_near" && t.error).length, 0) },
+  checks: { given: placed.reduce((a, r) => a + (r.checks?.length || 0), 0), failed: placed.reduce((a, r) => a + (r.checks || []).filter((c) => c.pass === false).length, 0) },
   earlier_pins: { note: "The original pins in the evaluation set, before Rob checked them against imagery", n: earlier.length, median_error_km: med(earlier), within_1km: share(earlier, 1), within_10km: share(earlier, 10) },
   tokens: results.reduce((a, r) => ({ input: a.input + (r.usage?.input_tokens || 0), output: a.output + (r.usage?.output_tokens || 0) }), { input: 0, output: 0 }),
 };
