@@ -20,7 +20,7 @@ const SET = arg("set", "names");
 const MAX_TOKENS = 8000;
 const UA = { "User-Agent": "gis-analyst-eval/1.0 (+https://github.com/pushpingeo/gis-analyst)" };
 
-const csv = readFileSync("data/eval_set.csv", "utf8").trim().split("\n");
+const csv = readFileSync("data/eval_set.csv", "utf8").trim().split(/\r?\n/);
 const head = csv[0].split(",");
 const rows = csv.slice(1).map((l) => {
   const cells = l.match(/("([^"]|"")*"|[^,]*)(,|$)/g).map((c) => c.replace(/,$/, "").replace(/^"|"$/g, "").replace(/""/g, '"'));

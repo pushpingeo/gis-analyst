@@ -5,7 +5,7 @@
 // Usage: ANTHROPIC_API_KEY=... node scripts/build-described-sites.mjs
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
-const csv = readFileSync("data/eval_set.csv", "utf8").trim().split("\n");
+const csv = readFileSync("data/eval_set.csv", "utf8").trim().split(/\r?\n/);
 const head = csv[0].split(",");
 const rows = csv.slice(1).map((l) => {
   const cells = l.match(/("([^"]|"")*"|[^,]*)(,|$)/g).map((c) => c.replace(/,$/, "").replace(/^"|"$/g, "").replace(/""/g, '"'));
