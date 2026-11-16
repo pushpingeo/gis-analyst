@@ -8,6 +8,7 @@ import * as R from "./reference.js";
 import { placeToolDefs, createPlaceTools, projectSummary } from "./placetools.js";
 import { parseSkill, systemPrompt, buildMessages, runTurn, activityFor } from "./converse.js";
 import { callClaude, LimitReached } from "./claude.js";
+import { atlasViaWorker } from "./atlasclient.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
@@ -261,6 +262,7 @@ const host = {
   ref,
   get anchors() { return anchors; },
   fetchFn: (...a) => fetch(...a),
+  atlas: atlasViaWorker,
   headers: {},
   places: () => [...places.values()],
   findPlace: placeByName,

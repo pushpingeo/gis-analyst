@@ -165,10 +165,10 @@ export function createPlaceTools(host) {
 
     async find_features_near({ anchor, feature_type, radius_km, name }) {
       const a = resolve(anchor);
-      const r = await findFeaturesNear(a.lonlat, feature_type, radius_km, { name, fetchFn: host.fetchFn, headers: host.headers });
+      const r = await findFeaturesNear(a.lonlat, feature_type, radius_km, { name, fetchFn: host.fetchFn, headers: host.headers, atlas: host.atlas || null });
       const list = r.candidates.map((c) => cands.get(keep(c)));
       host.onCandidates?.(list);
-      return { anchor: a.label, feature_type, radius_km, found: r.total, wind_turbines: r.wind_turbines, ...(r.note ? { note: r.note } : {}), candidates: list.map(compact) };
+      return { anchor: a.label, feature_type, radius_km, found: r.total, sources: r.sources, wind_turbines: r.wind_turbines, ...(r.note ? { note: r.note } : {}), candidates: list.map(compact) };
     },
 
     async make_place(i) {

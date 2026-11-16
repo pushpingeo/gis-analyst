@@ -4,6 +4,7 @@
 // No DOM, so it runs in the page and in the evaluation. fetchFn is injectable for tests and for Node.
 import * as turf from "./vendor/turf.js";
 import { fetchOverpass, OVERPASS_ENDPOINTS } from "./tools.js";
+import { atlasFeaturesNear, ATLAS_CONCEPTS } from "./atlasfeatures.js";
 
 const round = (v, d = 4) => Math.round(v * 10 ** d) / 10 ** d;
 
@@ -197,14 +198,38 @@ async function nearViaNominatim(lonlat, featureType, radiusKm, { fetchFn, header
   return { candidates: out.slice(0, limit), total: out.length, note: "Overpass was busy, so these came from Nominatim's search, which can miss unnamed or less prominent features." };
 }
 
-export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = null, fetchFn = fetch, limit = 15, headers = {} } = {}) {
+// Asks the atlas and OpenStreetMap at the same time and merges what answers. Neither is required:
+// whatever fails is reported as "not checked", never as "none found".
+export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = null, fetchFn = fetch, limit = 15, headers = {}, atlas = null } = {}) {
   const parts = FEATURE_TYPES[featureType];
   if (!parts) throw new Error(`Unknown feature type. Use one of: ${Object.keys(FEATURE_TYPES).join(", ")}.`);
-  try { return await findFeaturesNearOverpass(lonlat, featureType, radiusKm, { name, fetchFn, limit, headers }); }
-  catch (e) {
-    if (e instanceof ServiceDown && NOMINATIM_PHRASES[featureType] && !name) return nearViaNominatim(lonlat, featureType, radiusKm, { fetchFn, headers, limit });
-    throw e;
-  }
+  const osmP = (async () => {
+    try { return await findFeaturesNearOverpass(lonlat, featureType, radiusKm, { name, fetchFn, limit, headers }); }
+    catch (e) {
+      if (e instanceof ServiceDown && NOMINATIM_PHRASES[featureType] && !name) return nearViaNominatim(lonlat, featureType, radiusKm, { fetchFn, headers, limit });
+      throw e;
+    }
+  })();
+  const atlasP = atlas && ATLAS_CONCEPTS[featureType]
+    ? atlasFeaturesNear(lonlat, featureType, radiusKm, { call: atlas, name, limit })
+    : Promise.resolve(null);
+  const [osm, at] = await Promise.allSettled([osmP, atlasP]);
+  const sources = [];
+  const cands = [];
+  if (at.status === "fulfilled" && at.value) {
+    cands.push(...at.value.candidates);
+    sources.push({ source: "AI Living World Atlas", found: at.value.total, layers_checked: at.value.checked });
+  } else if (atlas && ATLAS_CONCEPTS[featureType]) sources.push({ source: "AI Living World Atlas", not_checked: String(at.reason?.message || at.reason || "unavailable").slice(0, 120) });
+  if (osm.status === "fulfilled") { cands.push(...osm.value.candidates); sources.push({ source: "OpenStreetMap", found: osm.value.total, ...(osm.value.note ? { note: osm.value.note } : {}) }); }
+  else sources.push({ source: "OpenStreetMap", not_checked: String(osm.reason?.message || osm.reason).slice(0, 160) });
+  if (!cands.length && osm.status === "rejected" && !(at.status === "fulfilled" && at.value)) throw osm.reason;
+  const bySize = /farm|hydro|power plant|mine|port|platform|industrial|airport/.test(featureType);
+  cands.sort(bySize ? (a, b) => (b.area_km2 || 0) - (a.area_km2 || 0) || a.distance_km - b.distance_km : (a, b) => a.distance_km - b.distance_km);
+  return {
+    candidates: cands.slice(0, limit), total: cands.length, sources,
+    wind_turbines: osm.status === "fulfilled" ? osm.value.wind_turbines : undefined,
+    ...(osm.status === "fulfilled" && osm.value.note ? { note: osm.value.note } : {}),
+  };
 }
 
 async function findFeaturesNearOverpass(lonlat, featureType, radiusKm, { name, fetchFn, limit, headers }) {

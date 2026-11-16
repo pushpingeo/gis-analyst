@@ -26,6 +26,7 @@ jobs:
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ATLAS_MCP_KEY: ${{ secrets.ATLAS_MCP_KEY }}
         # One run per line of the request file (or the manual arguments).
         run: |
           if [ -n "${{ github.event.inputs.args }}" ]; then node scripts/run-place-eval.mjs ${{ github.event.inputs.args }}; exit; fi

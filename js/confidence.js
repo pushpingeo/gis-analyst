@@ -28,7 +28,10 @@ export function tierOf(cand) {
   if (!cand) return "settlement";
   const id = cand.source?.id || "";
   if (id === "natural-earth") return "settlement";
-  if (cand.source?.atlas_id || (!GAZETTEER.has(id) && id)) return "authoritative";
+  // Atlas features carry whether their publisher is a government or intergovernmental body; others (a university's
+  // copy, a third-party summary) count like a gazetteer. Hand-picked anchors (NSTA, Crown Estate) are authoritative.
+  if (cand.source?.atlas_id) return cand.source.authoritative === false ? "gazetteer" : "authoritative";
+  if (!GAZETTEER.has(id) && id) return "authoritative";
   return "gazetteer";
 }
 

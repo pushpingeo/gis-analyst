@@ -245,4 +245,39 @@ await test("holes in a published outline are filled and reported, not swapped fo
   assert.equal(G.fillHoles(r.feature).holes, 0);
 });
 
+await test("feature search uses the atlas, and reports OpenStreetMap as not checked when it's down", async () => {
+  const { atlasFeaturesNear } = await import("../js/atlasfeatures.js");
+  const calls = [];
+  const call = async (tool, args) => {
+    calls.push(tool);
+    if (tool === "find_datasets") return { results: [
+      { id: "mrds", title: "Minerals Resource Data System", publisher: "U.S. Geological Survey", publisher_type: "government", licence: "public domain" },
+      { id: "fake", title: "Pennsylvania mines", publisher: "PSU", publisher_type: "academic", extent_may_be_overstated: true },
+      { id: "broken", title: "Global mining polygons", publisher: "WMU", publisher_type: "academic" },
+    ] };
+    if (args.id === "broken") throw new Error("atlas: Couldn't fetch features: Requested operation is not supported");
+    if (args.id === "mrds") return { returned: 3, features: [
+      { type: "Feature", geometry: { type: "Point", coordinates: [27.095, -11.255] }, properties: { site_name: "Kipoi Central", commod1: "Copper" } },
+      { type: "Feature", geometry: { type: "Point", coordinates: [27.073, -11.232] }, properties: { site_name: "Judeira", commod1: "Copper" } },
+      { type: "Feature", geometry: { type: "Point", coordinates: [29.5, -9.0] }, properties: { site_name: "Far away" } },
+    ] };
+    throw new Error("unexpected " + args.id);
+  };
+  const r = await atlasFeaturesNear([27.06, -11.21], "mine or quarry", 25, { call });
+  assert.deepEqual(r.candidates.map((c) => c.name), ["Judeira", "Kipoi Central"], "nearest first, far one dropped");
+  assert.equal(r.candidates[0].source.authoritative, true);
+  assert.ok(!calls.includes("fake"), "overstated extents skipped");
+  assert.ok(r.checked.some((x) => x.error && /not supported/.test(x.error)), "a broken layer is reported, not hidden");
+  // Through the tool, with Overpass failing.
+  const host = memoryHost();
+  host.atlas = call;
+  host.fetchFn = async (url) => { if (/overpass|interpreter/.test(url)) throw new Error("timed out"); return fetchFn(url); };
+  const t = createPlaceTools(host);
+  const town = await t.exec("find_place", { query: "Jackdaw" });
+  const out = await t.exec("find_features_near", { anchor: town.candidates[0].id, feature_type: "mine or quarry", radius_km: 25 });
+  const osm = out.sources.find((s) => s.source === "OpenStreetMap");
+  assert.ok(osm.not_checked, "OpenStreetMap marked not checked");
+  assert.ok(out.sources.find((s) => s.source === "AI Living World Atlas").found >= 0);
+});
+
 console.log(`${passed} place tests passed`);
