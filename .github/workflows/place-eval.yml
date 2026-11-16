@@ -26,7 +26,10 @@ jobs:
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: node scripts/run-place-eval.mjs ${{ github.event.inputs.args }} $(cat .github/place-eval-request 2>/dev/null | grep -v '^#' || true)
+        # One run per line of the request file (or the manual arguments).
+        run: |
+          if [ -n "${{ github.event.inputs.args }}" ]; then node scripts/run-place-eval.mjs ${{ github.event.inputs.args }}; exit; fi
+          grep -v '^#' .github/place-eval-request | grep -v '^\s*$' | while read -r line; do echo "== $line"; node scripts/run-place-eval.mjs $line; done
       - name: Commit results (even if the run stopped early)
         if: always()
         run: |
@@ -34,4 +37,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A eval/places
           git diff --cached --quiet || git commit -m "Place-finding evaluation results"
-          git pull --rebase && git push
+          for i in 1 2 3 4 5; do git pull --rebase && git push && break; sleep 10; done
