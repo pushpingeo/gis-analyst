@@ -23,7 +23,7 @@ async function claude(prompt) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 1200, messages: [{ role: "user", content: prompt }] }),
+    body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
   });
   if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 200)}`);
   const j = await r.json();
@@ -31,8 +31,13 @@ async function claude(prompt) {
 }
 
 mkdirSync("eval/places/sets", { recursive: true });
+// Keep descriptions already made; only redo sites that failed or are new.
+let previous = [];
+try { previous = JSON.parse(readFileSync("eval/places/sets/described-sites.json", "utf8")); } catch { /* first run */ }
 const out = [];
 for (const s of rows) {
+  const done = previous.find((p) => p.project === s.project_number && p.description && !p.error);
+  if (done) { out.push(done); continue; }
   let rec = { project: s.project_number, name: s.name, country: s.country, sector: s.sector, site_type: s.site_type, source: s.esrs_url, lat: +s.lat, lon: +s.lon };
   try {
     const r = await fetch(s.esrs_url, { headers: UA });
@@ -47,6 +52,7 @@ ${loc.map((x, i) => `${i + 1}. ${x}`).join("\n")}
 
 Write a short location description (one to three sentences) that a GIS analyst could use to find the main project site on a map: keep place names, districts, rivers, distances and directions; leave out any coordinates; leave out sentences about distant ports, suppliers or offices unless they help locate the site. Then list the clues.
 Reply with JSON only: {"description": "...", "clues": ["..."], "had_coordinates": true|false, "enough_to_locate": true|false}`);
+    if (!reply.includes("{")) throw new Error("the reply had no JSON");
     const j = JSON.parse(reply.slice(reply.indexOf("{"), reply.lastIndexOf("}") + 1));
     if (COORDS.test(j.description)) { j.description = j.description.replace(COORDS, "[coordinates removed]"); j.had_coordinates = true; }
     rec = { ...rec, ...j };
