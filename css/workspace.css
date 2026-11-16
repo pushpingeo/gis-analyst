@@ -65,11 +65,7 @@ a { color: var(--sea); }
 .handle { display: none; }
 .brand { padding: 18px 20px 12px; border-bottom: 1px solid var(--rule); }
 .brand h1 { margin: 0; font-size: 21px; line-height: 1.15; font-weight: 750; letter-spacing: -.015em; display: flex; align-items: center; gap: 10px; }
-/* the ranging pole: the one decorative mark, and the same banding as the shapes on the map */
-.brand h1::before {
-  content: ""; width: 6px; height: 22px; border-radius: 1px;
-  background: repeating-linear-gradient(180deg, var(--pole) 0 5.5px, #fff 5.5px 11px); box-shadow: 0 0 0 1px var(--ink);
-}
+.brand h1 .mark { width: 30px; height: 30px; flex: none; }
 .brand p { margin: 3px 0 0 16px; color: var(--ink-2); font-size: 13.5px; }
 
 .conversation { flex: 1; overflow-y: auto; padding: 14px 16px 6px; overscroll-behavior: contain; scroll-behavior: smooth; }
