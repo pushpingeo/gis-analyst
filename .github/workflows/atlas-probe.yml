@@ -1,0 +1,13 @@
+name: Atlas probe
+# Diagnostic: what the AI Living World Atlas holds near chosen sites. Uses ATLAS_MCP_KEY; no Anthropic cost.
+on: { workflow_dispatch: {} }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node scripts/probe-atlas.mjs
+        env: { ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}" }
