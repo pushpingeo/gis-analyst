@@ -211,6 +211,12 @@ export function createPlaceTools(host) {
             steps.push(`outlines of ${[a.label, ...parts.map((p) => p.label)].join(", ")}, joined`);
           } else steps.push(`outline of ${a.label}`);
           if (i.offset_km) f = G.move(f, i.offset_km, i.bearing_deg ?? 0);
+          {
+            // The map editor can't hold holes. Fill them, and say so with the area it adds, rather than
+            // let the analyst swap the publisher's outline for an invented shape (Beatrice, 16 Nov).
+            const filled = G.fillHoles(f);
+            if (filled.holes) { f = filled.feature; steps.push(`${filled.holes} hole${filled.holes > 1 ? "s" : ""} in the published outline filled (adds ${round(filled.addedKm2, 2)} km²), because the map can't edit holes yet`); }
+          }
           break;
         case "buffer":
           if (!i.buffer_km) throw new Error("A buffer needs buffer_km.");

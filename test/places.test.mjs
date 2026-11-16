@@ -235,4 +235,14 @@ await test("a turn runs tools and every tool_use gets a result", async () => {
   assert.equal(host.list.length, 1);
 });
 
+await test("holes in a published outline are filled and reported, not swapped for another shape", async () => {
+  const G = await import("../js/geometry.js");
+  const outer = [[0, 0], [0.1, 0], [0.1, 0.1], [0, 0.1], [0, 0]], hole = [[0.04, 0.04], [0.06, 0.04], [0.06, 0.06], [0.04, 0.06], [0.04, 0.04]];
+  const r = G.fillHoles({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [outer, hole] } });
+  assert.equal(r.holes, 1);
+  assert.equal(r.feature.geometry.coordinates.length, 1);
+  assert.ok(r.addedKm2 > 4.8 && r.addedKm2 < 5.0, `hole area ${r.addedKm2}`);
+  assert.equal(G.fillHoles(r.feature).holes, 0);
+});
+
 console.log(`${passed} place tests passed`);

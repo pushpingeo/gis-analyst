@@ -132,3 +132,16 @@ function compass(b) {
   const pts = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
   return pts[Math.round((((b % 360) + 360) % 360) / 45) % 8];
 }
+
+// Removes interior rings (holes) from a polygon or multipolygon. Returns the new feature, how many holes, and the area they add.
+export function fillHoles(feature) {
+  const g = feature.geometry;
+  if (!g || !/Polygon/.test(g.type)) return { feature, holes: 0, addedKm2: 0 };
+  const polys = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
+  const holes = polys.reduce((n, p) => n + p.length - 1, 0);
+  if (!holes) return { feature, holes: 0, addedKm2: 0 };
+  const outer = polys.map((p) => [p[0]]);
+  const geometry = g.type === "Polygon" ? { type: "Polygon", coordinates: outer[0] } : { type: "MultiPolygon", coordinates: outer };
+  const out = { ...feature, geometry };
+  return { feature: out, holes, addedKm2: (turf.area(out) - turf.area(feature)) / 1e6 };
+}
