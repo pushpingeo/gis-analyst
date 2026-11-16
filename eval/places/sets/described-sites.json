@@ -425,7 +425,7 @@
    "Ritual sites include ovoos, stone or wooden structures built on historically, culturally or religiously significant places or a particular mountain or hill that is located separately from other mountain ranges, and stupas &#8211; religious monuments made of bricks, mud, wood, and other materials.",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
+  "error": "Unexpected token '\\', ...\"\"clues\": [\\\"Located \"... is not valid JSON"
  },
  {
   "project": "34228",
@@ -497,7 +497,24 @@
    "Given that the project’s infrastructure is located within a legally protected area, the BAP will also include additional conservation actions.",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
+  "description": "The site lies on the Salar del Rincón salt pan in Los Andes department, Salta province, Puna Region of northwestern Argentina, about 150 km west of San Antonio de los Cobres and 270 km from Salta city, close to International Route 51 (the Salta–Sico Pass road to Chile). Reference points include Catua (Susques department, Jujuy) about 17 km northwest, Salar de Pocitos Station about 46 km south, Olacapato about 56 km west, and the Chilean border about 30 km west.",
+  "clues": [
+   "Salar del Rincón salt pan (salar nucleus at the centre of the Salar del Rincón hydrographic basin)",
+   "Province of Salta, Los Andes department, Puna Region, Argentina",
+   "Approximately 150 km west of San Antonio de los Cobres (departmental capital)",
+   "Approximately 270 km from the city of Salta (provincial capital)",
+   "Close to International Route 51, from Salta City to Sico Pass to Chile",
+   "Catua (~750 inhabitants) about 17 km northwest, in Susques department, Jujuy",
+   "Salar de Pocitos Station (~70 inhabitants) about 46 km south",
+   "Olacapato (~300 inhabitants) about 56 km west",
+   "Chilean border about 30 km west",
+   "Elevation approximately 3,725 m above sea level",
+   "Covers about 829 km2",
+   "Within the Los Andes Nature Wildlife Reserve (a protected area)",
+   "Central Andean dry puna ecoregion"
+  ],
+  "had_coordinates": false,
+  "enough_to_locate": true
  },
  {
   "project": "40101",
@@ -518,7 +535,19 @@
    "The ESHMP for area 5 should be consistent with the ESHMP’s for area 1 and the Sembehun haul road (the ESHMPs are dynamic documents and SRL will ensure that all the ESHMPs, are consistent) and will include compliance criteria and the location of compliance points for environmental, social and safety parameters for the expanded operation. 30-Sep-2019 SRL will fully implement its revised Environmental, Social and Health Management System (ESHMS) for area 1 including revised policies consistent with Iluka Corporate Policy and with the IFC Performance Standards.",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
+  "description": "The main project site is the potential greenfield Sembehun mining area (area 5) in southeast Sierra Leone, about 135 km geodesic distance southeast of Freetown and near the Gbangbama and Moyamba Hills, where SRL holds alluvial rutile mining leases. It would be reached by a new 35 km access road with a parallel transmission line, and the existing SRL operation (area 1) lies about 30 km inland from the Atlantic Ocean.",
+  "clues": [
+   "Sembehun, also called area 5, is a potential new greenfield mining area",
+   "A 35 km access road and parallel transmission line are required to reach Sembehun",
+   "SRL mining leases cover 559 km² and include 19 separate alluvial rutile deposits",
+   "The leases are mainly located around the Gbangbama and Moyamba Hills",
+   "The existing SRL operation (area 1) is about 30 km inland from the Atlantic Ocean",
+   "The SRL operation is about 135 km geodesic distance southeast of Freetown",
+   "Export runs through a small inland port at Nitti on a tributary of the Sherbro River",
+   "The exact location of Sembehun relative to the leases or the operation is not stated, so the position is approximate"
+  ],
+  "had_coordinates": false,
+  "enough_to_locate": true
  },
  {
   "project": "34785",
@@ -547,7 +576,24 @@
    "The ancestor site located on the western periphery of the development proposals should be protected from potential disturbance.",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
+  "description": "The New Liberty Gold Mine is in northwest Liberia's Grande Cape Mount County, about 100 km from Monrovia and 20 km from the Sierra Leone border, within a 457 km² license area and roughly 40 km inland from the coast. The main site lies along the Marvoe Creek, with the nearest community, Jikando, about 3 to 4 km downstream, and the Ndablama/Weaju exploration areas lie to the northeast.",
+  "clues": [
+   "Grande Cape Mount County, northwest Liberia (sentence 1)",
+   "About 100 km from Monrovia, the capital (sentence 1)",
+   "About 20 km from the Sierra Leone border (sentence 1)",
+   "457 km² license area (sentence 1)",
+   "Marvoe Creek, with a 3.7 km diversion (sentence 3)",
+   "Jikando is the closest community, about 3 to 4 km away and downstream along the Marvoe Creek (sentences 4, 8)",
+   "Jikando sits on high ground (+13 m) about 168 m from the creek, outside the drainage path (sentence 9)",
+   "About 40 km from the coast, in gently undulating topography (sentence 5)",
+   "Camp David is 1.5 km from the plant site (sentence 6)",
+   "Ndablama/Weaju exploration areas lie northeast of New Liberty (sentence 12)",
+   "Nearby villages Kinjor, Larjor, Jawajei and Jakindo (sentence 13; spelling of Jakindo/Jikando differs, so verify)",
+   "Within the Forests of Upper Guinea biodiversity hotspot (sentence 11), a regional rather than site-specific clue",
+   "Some location information is limited to the country (sentence 16)"
+  ],
+  "had_coordinates": false,
+  "enough_to_locate": true
  },
  {
   "project": "36754",
@@ -797,7 +843,20 @@
    "The EMMP proposes to provide potable water by constructing small-scale drinking water supply systems or installing hand-pumps at certain convenient points in the potentially affected urban and rural communities including Rehmani Mohalla and Naroch Colony located in the vicinity of the project site.",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
+  "description": "The project site is near Barali on the Poonch River, about 11 km downstream of Kotli town and 6 km downstream of the confluence of the Bann Nullah with the Poonch River. The intake is on the west bank about 150 m upstream of the weir, and the power house is on the right bank about 700 m downstream of the dam.",
+  "clues": [
+   "Barali on the Poonch River",
+   "About 11 km downstream of Kotli town",
+   "About 6 km downstream of the Bann Nullah / Poonch River confluence",
+   "Intake and power tunnel portal on the west bank, 150 m upstream of the weir, on the eastern face of a ridge",
+   "Power house and outlet on the right bank, about 700 m downstream of the dam",
+   "Nearest settlements Rehmani Mohallah and Naroch Colony, both over 500 m from the dam and power house",
+   "Section of the Poonch River recently declared a National Park",
+   "Gulpur HPP is cited as a comparable project in size and location",
+   "The ESIA describes an originally conceived dam further upstream on the ridge; this is not the current site and should not be used for mapping"
+  ],
+  "had_coordinates": false,
+  "enough_to_locate": true
  },
  {
   "project": "36627",
@@ -823,7 +882,18 @@
    "Hourly A-weighted equivalent continuous sound pressure levels (LAeq, 1 hour) were recorded continuously over 24 hours at each location during both weekday and weekend periods.",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
+  "description": "The 225 MW gas-fired power plant sits in the northeastern corner of the 280 ha Government-owned Myingyan Steel Mill site in Myingyan, Myanmar, adjacent to the operating Myingyan Steel Mill 4 complex. Its water intake and new pumping station are on the Ayeyarwady River about 12 km away, and the Nyanung Hla jetty is about 28 km from the site.",
+  "clues": [
+   "Site is within a 280 ha Government-owned and operated steel mill site that houses Myingyan Steel Mill 4, in the northeastern corner of that site.",
+   "Power plant connects by a 230 kV overhead line about 3 km long to an upgraded Myingyan Steel Mill sub-station within the adjacent steel mill complex.",
+   "Gas supply pipeline runs about 1.6 km to an existing gas receiving station.",
+   "Water supply pipeline runs about 12 km from the power plant to a water intake and new pumping station on the Ayeyarwady River.",
+   "Wastewater discharge pipeline runs about 2.5 km to an existing irrigation canal.",
+   "Water supply and wastewater pipelines run in parallel for 2.5 km until they reach the irrigation canal.",
+   "Jetty at Nyanung Hla, about 28 km from the project site, requires reinforcement and commissioning."
+  ],
+  "had_coordinates": false,
+  "enough_to_locate": true
  },
  {
   "project": "32859",
@@ -930,7 +1000,23 @@
    "One will be located in the same location described in the ESIA and the other monitoring station will be located in the area of the highest predicted NO2 impacts.",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
+  "description": "The power plant sits inside the Port of Acajutla, a brownfield port and industrial complex in the municipality of Acajutla in western El Salvador. The FSRU and marine terminal lie about 1.2 km offshore, in front of an artisanal fishers' jetty next to the port, and the 44 km transmission line runs northwest from Acajutla toward Ahuachapán.",
+  "clues": [
+   "The power plant is located in a brownfield port and industrial area in the municipality of Acajutla, under a 24-year lease with CEPA, which owns and manages the Port of Acajutla.",
+   "The LNG marine terminal (Restricted Catenary Mooring system and a dedicated FSRU) is located approximately 1.2 km offshore.",
+   "The marine facility is approximately 1.2 km off the coast, in front of an artisanal fishers' jetty, neighbouring the port of Acajutla.",
+   "The power plant is located west of an existing power plant, which is the dominant noise source in the area.",
+   "Residential receptors lie to the northwest, north and southeast of the plant, with the closest near the artisanal fishing pier.",
+   "The 44 km transmission line runs northwest from Acajutla to Ahuachapán, mainly through private agricultural properties.",
+   "The project is located at the northern end of an important stretch of sea turtle nesting beaches, just south of Acajutla beach.",
+   "Barra de Santiago Natural Protected Area lies about 17 km west of the project.",
+   "Los Cóbanos Natural Marine Protected Area lies about 6 km southeast of the project.",
+   "The 44 km transmission line crosses the northwest edge of the Los Cóbanos Important Bird Area for 2.89 km.",
+   "The transmission line crosses the Apaneca-Ilamatepec Biosphere Reserve buffer zone (4 towers) and transition zone (12 towers).",
+   "The ambient air monitoring station is located in the community of Acajutla."
+  ],
+  "had_coordinates": false,
+  "enough_to_locate": true
  },
  {
   "project": "45668",
@@ -1119,7 +1205,23 @@
    "There are approximately 350 residential structures in Al-Hashemiyeh-south including residential houses within a radius of 1.75 km from the project site of which the six are located at the closest distance (about 250 m).",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
+  "description": "The project is a gas-fired power plant on a decommissioned old power station site within the City of Zarqa Industrial Zone, north of Zarqa city, Jordan. The nearest residential area, the southern section of Al-Hashemiyeh, lies about 250 m north of the site, and a NEPCO training center lies about 200 m south. The existing Al Samra CCGT plant is about 3 km north, and a wadi drainage channel runs immediately north of the project boundary.",
+  "clues": [
+   "Country: Jordan",
+   "City of Zarqa Industrial Zone, north of Zarqa city",
+   "Decommissioned old power station site, about 14.9 ha, mostly undeveloped",
+   "Nearest residential receptor (southern Al-Hashemiyeh / Al Hashmiyeh-south) about 250 m north",
+   "NEPCO training center about 200 m south",
+   "Al-Hashemiyeh-south has about 350 residential structures within 1.75 km radius; population of southern Al-Hashemiyeh district about 40,000",
+   "Al Samra CCGT power plant about 3 km north",
+   "Jordan's main gas pipeline about 600 m from project boundary",
+   "Three existing 132 kV transmission line towers within the site (ACWA Zarqa CCGT grid connection)",
+   "Wadi drainage channel immediately north of the project boundary",
+   "Nearby industrial facilities: the only petrochemical refinery in Jordan, a steel fabrication plant, and a large wastewater treatment facility",
+   "Hussein Thermal Power Station decommissioning mentioned in cumulative assessment, but its link to this site is not stated"
+  ],
+  "had_coordinates": false,
+  "enough_to_locate": true
  },
  {
   "project": "41172",
@@ -1182,7 +1284,16 @@
    "The most likely areas for survival of such features and deposits would be the flatter, low-lying areas of modern settlement, areas where project construction facilities and contractor colonies will be located, as well as at tunnel adit sites which will be excavated.",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
+  "description": "The Shuakhevi scheme, the main project site, lies in the Adjaristsqali region of the Autonomous Republic of Adjara in southwest Georgia, on the Adjaristsqali River. The nearby Koromkheti village and the Chvanistskali and Akavreta rivers, which are affected by the wider project, lie within the same river system.",
+  "clues": [
+   "The scheme is located in the Adjaristsqali region of the Autonomous Republic of Adjara in southwest Georgia.",
+   "The Shuakhevi scheme is the project covered by this review and will involve 5.9 km of new roads and four new bridges.",
+   "The greater project area's affected rivers include the Adjaristsqali, Chvanistskali and Akavreta rivers, with the Shuakhevi scheme affecting one of the three.",
+   "The downstream Koromkheti scheme, a separate proposed development, is near Koromkheti village on the Adjaristsqali River.",
+   "Electricity is conveyed via a 120 km 220 kV transmission line to existing substations in Batumi and Akhaltsikhe, which helps frame the region's extent."
+  ],
+  "had_coordinates": false,
+  "enough_to_locate": true
  },
  {
   "project": "39879",
@@ -1369,7 +1480,17 @@
    "Diesel is procured, transported and handled by an authorized diesel provider from Yanahuanca located approximately 15 km from the camp.",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
+  "description": "The Colquipucro and Ayawilca zinc-silver exploration deposits, about 1,400 m apart within one concession package, lie in the central Andes of Peru roughly 60 km from Cerro de Pasco, on land of the San Pedro de Pillao and Yanacocha communities, a few kilometers from the drilling activities. The Uchucchacua mine is about 35 km from the Tinka project site, and the diesel supply town of Yanahuanca is about 15 km from the camp.",
+  "clues": [
+   "Colquipucro and Ayawilca are adjacent deposits, with drilling about 1,400 m apart, in the same concession package",
+   "Sites at 3,500 to 4,600 m above sea level in the central Andes of Peru",
+   "Approximately 60 km from the city of Cerro de Pasco",
+   "Land of the communities of San Pedro de Pillao and Yanacocha, a few km from drilling activities",
+   "Uchucchacua mining project is the closest mining project to Tinka, about 35 km from the project site",
+   "Diesel supplier based in Yanahuanca, about 15 km from the camp"
+  ],
+  "had_coordinates": false,
+  "enough_to_locate": true
  },
  {
   "project": "37808",
@@ -1606,172 +1727,15 @@
    "Solid and Hazardous Waste Management The ESIA indicates that the likely receiver for solid and hazardous wastes from the power plant is the “new” Mazar-e Sharif municipal land disposal site located approximately 15 km west of the city center.",
    "In some cases, available project location information is limited to the country of the project's activities."
   ],
-  "error": "Unexpected end of JSON input"
- },
- {
-  "project": "36877",
-  "name": "FRV Solar Jordan",
-  "country": "Jordan",
-  "sector": "Solar PV (50 MW)",
-  "site_type": "Single site (140 ha)",
-  "source": "https://disclosures.ifc.org/project-detail/ESRS/36877/frv-solar-jordan",
-  "lat": 32.36541,
-  "lon": 36.29412,
-  "sentences": [
-   "The project will be located in the Al-Mafraq governorate, which lies approximately 68 kilometers (km) north of the Jordanian capital, Amman.",
-   "It occupies a 140-hectare plot located within the 2100-hectare King Hussein Bin Talal Development Area (KHBTDA) for which Mafraq Development Corporation (MDC) is the master developer as mandated by the GoJ.",
-   "The KHBTDA is located in the Al-Badyeah Al-Shamalyah municipality of the Al-Mafraq governorate, and the land was previously managed by the army as part of the Mafraq military air force airport lands.",
-   "The airport is located less than 1 km to the west of the project.",
-   "The project also comprises the construction of a 5 km underground 33 kilovolt (kV) transmission line connecting the project to the National Electric Power Company (NEPCO) substation located within the MDC land.",
-   "The project is located approximately 5.8 km from the city of Al-Mafraq, and approximately 8 km from the Syrian border.",
-   "The nearest communities are the villages of Al-Zbaidiyah 1 km to the north, Al-Zatary 2.7 km to the southeast and Al-Ba’ej 3 km to the northeast.",
-   "The Zaatari Syrian refugee camp is located approximately 5.4 km southeast of the project; the camp population is currently estimated at 79,000 refugees.",
-   "The key E&S issues largely relate to the optimization of water use for cleaning solar panels, given the arid environment; the development of Human Resources Policies and Procedures that are applicable to the sub-contractors, given that hiring will likely be done through the sub-contractors; and, the development of a Security Risk Assessment (SRA), given the location of the project in the vicinity of the Syrian border.",
-   "The security company will work closely with the Jordanian police stationed on the MDC area (a small police station is located in the MDC).",
-   "The project is located on land which is owned by KHBTDA and managed by MDC since 2007.",
-   "FRV will also develop its own overarching Human Resources Policy. 15-Jul-2016 Completed Completed 4/10/2017 FRV will ensure that the project makes available a grievance mechanism for workers which is managed openly by the EPC Contractor/O&M Provider 01-Oct-2016 Completed Completed 4/11/2017 FRV will ensure that a site-specific Occupational Health and Safety (H&S) Procedure is developed for the construction phase, that includes location-specific emergency preparedness and response procedures.",
-   "Such location-specific information will also be included in the operations phase Occupational H&S Procedure. 01-Oct-2016 Completed Completed 8/24/2016 FRV will include a water consumption per kWh key performance indicator as part of its Environmental Management Plan. 01-Jun-2018 In progress Due date revised as agreed with IFC Client FRV will develop a Security Risk Assessment and a Security Management Plan which captures the key elements of PS4.",
-   "In some cases, available project location information is limited to the country of the project's activities."
-  ],
-  "description": "The 140-hectare solar PV site lies within the 2,100-hectare King Hussein Bin Talal Development Area in Al-Badyeah Al-Shamalyah municipality, Al-Mafraq governorate, about 68 km north of Amman and 5.8 km from Al-Mafraq city. It is less than 1 km east of the Mafraq military airport, about 1 km south of Al-Zbaidiyah village, and roughly 8 km from the Syrian border, with the Zaatari refugee camp about 5.4 km southeast.",
+  "description": "The Mazar IPP greenfield site lies in Dehdadi District, Balkh Province, northern Afghanistan, about 17 km southwest of Mazar-e Sharif and 15 km southeast of Balkh town. The Northern Fertilizer and Power Plant is about 300 m north of the site, and the Jade Glass Manufacturing Plant is about 100 m east.",
   "clues": [
-   "Al-Mafraq governorate, about 68 km north of Amman",
-   "Within the King Hussein Bin Talal Development Area (KHBTDA), 2,100 ha, master-developed by Mafraq Development Corporation",
-   "KHBTDA is in Al-Badyeah Al-Shamalyah municipality",
-   "Land was formerly Mafraq military air force airport land",
-   "Airport lies less than 1 km west of the project, so the site is east of the airport",
-   "About 5.8 km from Al-Mafraq city",
-   "About 8 km from the Syrian border",
-   "Al-Zbaidiyah village 1 km north of the project",
-   "Al-Zatary village 2.7 km southeast and Al-Ba'ej village 3 km northeast",
-   "Zaatari Syrian refugee camp about 5.4 km southeast",
-   "Site is a 140 ha plot inside the KHBTDA, so the exact boundary must be taken from MDC land records",
-   "A 5 km underground 33 kV line runs from the project to the NEPCO substation on MDC land"
-  ],
-  "had_coordinates": false,
-  "enough_to_locate": true
- },
- {
-  "project": "35479",
-  "name": "Jordan Solar One",
-  "country": "Jordan",
-  "sector": "Solar PV (20 MW)",
-  "site_type": "Single site (63 ha) + 13 km line",
-  "source": "https://disclosures.ifc.org/project-detail/ESRS/35479/jordan-solar-one",
-  "lat": 32.43837,
-  "lon": 36.09957,
-  "sentences": [
-   "The project also comprises the construction of a 13 km 33 kilovolt (kV) transmission line connecting to Al Hassan substation.",
-   "The project proposed site is located within the Husha and Hamra municipalities in the Mafraq governorate, which is located in the far north of Jordan, near to the border with Syria.",
-   "At the western edge of the project site is the Mafraq-Irbid road, and various productive facilities are located on neighboring lands, such as a poultry farm and a sponge manufacturing plant.",
-   "The closest settlements are as follows: Husha Village (circa 3000 inhabitants), located approximately 1.6 kilometers (km) to the north of the project site;",
-   "Fa`A Village (circa 5000 inhabitants), located approximately 2 km to the southwest;",
-   "Hamra Village (circa 9500 inhabitants), located approximately 5 km to the east;",
-   "Mesherfeh Village (circa 500 inhabitants), located approximately 6 km to the northeast; and, Mansoura Village (circa 3500 inhabitants), located approximately 6 km to the southeast.",
-   "The Zaatari Syrian refugee camp is located 10 km east of the city of Mafraq, approximately 20km from the project site; the camp population is estimated at 81,000 refugees.",
-   "The transmission line is located in the Husha municipality in the Mafraq governorate and the Buwaida municipality of the Irbid governorate; it will cross through the town of Buwayda, located approximately 7 km from the project site.",
-   "The transmission line is currently planned to be approximately 13 km in length (10 km overhead and 3 km underground).",
-   "The land on which the project will be located was leased from a single private land owner in March 2014 for a 20-year period.",
-   "The OHS Procedures will also include location-specific emergency preparedness and response procedures.",
-   "All components and equipment for the site will be transported to a designated location for resale, recycling, or disposal in accordance with local by-laws and regulations.",
-   "PS 6: Biodiversity Conservation and Sustainable Management of Living Natural Resources The project site and surroundings are located in the Irano-turanian biogeographic region, which is characterized by steppe vegetation dominated by dwarf shrubs and annual grasses.",
-   "The project site is located within the southern edge of the Irbid - Mafraq plains Important Bird Area (IBA), and the 30 kV transmission lines ROW will pass through this area.",
-   "Indeed the town of Buwaida with a population of approximately 7,500 inhabitants is located within the IBA itself, near to the project site.",
-   "In some cases, available project location information is limited to the country of the project's activities."
-  ],
-  "description": "The solar PV site (63 ha) lies within the Husha and Hamra municipalities of Mafraq governorate in far northern Jordan, near the Syrian border. Its western edge is bordered by the Mafraq-Irbid road, and Husha Village is about 1.6 km north, Fa'a Village about 2 km southwest, Hamra Village about 5 km east, Mesherfeh Village about 6 km northeast, and Mansoura Village about 6 km southeast. The 13 km 33 kV line runs from the site to Al Hassan substation, crossing the Husha municipality and the Buwayda municipality of Irbid governorate, and passes through Buwayda town about 7 km from the site.",
-  "clues": [
-   "Site is in the Husha and Hamra municipalities, Mafraq governorate, far north Jordan, near the Syrian border",
-   "Site area is 63 ha",
-   "Western edge of the site is the Mafraq-Irbid road",
-   "Poultry farm and sponge manufacturing plant on neighboring lands",
-   "Husha Village (~3,000 inhabitants) about 1.6 km north of the site",
-   "Fa'a Village (~5,000 inhabitants) about 2 km southwest of the site",
-   "Hamra Village (~9,500 inhabitants) about 5 km east of the site",
-   "Mesherfeh Village (~500 inhabitants) about 6 km northeast of the site",
-   "Mansoura Village (~3,500 inhabitants) about 6 km southeast of the site",
-   "Zaatari refugee camp is 10 km east of Mafraq city and about 20 km from the site",
-   "Transmission line runs about 13 km (10 km overhead, 3 km underground) to Al Hassan substation",
-   "Transmission line crosses Husha municipality (Mafraq) and Buwayda municipality (Irbid), passing through Buwayda town about 7 km from the site",
-   "Site lies at the southern edge of the Irbid-Mafraq plains Important Bird Area, and Buwaida town is within that IBA near the site"
-  ],
-  "had_coordinates": false,
-  "enough_to_locate": true
- },
- {
-  "project": "44816",
-  "name": "EGP India - Thar",
-  "country": "India",
-  "sector": "Solar PV (300 MW)",
-  "site_type": "Single large site",
-  "source": "https://disclosures.ifc.org/project-detail/ESRS/44816/egp-india-thar",
-  "lat": 28.24491,
-  "lon": 73.2838,
-  "sentences": [
-   "There are six villages within 5 km of the project area.",
-   "The nearest protected area, Jorbeer Bird Sanctuary, is located 30 km away.",
-   "There are three other solar power plants under planning or construction stage located within 10 km of the project boundary.",
-   "The district (Bikaner) where the project is located is not a tribal area and does not have any significant presence of tribal communities.",
-   "Due to the proximity of three additional solar plants within 10 km of the project site, IFC also reviewed EGP’s assessment of the project’s likely cumulative E&S risks and impacts.",
-   "However, the guidance and response measures provided in this corporate program have not been sufficiently adapted to the Thar project context and location.",
-   "Project risks and impacts on public health, safety, and security – primarily among the six villages located within a 5 km radius - are expected to be limited, short-lived, and easily mitigated through standard good international industry practices.",
-   "Safety risks associated with construction of the 10 km transmission line will be avoided by sensitizing nearby communities to the risks and controlling access to active construction sites.",
-   "PS 6: Biodiversity Conservation and Sustainable Management of Living Natural Resources &#xa0;&#xa0;The project is located in the Thar Desert landscape which covers the majority of the Indian State of Rajasthan.",
-   "Both sites are located to the south east of the Project at a distance of approximately 40km and 35km respectively.",
-   "The survey is to consist of vantage points located near to potential areas of congregation covering all active periods of the day.",
-   "In some cases, available project location information is limited to the country of the project's activities."
-  ],
-  "description": "The 300 MW solar PV project is in Bikaner district in the Thar Desert of Rajasthan, India, with the Jorbeer Bird Sanctuary about 30 km away. Three other solar plants under planning or construction lie within 10 km of the project boundary, and six villages are within 5 km.",
-  "clues": [
-   "Bikaner district, Rajasthan, India (sentence 4)",
-   "Thar Desert landscape covering most of Rajasthan (sentence 9)",
-   "Jorbeer Bird Sanctuary is the nearest protected area, about 30 km away (sentence 2)",
-   "Three other solar plants in planning or construction within 10 km of the project boundary (sentence 3)",
-   "Six villages within 5 km of the project area (sentence 1)",
-   "A 10 km transmission line is associated with the project (sentence 8)",
-   "Sentence 10 gives distances of about 40 km and 35 km to the southeast for two unnamed sites, which are not identified, so they are not usable as anchors"
-  ],
-  "had_coordinates": false,
-  "enough_to_locate": false
- },
- {
-  "project": "48399",
-  "name": "Manatuto Solar (Laleia)",
-  "country": "Timor-Leste",
-  "sector": "Solar PV (72 MW) + BESS",
-  "site_type": "Single site (350 ha)",
-  "source": "https://disclosures.ifc.org/project-detail/ESRS/48399/timor-solar",
-  "lat": -8.51782,
-  "lon": 126.13329,
-  "sentences": [
-   "The project, a 90MWp/72MWac PV power plant with an 80 MWh BESS, is located in the Laleia area of Timor-Leste and is being developed by a consortium comprising EDF Power Solutions (EDFps; formerly EDF Renewables, a subsidiary of EDF Group) and I-Environment Investments Pacific Pty Ltd (a subsidiary of Itochu), who jointly are the project sponsors.",
-   "The project site is located on Timor-Leste’s north coast, about 70 kilometers east of Dili, within the Laleia Administrative Post of Manatuto Municipality.",
-   "The site is not intensively cultivated and is situated several kilometers from the nearest village.",
-   "Overview of IFC's Scope of Review IFC’s environmental and social (E&S) review of the proposed investment included a site visit to the project location on August 26, 2025, meeting with villagers from Suco Lifau, Suco Hatularan and their administrative authorities; as well as review of available E&S documentation, such as the project Environmental Impact Statement (EIS), the Supplementary Environmental and Social Impact Assessment (S-ESIA) as well as EDFps E&S, Code of Conduct and Procurement Policies.",
-   "However, additional measures are discussed in PS1 since there are three important springs situated to the east of the project area, outside the project boundaries.",
-   "Accommodation for other workers may need to be arranged through rental housing in a nearby town located approximately 10 kilometers from the project site.",
-   "Given the 3 km distance to the nearest settlement, impacts will be minor and localized, with negligible disturbance to communities outside the largely uninhabited project area.",
-   "During operation, noise from inverters and transformers will be minimal, as the equipment will be enclosed and located far from residential areas.",
-   "The remaining small management team and expatriate personnel as well as construction workers will travel between Dili and the project site or reside in rental accommodation in a nearby town, which is approximately 10 km from the site.",
-   "The residential area of Lifau is about 3 km east of the site, and the residential area of Haturalan is about 3.5 km east-southeast of the site.",
-   "Suco Cairui, approximately 10 km south of the project site, is not expected to experience any loss of access.",
-   "PS6: Biodiversity Conservation and Sustainable Management of Living Natural Resources? The Project is located within the Timor and Wetar deciduous forests Ecoregion which is characterized by a mix of forest types, including savannah woodlands on lowland coastal areas.",
-   "The Project area (350 ha) is located within a mosaic of natural and modified habitats, including 260 ha remnant savannah woodlands and coastal vegetation that are natural habitats, and agriculture.",
-   "In some cases, available project location information is limited to the country of the project's activities."
-  ],
-  "description": "The site lies on Timor-Leste's north coast within the Laleia Administrative Post of Manatuto Municipality, about 70 km east of Dili. The residential area of Lifau is about 3 km east of the site, and Haturalan is about 3.5 km east-southeast, with three important springs east of the project boundary. Suco Cairui is about 10 km south of the site.",
-  "clues": [
-   "Located in the Laleia area of Timor-Leste",
-   "Site on Timor-Leste's north coast, about 70 km east of Dili",
-   "Within the Laleia Administrative Post of Manatuto Municipality",
-   "Residential area of Lifau is about 3 km east of the site",
-   "Residential area of Haturalan is about 3.5 km east-southeast of the site",
-   "Three important springs situated east of the project area, outside the project boundaries",
-   "Suco Cairui is approximately 10 km south of the project site",
-   "Suco Lifau and Suco Hatularan are the nearby villages consulted",
-   "Single site of 350 ha",
-   "Nearest village is several kilometers away",
-   "Rental accommodation town approximately 10 km from the site (town not named)"
+   "Greenfield development in Dehdadi District, Balkh Province, northern Afghanistan.",
+   "Situated approximately 17 km southwest of the provincial capital Mazar-e Sharif and 15 km southeast of the town of Balkh.",
+   "Northern Fertilizer and Power Plant (NFPP), 48 MW, located about 300 m north of the project site.",
+   "Jade Glass Manufacturing Plant located about 100 m east of the project site.",
+   "Nearest residences are more than 1 km away to the north and west; an existing fertilizer plant lies between the power plant and the northward residences.",
+   "A 220-kV transmission line interconnects the Mazar IPP with the Sheberghan to Mazar-e Sharif 220 kV line, approximately 11.3 km north of the site.",
+   "Mazar-e Sharif (about 500,000 people) is about 12 km east and Balkh (about 80,000 people) a similar distance north, which conflicts somewhat with the 17 km and 15 km figures above and should be checked."
   ],
   "had_coordinates": false,
   "enough_to_locate": true
