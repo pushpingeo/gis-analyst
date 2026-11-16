@@ -1,6 +1,10 @@
 name: Atlas probe
-# Diagnostic: what the AI Living World Atlas holds near chosen sites. Uses ATLAS_MCP_KEY; no Anthropic cost.
-on: { workflow_dispatch: {} }
+# Diagnostic calls to the AI Living World Atlas. Uses ATLAS_MCP_KEY; no Anthropic cost.
+on:
+  workflow_dispatch:
+    inputs:
+      calls: { description: 'JSON array of [tool, args] pairs', required: false, default: '' }
+      urls: { description: 'JSON array of URLs to GET', required: false, default: '' }
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -9,5 +13,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: node scripts/probe-atlas.mjs
+      - if: inputs.calls == '' && inputs.urls == ''
+        run: node scripts/probe-atlas.mjs
         env: { ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}" }
+      - if: inputs.calls != '' || inputs.urls != ''
+        run: node scripts/atlas-call.mjs
+        env: { ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}", CALLS: "${{ inputs.calls }}", URLS: "${{ inputs.urls }}" }
