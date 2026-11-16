@@ -417,6 +417,11 @@ function paintOrigin(p, card = p.card) {
     body.append(line);
   } else if (a.place) body.append(el("p", `Anchor: ${a.place}`));
   body.append(el("p", `Built: ${o.steps.join(", then ")}.`), el("p", `Why: ${o.reason}`));
+  if (o.confidence_rules?.length) body.append(el("p", `Confidence: ${o.confidence_rules.join("; ")}.`));
+  for (const c of o.checks || []) {
+    const verdict = c.pass === true ? "fits" : c.pass === false ? `doesn't fit (${c.why})` : "not checked";
+    body.append(el("p", `Check: ${c.against} about ${c.expected_km} km${c.direction ? ` ${c.direction}` : ""}: measured ${c.actual_km ?? "?"} km, ${verdict}.`, c.pass === false ? "warn" : "quiet"));
+  }
   if (a.extra?.CRS_NAME && /ED50/i.test(a.extra.CRS_NAME)) body.append(el("p", `The source position was surveyed in ${a.extra.CRS_NAME}; the publisher supplies it in WGS84.`, "quiet"));
 }
 

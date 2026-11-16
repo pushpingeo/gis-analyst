@@ -123,6 +123,7 @@ a { color: var(--sea); }
 .origin p { margin: 0 0 4px; }
 .origin .words { font-style: italic; }
 .origin .quiet { color: var(--ink-2); }
+.origin .warn { color: #9a3412; }
 
 /* choices: a carousel of candidates, each with its source */
 .choices { border: 1px solid var(--rule); border-radius: 14px; padding: 12px 14px; }

@@ -4,6 +4,7 @@
 import * as turf from "./vendor/turf.js";
 import * as G from "./geometry.js";
 import * as R from "./reference.js";
+import { rateConfidence, runCheck, MATCHES } from "./confidence.js";
 import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES } from "./gazetteer.js";
 
 const round = (v, d = 3) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
@@ -56,11 +57,12 @@ export function placeToolDefs(skills) {
           buffer_km: { type: "number" }, rotation_deg: { type: "number" },
           offset_km: { type: "number" }, bearing_deg: { type: "number", description: "Degrees clockwise from north for the offset" },
           words: { type: "string", description: "The person's own words that this place answers" },
-          confidence: { type: "string", enum: ["high", "medium", "low"] },
-          reason: { type: "string", description: "One line: the evidence for the location and the confidence" },
+          match: { type: "string", enum: MATCHES, description: "How the anchor relates to what the person wants. named_place: they asked for this place itself (a palace, a town, a block, a field). name_and_type: the asset itself, matched by name and of the right type (a mine for a mine). type_near_clues: a feature of the right type found where the clues point, its name not confirmed. name_only: the name matches but the type is wrong or unknown. settlement_or_region: a town, village or region stands in for the site. none: nothing specific." },
+          checks: { type: "array", description: "Every distance clue in the request that the place can be checked against, e.g. 'Nok Kundi lies about 80 km south-east of the mine' → { against: <Nok Kundi's candidate id>, expected_km: 80, direction: 'SE' }. Direction is the way you travel FROM the site TO that feature. Give all you have; they are measured, not trusted.", items: { type: "object", properties: { against: { type: "string", description: "Candidate id" }, expected_km: { type: "number" }, direction: { type: "string", description: "Compass point from the site to it: N, NE, ENE… (optional)" } }, required: ["against", "expected_km"] } },
+          reason: { type: "string", description: "One line: the evidence for the location" },
           scale: { type: "string", enum: ["local", "regional", "global"], description: "Only when the request itself says the scale of the work (e.g. 'screen Mozambique' is global, 'the whole of the Moray Firth' regional) and it differs from the shape's size. Otherwise leave it out and the size decides." },
         },
-        required: ["anchor", "shape", "words", "confidence", "reason"],
+        required: ["anchor", "shape", "words", "match", "reason"],
       },
     },
     {
@@ -219,13 +221,25 @@ export function createPlaceTools(host) {
       if (i.rotation_deg && !["square", "rectangle", "point"].includes(i.shape)) { f = G.rotate(f, i.rotation_deg); steps.push(`rotated ${i.rotation_deg}°`); }
       else if (i.rotation_deg && ["square", "rectangle"].includes(i.shape)) steps.push(`rotated ${i.rotation_deg}°`);
       f = G.roundCoords({ type: "Feature", properties: {}, geometry: f.geometry });
+      // Confidence from the evidence, in code: checks are measured from the place just built.
+      const site = f.geometry.type === "Point" ? f.geometry.coordinates : turf.centroid(f).geometry.coordinates;
+      const checks = [];
+      for (const c of i.checks || []) {
+        try { const t = resolve(c.against); checks.push(runCheck(site, { lonlat: t.lonlat, name: t.label }, c)); }
+        catch { checks.push({ against: c.against, expected_km: c.expected_km, pass: null, why: "not a candidate id, so not checked" }); }
+      }
+      const rated = rateConfidence({ cand: a.cand, match: i.match, checks: checks.filter((c) => c.pass !== null), offset: !!i.offset_km, shape: i.shape });
       const origin = {
-        method: "words", words: i.words, steps, confidence: i.confidence, reason: i.reason,
+        method: "words", words: i.words, steps, confidence: rated.confidence, confidence_rules: rated.rules, match: i.match, checks, reason: i.reason,
         anchor: a.cand ? { name: a.cand.name, type: a.cand.type, source: a.cand.source, lonlat: a.cand.lonlat, extra: a.cand.extra } : { place: a.label },
         at: new Date().toISOString(),
       };
       const p = host.addPlace({ feature: f, origin, scale: i.scale });
-      return { ...(await placeSummary(p)), how: steps.join(", then "), next: "Shown on the map as a proposal. Ask the person if it's what they meant." };
+      return { ...(await placeSummary(p)), how: steps.join(", then "), confidence: rated.confidence, why: rated.rules,
+        ...(checks.length ? { checks } : {}),
+        next: rated.confidence === "low" && checks.some((c) => c.pass === false)
+          ? "Shown as a proposal, low confidence because a check failed. Say which, and look for a feature that fits all the clues (find_features_near) before asking the person."
+          : "Shown on the map as a proposal. Report the confidence as given here, and ask the person if it's what they meant." };
     },
 
     async offer_choices({ candidates, recommended, reason, question }) {

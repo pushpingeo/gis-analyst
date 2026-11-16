@@ -6,6 +6,7 @@ import * as R from "../js/reference.js";
 import { createPlaceTools, placeToolDefs, projectSummary } from "../js/placetools.js";
 import { buildMessages, runTurn, parseSkill } from "../js/converse.js";
 import { BLOCK_REF, findFeaturesNear } from "../js/gazetteer.js";
+import { rateConfidence, runCheck } from "../js/confidence.js";
 
 let passed = 0;
 const test = async (name, fn) => { await fn(); passed++; console.log("ok", name); };
@@ -66,7 +67,7 @@ await test("make_place builds a 3 km² square on the anchor and records how", as
   const t = createPlaceTools(host);
   const r = await t.exec("find_place", { query: "Jackdaw" });
   const id = r.candidates.find((x) => x.name === "JACKDAW").id;
-  const out = await t.exec("make_place", { anchor: id, shape: "square", area_km2: 3, words: "a 3 km² block around Jackdaw", confidence: "high", reason: "NSTA platform matched by name" });
+  const out = await t.exec("make_place", { anchor: id, shape: "square", area_km2: 3, words: "a 3 km² block around Jackdaw", match: "named_place", reason: "NSTA platform matched by name" });
   assert.equal(out.place, "Area 1");
   near(host.list[0].feature && turf.area(host.list[0].feature) / 1e6, 3, 0.01, "area");
   near(turf.distance(turf.centroid(host.list[0].feature), [2.37924, 56.90038]), 0, 0.01, "centred on the platform (km)");
@@ -80,7 +81,7 @@ await test("feature shape uses the block outline; edits resize and rotate on the
   const r = await t.exec("find_place", { query: "30/2" });
   const blk = r.candidates.find((x) => x.name === "30/2");
   assert.ok(blk && blk.area_km2 > 200, JSON.stringify(r));
-  await t.exec("make_place", { anchor: blk.id, shape: "feature", words: "block 30/2", confidence: "high", reason: "NSTA block reference" });
+  await t.exec("make_place", { anchor: blk.id, shape: "feature", words: "block 30/2", match: "named_place", reason: "NSTA block reference" });
   const e = await t.exec("edit_place", { place: "Area 1", resize_to: 100, rotate_deg: 30 });
   near(e.area_km2, 100, 0.5, "resized area");
   assert.match(e.changed, /rotated 30°.*resized to 100/);
@@ -94,7 +95,7 @@ await test("offset and circle", async () => {
   const t = createPlaceTools(host);
   const r = await t.exec("find_place", { query: "Jackdaw" });
   const id = r.candidates.find((x) => x.name === "JACKDAW").id;
-  await t.exec("make_place", { anchor: id, shape: "circle", radius_km: 2, offset_km: 10, bearing_deg: 0, words: "2 km circle 10 km north of Jackdaw", confidence: "low", reason: "offset from a single anchor" });
+  await t.exec("make_place", { anchor: id, shape: "circle", radius_km: 2, offset_km: 10, bearing_deg: 0, words: "2 km circle 10 km north of Jackdaw", match: "settlement_or_region", reason: "offset from a single anchor" });
   const c = turf.centroid(host.list[0].feature).geometry.coordinates;
   near(turf.distance(c, [2.37924, 56.90038]), 10, 0.05, "10 km away");
   near(turf.bearing([2.37924, 56.90038], c), 0, 1, "to the north");
@@ -135,7 +136,7 @@ await test("when Overpass is down, schools come from Nominatim, nearest first, a
 
 await test("unknown anchors give a useful error", async () => {
   const t = createPlaceTools(memoryHost());
-  await assert.rejects(() => t.exec("make_place", { anchor: "C99", shape: "point", words: "x", confidence: "low", reason: "x" }), /Use find_place first/);
+  await assert.rejects(() => t.exec("make_place", { anchor: "C99", shape: "point", words: "x", match: "none", reason: "x" }), /Use find_place first/);
 });
 
 await test("scale is worked out: size, map view, and the request when it says", async () => {
@@ -152,18 +153,56 @@ await test("scale is worked out: size, map view, and the request when it says", 
   const host = memoryHost();
   const t = createPlaceTools(host);
   const r = await t.exec("find_place", { query: "Jackdaw" });
-  await t.exec("make_place", { anchor: r.candidates[0].id, shape: "point", words: "screen the whole North Sea from Jackdaw", confidence: "high", reason: "x", scale: "regional" });
+  await t.exec("make_place", { anchor: r.candidates[0].id, shape: "point", words: "screen the whole North Sea from Jackdaw", match: "named_place", reason: "x", scale: "regional" });
   const s = await projectSummary(ref, host.list, "Area 1", [-7, 54.5, 0, 59]);
   assert.match(s, /scale regional \(from request\)/);
   assert.match(s, /Map view: about \d+ km across \(regional scale\)/);
   assert.match(await projectSummary(ref, [], null, [-3.62, 55.97, -3.58, 55.99]), /No places yet\.\nMap view: about \d+ km across \(local scale\)/);
 });
 
+await test("confidence is worked out from the evidence, not chosen", async () => {
+  const wd = { name: "Reko Diq Mine", type: "mine", source: { id: "wikidata", publisher: "Wikidata contributors" } };
+  const nsta = { name: "JACKDAW", type: "PLATFORM", source: { id: "nsta-surface", atlas_id: "x", publisher: "North Sea Transition Authority" } };
+  const village = { name: "Sembehun", type: "village", source: { id: "osm-nominatim" } };
+  const salar = { name: "Salar del Rincón", type: "salt flat", source: { id: "wikidata" } };
+  const ok = { pass: true }, bad = { pass: false };
+  assert.equal(rateConfidence({ cand: nsta, match: "name_and_type", shape: "point" }).confidence, "high");
+  assert.equal(rateConfidence({ cand: wd, match: "name_and_type", shape: "point" }).confidence, "medium", "a gazetteer point on its own");
+  assert.equal(rateConfidence({ cand: wd, match: "name_and_type", checks: [ok], shape: "point" }).confidence, "high", "confirmed by a check");
+  assert.equal(rateConfidence({ cand: wd, match: "name_and_type", checks: [ok, bad], shape: "point" }).confidence, "low", "Reko Diq: a failed check");
+  assert.equal(rateConfidence({ cand: nsta, match: "name_and_type", checks: [bad], shape: "point" }).confidence, "low", "even authoritative");
+  assert.equal(rateConfidence({ cand: village, match: "name_and_type", shape: "point" }).confidence, "low", "Sierra Rutile: a village isn't the mine");
+  assert.equal(rateConfidence({ cand: salar, match: "name_and_type", checks: [ok], shape: "point" }).confidence, "medium", "a point for a salt flat");
+  assert.equal(rateConfidence({ cand: salar, match: "name_and_type", checks: [ok], shape: "feature" }).confidence, "high", "its outline is fine");
+  assert.equal(rateConfidence({ cand: wd, match: "type_near_clues", checks: [ok], shape: "point" }).confidence, "medium");
+  assert.equal(rateConfidence({ cand: wd, match: "type_near_clues", checks: [ok, ok], shape: "point" }).confidence, "high");
+  assert.equal(rateConfidence({ cand: nsta, match: "name_and_type", offset: true, shape: "circle" }).confidence, "medium", "offset caps at medium");
+  assert.equal(rateConfidence({ cand: village, match: "settlement_or_region", offset: true, checks: [ok], shape: "point" }).confidence, "medium");
+  assert.equal(rateConfidence({ cand: village, match: "named_place", shape: "circle" }).confidence, "high", "the person asked for the village itself");
+  assert.equal(rateConfidence({ cand: wd, match: "name_only", shape: "point" }).confidence, "low");
+  // Checks: distance within max(3 km, 35%); direction from the site within 45°.
+  const site = [0, 0], east25 = { lonlat: turf.destination(site, 25, 90).geometry.coordinates, name: "X" };
+  assert.equal(runCheck(site, east25, { expected_km: 25, direction: "E" }).pass, true);
+  assert.equal(runCheck(site, east25, { expected_km: 30, direction: "ENE" }).pass, true);
+  assert.equal(runCheck(site, east25, { expected_km: 80, direction: "E" }).pass, false);
+  assert.equal(runCheck(site, east25, { expected_km: 25, direction: "W" }).pass, false);
+  // Through the tool: Jackdaw with a check against the block it sits in.
+  const host = memoryHost();
+  const t = createPlaceTools(host);
+  const r = await t.exec("find_place", { query: "Jackdaw" });
+  const b = await t.exec("find_place", { query: "30/2" });
+  const out = await t.exec("make_place", { anchor: r.candidates.find((x) => x.name === "JACKDAW").id, shape: "point", words: "the Jackdaw platform, about 4 km from block 30/2's centre", match: "name_and_type", reason: "x",
+    checks: [{ against: b.candidates[0].id, expected_km: 60 }] });
+  assert.equal(out.confidence, "low");
+  assert.equal(out.checks[0].pass, false);
+  assert.equal(host.list[0].origin.confidence, "low");
+});
+
 await test("project summary has no coordinates", async () => {
   const host = memoryHost();
   const t = createPlaceTools(host);
   const r = await t.exec("find_place", { query: "Jackdaw" });
-  await t.exec("make_place", { anchor: r.candidates[0].id, shape: "square", area_km2: 3, words: "3 km² around Jackdaw", confidence: "high", reason: "x" });
+  await t.exec("make_place", { anchor: r.candidates[0].id, shape: "square", area_km2: 3, words: "3 km² around Jackdaw", match: "named_place", reason: "x" });
   const s = await projectSummary(ref, host.list, "Area 1");
   assert.match(s, /Area 1 \[in focus\] \(proposed\): 3 km², offshore/);
   assert.doesNotMatch(s, /56\.9|2\.379/);
@@ -181,7 +220,7 @@ await test("a turn runs tools and every tool_use gets a result", async () => {
   const t = createPlaceTools(host);
   const script = [
     { stop_reason: "tool_use", content: [{ type: "tool_use", id: "a", name: "load_skill", input: { name: "place-finding" } }, { type: "tool_use", id: "b", name: "find_place", input: { query: "Jackdaw" } }] },
-    { stop_reason: "tool_use", content: [{ type: "text", text: "Found it." }, { type: "tool_use", id: "c", name: "make_place", input: { anchor: "C1", shape: "square", area_km2: 3, words: "w", confidence: "high", reason: "r" } }] },
+    { stop_reason: "tool_use", content: [{ type: "text", text: "Found it." }, { type: "tool_use", id: "c", name: "make_place", input: { anchor: "C1", shape: "square", area_km2: 3, words: "w", match: "named_place", reason: "r" } }] },
     { stop_reason: "end_turn", content: [{ type: "text", text: "Here's a 3 km² square around JACKDAW. Is that what you meant?" }] },
   ];
   const seen = [];
