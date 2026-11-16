@@ -14,9 +14,25 @@ export function setUserKey(k) {
 
 export class LimitReached extends Error {}
 
-export async function callClaude({ system, messages, tools }) {
+export async function callClaude(args) {
+  // A dropped connection (Safari says "Load failed") gets one quiet retry before it's reported.
+  try { return await callOnce(args); }
+  catch (e) {
+    if (!(e instanceof TypeError)) throw e;
+    await new Promise((ok) => setTimeout(ok, 1500));
+    try { return await callOnce(args); }
+    catch (e2) {
+      if (e2 instanceof TypeError) throw new Error("the connection to the analyst dropped (twice). Check your connection, keep this tab in front, and try again");
+      throw e2;
+    }
+  }
+}
+
+async function callOnce({ system, messages, tools }) {
   const body = { model: CONFIG.model, max_tokens: CONFIG.maxTokens, system, messages, tools };
   const key = getUserKey();
+  const size = JSON.stringify(body).length;
+  if (size > 100000) console.warn(`Claude request is ${Math.round(size / 1000)} kB; the Worker refuses over 120 kB.`);
   const res = key
     ? await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",

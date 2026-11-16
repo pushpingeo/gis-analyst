@@ -140,9 +140,16 @@ export const FEATURE_TYPES = {
   "industrial area": ['way["landuse"="industrial"]'],
   "airport": ['nwr["aeroway"="aerodrome"]'],
   "settlement": ['node["place"~"city|town|village|hamlet"]'],
+  "school": ['nwr["amenity"~"^(school|kindergarten|college|university)$"]'],
+  "hospital or clinic": ['nwr["amenity"~"^(hospital|clinic|doctors)$"]', 'nwr["healthcare"~"^(hospital|clinic|centre)$"]'],
+  "place of worship": ['nwr["amenity"="place_of_worship"]'],
+  "cemetery": ['nwr["landuse"="cemetery"]', 'nwr["amenity"="grave_yard"]'],
+  "railway station": ['nwr["railway"~"^(station|halt)$"]'],
+  "park or green space": ['nwr["leisure"~"^(park|nature_reserve|recreation_ground)$"]'],
+  "residential area": ['way["landuse"="residential"]'],
 };
 
-export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = null, fetchFn = fetch, limit = 12, headers = {} } = {}) {
+export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = null, fetchFn = fetch, limit = 15, headers = {} } = {}) {
   const parts = FEATURE_TYPES[featureType];
   if (!parts) throw new Error(`Unknown feature type. Use one of: ${Object.keys(FEATURE_TYPES).join(", ")}.`);
   const r = Math.min(Math.max(radiusKm, 0.5), 50) * 1000;
@@ -170,7 +177,9 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
     if (el.type !== "node") { c.osm = { type: el.type, id: el.id }; c.approx = true; c.extra.size = "area is of the bounding box until the outline is fetched"; }
     cands.push(c);
   }
-  cands.sort((a, b) => (b.area_km2 || 0) - (a.area_km2 || 0) || a.distance_km - b.distance_km);
+  // Big assets: largest first (the mine or plant itself). Everything else: nearest first.
+  const bySize = /farm|hydro|power plant|mine|port|platform|industrial|airport/.test(featureType);
+  cands.sort(bySize ? (a, b) => (b.area_km2 || 0) - (a.area_km2 || 0) || a.distance_km - b.distance_km : (a, b) => a.distance_km - b.distance_km);
   return { candidates: cands.slice(0, limit), total: cands.length, wind_turbines: turbines || undefined };
 }
 
@@ -221,7 +230,7 @@ export async function searchWikidata(term, { fetchFn = fetch, headers = {}, limi
 }
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k]).map((k) => [k, o[k]]));
 function describeTags(t) {
-  for (const k of ["power", "man_made", "landuse", "industrial", "waterway", "water", "aeroway", "place"]) {
+  for (const k of ["power", "man_made", "amenity", "healthcare", "railway", "leisure", "landuse", "industrial", "waterway", "water", "aeroway", "place"]) {
     if (t[k]) return `${k}=${t[k]}${t["plant:source"] ? ` (${t["plant:source"]})` : t["generator:source"] ? ` (${t["generator:source"]})` : ""}`;
   }
   return "feature";

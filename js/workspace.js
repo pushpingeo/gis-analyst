@@ -7,7 +7,7 @@ import * as G from "./geometry.js";
 import * as R from "./reference.js";
 import { placeToolDefs, createPlaceTools, projectSummary } from "./placetools.js";
 import { parseSkill, systemPrompt, buildMessages, runTurn, activityFor } from "./converse.js";
-import { callClaude, LimitReached } from "./claude.js?v=m2b";
+import { callClaude, LimitReached } from "./claude.js?v=t1";
 
 const $ = (id) => document.getElementById(id);
 const C = { ink: "#15303c", pole: "#d1352a", white: "#ffffff", sea: "#2b6a80" };

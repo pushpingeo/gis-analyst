@@ -30,7 +30,7 @@ export function placeToolDefs(skills) {
     },
     {
       name: "find_features_near",
-      description: `Find OpenStreetMap features of a type within a radius of an anchor, with distance and bearing from it, largest first. Use to find the asset itself once a town or feature anchors the search. Types: ${Object.keys(FEATURE_TYPES).join(", ")}.`,
+      description: `Find OpenStreetMap features of a type within a radius of an anchor (a candidate or a place), with distance and bearing from it. Assets come largest first, everything else nearest first. Use it for "schools near X" or "hospitals within 5 km of Area 1", and to find an asset once a town anchors the search. One call does the whole search: don't search by name for kinds of things. Types: ${Object.keys(FEATURE_TYPES).join(", ")}.`,
       input_schema: {
         type: "object",
         properties: {
