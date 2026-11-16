@@ -1,0 +1,31 @@
+name: Build place-finding test sets
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/place-sets-request"]
+permissions:
+  contents: write
+concurrency: place-sets
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci || npm install
+      - name: Described locations from the IFC review summaries
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/build-described-sites.mjs
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A eval/places/sets
+          git diff --cached --quiet || git commit -m "Place-finding test sets"
+          git pull --rebase && git push
