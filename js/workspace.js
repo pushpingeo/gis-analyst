@@ -32,7 +32,12 @@ map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
 // If the basemap can't be reached, fall back to the reference countries on a plain background so the tools still work.
 // Start on "style.load", not "load": a hidden tab doesn't render, so "load" may never come (lesson from demo 1).
 let started = false, fellBack = false;
-const fallbackTimer = setTimeout(useFallbackBasemap, 15000);
+// A hidden tab may not finish loading the style at all, so the wait only counts while the page is visible.
+let fallbackTimer = setTimeout(fallbackIfVisible, 15000);
+function fallbackIfVisible() {
+  if (document.hidden) fallbackTimer = setTimeout(fallbackIfVisible, 15000);
+  else useFallbackBasemap();
+}
 map.on("error", (e) => { if (!started && /style|fetch|Failed|NetworkError/i.test(String(e?.error?.message || ""))) useFallbackBasemap(); });
 map.once("style.load", start);
 
