@@ -63,6 +63,8 @@ async function useFallbackBasemap() {
   activity("");
 }
 
+const viewBounds = () => map.getBounds().toArray().flat();
+
 // ---- places ---------------------------------------------------------------------------
 // A place: { id (Terra Draw id), name, kind, feature, status: drawn | proposed | accepted, origin, edits, scale, scaleFrom, card }
 let draw;
@@ -75,9 +77,13 @@ const kindOf = (geom) => (geom.type === "Point" ? "Point" : /LineString/.test(ge
 const placeByName = (name) => [...places.values()].find((p) => p.name.toLowerCase() === String(name).trim().toLowerCase());
 const featureOf = (id) => { const f = draw.getSnapshotFeature(id); return f && { type: "Feature", properties: {}, geometry: f.geometry }; };
 
-function newPlace(id, feature, { status = "drawn", origin = { method: "drawn", at: new Date().toISOString() } } = {}) {
+// Scale is worked out, never asked: from the request if it says, else the shape's size; a point has no size,
+// so a drawn point takes its scale from the zoom level when it was dropped. The person can change it on the card.
+function newPlace(id, feature, { status = "drawn", origin = { method: "drawn", at: new Date().toISOString() }, scale = null } = {}) {
   const kind = kindOf(feature.geometry);
   const p = { id, kind, name: `${kind} ${++counts[kind]}`, feature, status, origin, edits: [], scaleFrom: "size" };
+  if (scale && R.SCALES[scale]) { p.scale = scale; p.scaleFrom = "request"; }
+  else if (kind === "Point" && origin.method === "drawn") { p.scale = R.scaleForKm(R.viewKm(viewBounds())); p.scaleFrom = "zoom"; }
   places.set(id, p);
   p.card = makeCard(p);
   focusName = p.name;
@@ -261,12 +267,12 @@ const host = {
   skillText: (name) => skills[name]?.body || "",
   onCandidates: showCandidates,
   offerChoices: (o) => makeChoiceCard(o),
-  addPlace({ feature, origin }) {
+  addPlace({ feature, origin, scale }) {
     const id = crypto.randomUUID();
     const mode = feature.geometry.type === "Point" ? "point" : /LineString/.test(feature.geometry.type) ? "linestring" : "polygon";
     const bad = draw.addFeatures([{ id, type: "Feature", geometry: feature.geometry, properties: { mode } }]).find((v) => !v.valid);
     if (bad) throw new Error(`The shape couldn't be drawn: ${bad.reason}`);
-    const p = newPlace(id, feature, { status: "proposed", origin });
+    const p = newPlace(id, feature, { status: "proposed", origin, scale });
     zoomTo(p);
     return p;
   },
@@ -417,7 +423,7 @@ function paintOrigin(p, card = p.card) {
 function paintScale(p) {
   p.card.querySelectorAll(".scale button").forEach((b) => {
     b.setAttribute("aria-checked", String(b.dataset.scale === p.scale));
-    b.title = b.dataset.scale === p.scale && p.scaleFrom === "size" ? `Worked out from the size: ${R.SCALES[p.scale].hint}` : R.SCALES[b.dataset.scale].hint;
+    b.title = b.dataset.scale === p.scale && p.scaleFrom !== "you" ? `${R.SCALE_FROM[p.scaleFrom]}: ${R.SCALES[p.scale].hint}` : R.SCALES[b.dataset.scale].hint;
   });
 }
 
@@ -520,7 +526,7 @@ async function send(text) {
   showCandidates([]);
   const steps = trace.querySelector("ol");
   try {
-    const summary = await projectSummary(ref, host.places(), focusName);
+    const summary = await projectSummary(ref, host.places(), focusName, viewBounds());
     const skillList = Object.values(skills);
     const res = await runTurn({
       system: systemPrompt({ skills: skillList, comingSoon: ["risk screening (NTR), net developable area and constraints-and-access analysis"] }),

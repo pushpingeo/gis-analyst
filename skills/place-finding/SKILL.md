@@ -1,6 +1,6 @@
 ---
 name: place-finding
-version: 3.1
+version: 3.2
 description: Turn words into a place on the map. Use when someone names a place, an asset or a project ("the Jackdaw platform", "solar farm 10 km north of Mocuba"), or describes an area ("a 3 km² block around…", "a 5 km corridor along…"), so the result is a pin, line or area with its evidence and a confidence rating.
 ---
 
@@ -28,6 +28,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
    - "X km north of" → offset from the anchor by distance and bearing.
    - "Along", "corridor" → a buffer around a line.
    - A bare point anchor with no size → a point.
+   - **Scale is worked out, never asked.** The shape's size decides it (up to ~50 km across is local, up to ~1,000 km regional). Pass `scale` only when the request itself says the scale of the work and the shape doesn't show it, e.g. "screen the whole country" around a capital's pin. The project summary also gives the map view's width, which tells you the scale the person is looking at when there's no place yet.
 5. **Show it and ask** whether it's what they meant. One short question, only about what's genuinely uncertain.
 6. **Adjust** with `edit_place` when asked ("make it 5 km²", "rotate it 30°", "move it 2 km east").
 

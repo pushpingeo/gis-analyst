@@ -35,7 +35,7 @@ function memoryHost() {
     places: () => list,
     findPlace: (n) => list.find((p) => p.name.toLowerCase() === String(n).toLowerCase()),
     skillText: () => skill.body,
-    addPlace({ feature, origin }) { const p = { name: `Area ${list.length + 1}`, feature, origin, status: "proposed", edits: [] }; list.push(p); return p; },
+    addPlace({ feature, origin, scale }) { const p = { name: `Area ${list.length + 1}`, feature, origin, status: "proposed", edits: [], ...(scale ? { scale, scaleFrom: "request" } : {}) }; list.push(p); return p; },
     updatePlace(name, feature, words) { const p = this.findPlace(name); p.feature = feature; p.edits.push({ change: words }); },
     renamePlace(name, to) { this.findPlace(name).name = to; },
   };
@@ -136,6 +136,27 @@ await test("when Overpass is down, schools come from Nominatim, nearest first, a
 await test("unknown anchors give a useful error", async () => {
   const t = createPlaceTools(memoryHost());
   await assert.rejects(() => t.exec("make_place", { anchor: "C99", shape: "point", words: "x", confidence: "low", reason: "x" }), /Use find_place first/);
+});
+
+await test("scale is worked out: size, map view, and the request when it says", async () => {
+  assert.equal(R.deduceScale(turf.point([0, 0])), "local");
+  assert.equal(R.deduceScale(turf.bboxPolygon([2.2, 56.8, 2.4, 57.0])), "local"); // a licence block
+  assert.equal(R.deduceScale(turf.bboxPolygon([-3, 55, 2, 58])), "regional");
+  assert.equal(R.deduceScale(turf.bboxPolygon([30, -27, 41, -10])), "global"); // Mozambique-sized
+  // Map view widths: a street, Scotland, the world (including a view wider than 360°).
+  assert.equal(R.scaleForKm(R.viewKm([-3.62, 55.97, -3.58, 55.99])), "local");
+  assert.equal(R.scaleForKm(R.viewKm([-7, 54.5, 0, 59])), "regional");
+  assert.equal(R.scaleForKm(R.viewKm([-400, -80, 400, 80])), "global");
+  near(R.viewKm([0, 0, 1, 0.5]), 55.7, 0.5, "1° wide, half a degree tall at the equator");
+  // The request can set the scale; the summary says where it came from and gives the map view.
+  const host = memoryHost();
+  const t = createPlaceTools(host);
+  const r = await t.exec("find_place", { query: "Jackdaw" });
+  await t.exec("make_place", { anchor: r.candidates[0].id, shape: "point", words: "screen the whole North Sea from Jackdaw", confidence: "high", reason: "x", scale: "regional" });
+  const s = await projectSummary(ref, host.list, "Area 1", [-7, 54.5, 0, 59]);
+  assert.match(s, /scale regional \(from request\)/);
+  assert.match(s, /Map view: about \d+ km across \(regional scale\)/);
+  assert.match(await projectSummary(ref, [], null, [-3.62, 55.97, -3.58, 55.99]), /No places yet\.\nMap view: about \d+ km across \(local scale\)/);
 });
 
 await test("project summary has no coordinates", async () => {

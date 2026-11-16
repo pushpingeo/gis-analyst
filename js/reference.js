@@ -37,11 +37,29 @@ export function extentKm(feature) {
   return Math.max(across, down);
 }
 
+export const scaleForKm = (km) => (km <= 50 ? "local" : km <= 1000 ? "regional" : "global");
+
+// From the geometry's size. A point has no size, so it's local unless the zoom or the request says otherwise.
 export function deduceScale(feature) {
   if (feature.geometry.type === "Point") return "local";
-  const km = extentKm(feature);
-  return km <= 50 ? "local" : km <= 1000 ? "regional" : "global";
+  return scaleForKm(extentKm(feature));
 }
+
+// From the map view: how wide the visible map is, [west, south, east, north] in degrees.
+export function viewKm([w, s, e, n]) {
+  const midLat = Math.max(-85, Math.min(85, (s + n) / 2));
+  const across = (Math.min(e - w, 360) / 360) * 40075 * Math.cos((midLat * Math.PI) / 180);
+  const down = turf.distance([0, Math.max(-85, s)], [0, Math.min(85, n)]);
+  return Math.min(across, down) || Math.max(across, down);
+}
+
+// Where a place's scale came from, in the order it's decided: the request, the size, the zoom; or set by the person.
+export const SCALE_FROM = {
+  request: "Worked out from what you asked",
+  size: "Worked out from the size",
+  zoom: "Worked out from the zoom level when the point was dropped",
+  you: "Set by you",
+};
 
 // ---- measuring ----------------------------------------------------------------------
 export function measure(feature) {

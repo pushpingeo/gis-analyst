@@ -58,6 +58,7 @@ export function placeToolDefs(skills) {
           words: { type: "string", description: "The person's own words that this place answers" },
           confidence: { type: "string", enum: ["high", "medium", "low"] },
           reason: { type: "string", description: "One line: the evidence for the location and the confidence" },
+          scale: { type: "string", enum: ["local", "regional", "global"], description: "Only when the request itself says the scale of the work (e.g. 'screen Mozambique' is global, 'the whole of the Moray Firth' regional) and it differs from the shape's size. Otherwise leave it out and the size decides." },
         },
         required: ["anchor", "shape", "words", "confidence", "reason"],
       },
@@ -223,7 +224,7 @@ export function createPlaceTools(host) {
         anchor: a.cand ? { name: a.cand.name, type: a.cand.type, source: a.cand.source, lonlat: a.cand.lonlat, extra: a.cand.extra } : { place: a.label },
         at: new Date().toISOString(),
       };
-      const p = host.addPlace({ feature: f, origin });
+      const p = host.addPlace({ feature: f, origin, scale: i.scale });
       return { ...(await placeSummary(p)), how: steps.join(", then "), next: "Shown on the map as a proposal. Ask the person if it's what they meant." };
     },
 
@@ -273,14 +274,16 @@ export function createPlaceTools(host) {
 const pickD = (d) => ({ scale: d.scale, area_km2: d.area_km2, length_km: d.length_km, extent_km: d.extent_km, countries: d.countries, offshore: d.offshore, coast_km: d.coast_km, centre: { lat: round(d.centroid[1], 4), lon: round(d.centroid[0], 4) } });
 
 // One line per place for the conversation agent's project summary. Coordinates stay out.
-export async function projectSummary(ref, places, focus) {
-  if (!places.length) return "No places yet.";
+export async function projectSummary(ref, places, focus, view = null) {
+  const viewLine = view ? `Map view: about ${Math.round(R.viewKm(view))} km across (${R.scaleForKm(R.viewKm(view))} scale).` : "";
+  if (!places.length) return ["No places yet.", viewLine].filter(Boolean).join("\n");
   const lines = [];
   for (const p of places) {
     const d = await R.describe(ref, p.feature);
     const how = p.origin?.method === "words" ? `from words "${p.origin.words}" (anchor: ${p.origin.anchor?.name || p.origin.anchor?.place}, ${p.origin.confidence} confidence)` : "drawn on the map";
     const edits = p.edits?.length ? `; edited: ${p.edits.slice(-3).map((e) => e.change).join("; ")}` : "";
-    lines.push(`- ${p.name}${p.name === focus ? " [in focus]" : ""} (${p.status}): ${R.summaryLine(d)}; scale ${p.scale || d.scale}; ${how}${edits}`);
+    lines.push(`- ${p.name}${p.name === focus ? " [in focus]" : ""} (${p.status}): ${R.summaryLine(d)}; scale ${p.scale || d.scale}${p.scaleFrom && p.scaleFrom !== "size" ? ` (from ${p.scaleFrom === "you" ? "the person" : p.scaleFrom})` : ""}; ${how}${edits}`);
   }
+  if (viewLine) lines.push(viewLine);
   return lines.join("\n");
 }
