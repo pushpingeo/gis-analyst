@@ -1,4 +1,4 @@
 # Push a change to this file to run the place-finding evaluation. One run per line.
---label=pf-v3-names-smoke --set=names --sites=5
---label=pf-v3-areas --set=areas
---label=pf-v3-described --set=described
+--label=pf-v4-names-smoke --set=names --sites=5
+--label=pf-v4-areas --set=areas
+--label=pf-v4-described --set=described
