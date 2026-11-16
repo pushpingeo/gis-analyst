@@ -1,2 +1,2 @@
 # Push a change to this file to run the place-finding evaluation. Arguments on the next line.
---label=pf-v1-smoke --sites=5
+--label=pf-v2-smoke --sites=5

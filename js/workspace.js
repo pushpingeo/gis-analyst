@@ -268,7 +268,13 @@ const host = {
   },
   updatePlace(name, feature, words) {
     const p = placeByName(name);
-    if (p) applyGeometry(p, feature, words);
+    if (!p) return;
+    applyGeometry(p, feature, words);
+    // A changed proposal is asked about again, next to the reply that asks.
+    if (p.status !== "drawn") {
+      p.status = "proposed"; paintStatus(p); scheduleRefresh();
+      if (pendingReply?.isConnected) $("conversation").insertBefore(p.card, pendingReply);
+    }
   },
   renamePlace(name, to) {
     const p = placeByName(name);
@@ -317,14 +323,16 @@ function makeCard(p) {
     logEdit(p, `scale set to ${R.SCALES[p.scale].label.toLowerCase()}`);
     paintScale(p);
   }));
+  // The answer buttons count as a reply in the conversation.
   card.querySelector('[data-op="accept"]').addEventListener("click", () => {
+    if (busy) return;
     p.status = "accepted"; paintStatus(p); scheduleRefresh();
-    remember("user", `(I accepted ${p.name}.)`);
-    activity(`${p.name} accepted.`);
+    send(`Yes, use ${p.name}.`);
   });
   card.querySelector('[data-op="revise"]').addEventListener("click", () => {
-    say.value = `${p.name} isn't quite right: `; grow(); say.focus();
-    say.setSelectionRange(say.value.length, say.value.length);
+    if (busy) return;
+    p.status = "revising"; paintStatus(p);
+    send(`${p.name} isn't quite right.`);
   });
   card.addEventListener("click", (e) => {
     if (e.target.closest("button, input, form, a, summary") || !places.has(p.id)) return;

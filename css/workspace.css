@@ -28,6 +28,7 @@ button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: var(--sea); }
 :focus-visible { outline: 2px solid var(--sea); outline-offset: 2px; }
+[hidden] { display: none !important; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 #map { position: fixed; inset: 0; }
@@ -115,7 +116,8 @@ a { color: var(--sea); }
 .shape header .badge:empty { display: none; }
 .shape .badge { font-size: 12px; font-weight: 650; color: var(--pole); margin-right: auto; }
 .shape.proposed { border-style: dashed; }
-.proposal { display: flex; gap: 6px; margin: 0 0 10px; }
+.proposal { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--rule); }
+.proposal p { margin: 0 6px 0 0; font-size: 13.5px; font-weight: 600; flex-basis: 100%; }
 .proposal button { border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 5px 12px; font-size: 13.5px; }
 .proposal .primary { background: var(--ink); border-color: var(--ink); color: #fff; }
 .origin { margin: 0 0 8px; font-size: 13px; }

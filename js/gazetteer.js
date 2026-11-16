@@ -124,10 +124,12 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
   if (!parts) throw new Error(`Unknown feature type. Use one of: ${Object.keys(FEATURE_TYPES).join(", ")}.`);
   const r = Math.min(Math.max(radiusKm, 0.5), 50) * 1000;
   const nameFilter = name ? `["name"~"${name.replace(/["\\]/g, "")}",i]` : "";
-  const q = `[out:json][timeout:40];(${parts.map((p) => `${p}${nameFilter}(around:${r},${lonlat[1]},${lonlat[0]});`).join("")});out geom 80;`;
+  // Tags and bounding boxes only: cheap enough not to time out over a wide radius. Outlines are fetched later,
+  // only for the feature that's actually used (featureOutline).
+  const q = `[out:json][timeout:25];(${parts.map((p) => `${p}${nameFilter}(around:${r},${lonlat[1]},${lonlat[0]});`).join("")});out tags bb 150;`;
   let json, lastErr;
   for (const ep of OVERPASS_ENDPOINTS) {
-    try { json = await fetchOverpass(q, ep, fetchFn, 45000, headers); break; } catch (e) { lastErr = e; }
+    try { json = await fetchOverpass(q, ep, fetchFn, 30000, headers); break; } catch (e) { lastErr = e; }
   }
   if (!json) throw new Error(`OpenStreetMap search failed: ${lastErr?.message}`);
   const cands = [];
@@ -137,8 +139,6 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
     if (t["generator:source"] === "wind" && el.type === "node") { turbines++; continue; } // counted, not listed
     let geometry;
     if (el.type === "node") geometry = { type: "Point", coordinates: [el.lon, el.lat] };
-    else if (el.type === "way" && el.geometry?.length > 3 && sameXY(el.geometry[0], el.geometry.at(-1))) geometry = { type: "Polygon", coordinates: [el.geometry.map((p) => [p.lon, p.lat])] };
-    else if (el.type === "way" && el.geometry) geometry = { type: "LineString", coordinates: el.geometry.map((p) => [p.lon, p.lat]) };
     else if (el.bounds) geometry = turf.bboxPolygon([el.bounds.minlon, el.bounds.minlat, el.bounds.maxlon, el.bounds.maxlat]).geometry;
     if (!geometry) continue;
     const c = candidate({
@@ -148,7 +148,7 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
     });
     c.distance_km = round(turf.distance(lonlat, c.lonlat), 2);
     c.bearing = Math.round((turf.bearing(lonlat, c.lonlat) + 360) % 360);
-    if (el.type === "relation") c.extra.note = "relation: outline approximated by its bounding box";
+    if (el.type !== "node") { c.osm = { type: el.type, id: el.id }; c.approx = true; c.extra.size = "area is of the bounding box until the outline is fetched"; }
     cands.push(c);
   }
   cands.sort((a, b) => (b.area_km2 || 0) - (a.area_km2 || 0) || a.distance_km - b.distance_km);
@@ -156,6 +156,52 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
 }
 
 const sameXY = (a, b) => a.lat === b.lat && a.lon === b.lon;
+
+// The real outline of one OpenStreetMap way or relation, fetched when a place is built from it.
+export async function featureOutline(osm, { fetchFn = fetch, headers = {} } = {}) {
+  const q = `[out:json][timeout:25];${osm.type}(${osm.id});out geom;`;
+  let json, lastErr;
+  for (const ep of OVERPASS_ENDPOINTS) {
+    try { json = await fetchOverpass(q, ep, fetchFn, 30000, headers); break; } catch (e) { lastErr = e; }
+  }
+  if (!json) throw new Error(`Couldn't fetch the outline: ${lastErr?.message}`);
+  const el = json.elements?.[0];
+  if (el?.type === "way" && el.geometry?.length > 3 && sameXY(el.geometry[0], el.geometry.at(-1))) return { type: "Polygon", coordinates: [el.geometry.map((p) => [p.lon, p.lat])] };
+  if (el?.type === "way" && el.geometry) return { type: "LineString", coordinates: el.geometry.map((p) => [p.lon, p.lat]) };
+  if (el?.type === "relation") {
+    const outers = (el.members || []).filter((m) => m.role === "outer" && m.geometry?.length > 3 && sameXY(m.geometry[0], m.geometry.at(-1)));
+    if (outers.length) return { type: "MultiPolygon", coordinates: outers.map((m) => [m.geometry.map((p) => [p.lon, p.lat])]) };
+  }
+  return null; // caller keeps the bounding box and says so
+}
+
+// ---- Wikidata: named assets (mines, dams, power plants, ports) with coordinates ------------------
+const WD = "https://www.wikidata.org/w/api.php";
+export async function searchWikidata(term, { fetchFn = fetch, headers = {}, limit = 8 } = {}) {
+  const get = async (params) => {
+    const r = await fetchFn(`${WD}?${new URLSearchParams({ format: "json", origin: "*", ...params })}`, { headers });
+    if (!r.ok) throw new Error(`Wikidata ${r.status}`);
+    return r.json();
+  };
+  const found = await get({ action: "wbsearchentities", search: term, language: "en", uselang: "en", type: "item", limit: String(limit) });
+  const ids = (found.search || []).map((x) => x.id);
+  if (!ids.length) return [];
+  const ents = (await get({ action: "wbgetentities", ids: ids.join("|"), props: "claims|labels|descriptions", languages: "en" })).entities || {};
+  const val = (e, p) => (e.claims?.[p] || []).map((c) => c.mainsnak?.datavalue?.value).filter(Boolean);
+  const withCoords = ids.map((id) => ents[id]).filter((e) => e && val(e, "P625").length);
+  const linked = [...new Set(withCoords.flatMap((e) => [...val(e, "P31"), ...val(e, "P17")].map((v) => v.id)))];
+  const labels = linked.length ? (await get({ action: "wbgetentities", ids: linked.slice(0, 50).join("|"), props: "labels", languages: "en" })).entities || {} : {};
+  const label = (id) => labels[id]?.labels?.en?.value || id;
+  return withCoords.map((e) => {
+    const c = val(e, "P625")[0];
+    return candidate({
+      name: e.labels?.en?.value || e.id, type: val(e, "P31").map((v) => label(v.id)).join(", ") || "item",
+      geometry: { type: "Point", coordinates: [c.longitude, c.latitude] },
+      source: { id: "wikidata", title: "Wikidata", publisher: "Wikidata contributors", licence: "CC0 1.0", url: `https://www.wikidata.org/wiki/${e.id}` },
+      extra: { description: e.descriptions?.en?.value, country: val(e, "P17").map((v) => label(v.id)).join(", ") || undefined },
+    });
+  });
+}
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k]).map((k) => [k, o[k]]));
 function describeTags(t) {
   for (const k of ["power", "man_made", "landuse", "industrial", "waterway", "water", "aeroway", "place"]) {

@@ -1,6 +1,6 @@
 ---
 name: place-finding
-version: 1
+version: 2
 description: Turn words into a place on the map. Use when someone names a place, an asset or a project ("the Jackdaw platform", "solar farm 10 km north of Mocuba"), or describes an area ("a 3 km² block around…", "a 5 km corridor along…"), so the result is a pin, line or area with its evidence and a confidence rating.
 ---
 
@@ -13,8 +13,11 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
 ## Steps
 1. **Read the request for every clue:** named places, the asset and its type (platform, field, block, dam, mine, solar or wind farm, port, town), distances and bearings ("10 km north of"), sizes ("3 km²", "5 km wide"), and the country or sea.
 2. **Find the anchor** with `find_place`. Search for the asset itself before the nearest town: *an asset matched as a mapped feature is far more precise than a settlement.*
-   - Prefer authoritative sources where they exist (e.g. NSTA installations, fields and blocks on the UK Continental Shelf) over OpenStreetMap; say which you used.
-   - If the asset isn't found by name, find the town or feature it's described from, then use `find_features_near` to look for the asset by type around it (e.g. solar farms within 15 km of Mocuba). A feature of the right type, size and bearing is strong evidence.
+   - Try the asset's own name in a few forms: the distinctive word alone ("Tasiast"), with its type ("Tasiast mine", "Nachtigal dam"), and the operator if it's a company name. Wikidata often has named mines, dams, power plants and ports with coordinates; OpenStreetMap often doesn't name them.
+   - Prefer authoritative sources where they exist (e.g. NSTA installations, fields and blocks on the UK Continental Shelf), then a Wikidata or OpenStreetMap item **of the right type** (a mine for a mine, a dam or reservoir for hydro). Say which you used.
+   - A result of the wrong type (an airport, a viewpoint, an office, a village that shares the name) is only a clue for where to look next, never the site itself.
+   - If the asset isn't found by name, find the town or feature it's described from, then use `find_features_near` to look for the asset by type around it (e.g. solar farms within 15 km of Mocuba). A feature of the right type, size and bearing is strong evidence. For big assets (mines, dams, large plants), the largest feature of the right type near the named place is usually the one.
+   - You may use what you already know (for example that a company mines near a particular town) to decide **where to search**, but the place itself must come from a found feature. Say when a clue came from your own knowledge.
 3. **Triangulate** when there are two or more clues: the candidate should fit all of them (name, type, country, distance and bearing). Say which clues agree and which don't.
 4. **Build the shape** with `make_place`, using the anchor's id. Choose the shape from the words:
    - "around", "centred on" with an area or size → square, circle or rectangle centred on the anchor. "Block" or "box" means a square unless the context says otherwise; "radius" or "within X km" means a circle.
@@ -32,7 +35,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
 - Never invent a location, and never move a pin to "where it probably is" without a found feature.
 
 ## Confidence (from rules, not feel)
-- **High:** the asset itself matched as a mapped feature by name or by type and position (an authoritative or OSM feature).
+- **High:** the asset itself matched by name and type in an authoritative layer, Wikidata or OpenStreetMap, or a feature of the right type and size exactly where two clues point.
 - **Medium:** two or more clues triangulate on a position, but the asset itself isn't mapped.
 - **Low:** a single anchor (a town or region) with an offset or a guess at the footprint.
 State the confidence and the reason in one line.

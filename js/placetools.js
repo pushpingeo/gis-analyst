@@ -4,7 +4,7 @@
 import * as turf from "./vendor/turf.js";
 import * as G from "./geometry.js";
 import * as R from "./reference.js";
-import { searchAnchors, searchNominatim, searchNaturalEarth, findFeaturesNear, FEATURE_TYPES } from "./gazetteer.js";
+import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES } from "./gazetteer.js";
 
 const round = (v, d = 3) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
 
@@ -17,7 +17,7 @@ export function placeToolDefs(skills) {
     },
     {
       name: "find_place",
-      description: "Search for a named place, asset or feature: authoritative named-feature layers from the atlas (e.g. NSTA offshore installations, fields and licensing blocks on the UK Continental Shelf), OpenStreetMap (Nominatim) and Natural Earth towns. Returns candidates with ids (C1, C2…), type, source, position and size. Give a block reference like 30/2 to find a UK licensing block.",
+      description: "Search for a named place, asset or feature: authoritative named-feature layers from the atlas (e.g. NSTA offshore installations, fields and licensing blocks on the UK Continental Shelf), OpenStreetMap (Nominatim), Wikidata (good for named mines, dams, power plants and ports) and Natural Earth towns. Returns candidates with ids (C1, C2…), type, source, position and size. Give a block reference like 30/2 to find a UK licensing block.",
       input_schema: {
         type: "object",
         properties: {
@@ -95,6 +95,11 @@ export function createPlaceTools(host) {
     const c = cands.get(String(ref).trim().toUpperCase());
     if (c) return { feature: { type: "Feature", properties: {}, geometry: c.geometry }, lonlat: c.lonlat, label: c.name || c.id, cand: c };
     const p = host.findPlace(ref);
+    if (!p) {
+      // The model sometimes passes a name instead of an id: take the most recent candidate with that name.
+      const byName = [...cands.values()].reverse().find((x) => x.name && x.name.toLowerCase() === String(ref).trim().toLowerCase());
+      if (byName) return resolve(byName.id);
+    }
     if (p) {
       const at = p.feature.geometry.type === "Point" ? p.feature.geometry.coordinates : turf.centroid(p.feature).geometry.coordinates;
       return { feature: p.feature, lonlat: at, label: p.name, place: p };
@@ -128,6 +133,8 @@ export function createPlaceTools(host) {
       for (const a of anchors) (a.error ? errors.push(a.error) : results.push(a));
       try { results.push(...(await searchNominatim(query, { near: nearAt, country, fetchFn: host.fetchFn, headers: host.headers }))); }
       catch (e) { errors.push(`OpenStreetMap search: ${e.message}`); }
+      try { results.push(...(await searchWikidata(query, { fetchFn: host.fetchFn, headers: host.headers }))); }
+      catch (e) { errors.push(`Wikidata search: ${e.message}`); }
       try { results.push(...searchNaturalEarth(await host.ref.get("places"), query)); } catch { /* reference not loaded */ }
       const list = results.map((c) => {
         if (nearAt) { c.distance_km = round(turf.distance(nearAt, c.lonlat), 1); c.bearing = Math.round((turf.bearing(nearAt, c.lonlat) + 360) % 360); }
@@ -171,6 +178,11 @@ export function createPlaceTools(host) {
           if (!i.width_km || !i.height_km) throw new Error("A rectangle needs width_km and height_km.");
           f = G.rectangleAround(centre, i.width_km, i.height_km, i.rotation_deg || 0); steps.push(`rectangle ${i.width_km} × ${i.height_km} km`); break;
         case "feature":
+          if (a.cand?.approx && a.cand.osm) {
+            const g = await featureOutline(a.cand.osm, { fetchFn: host.fetchFn, headers: host.headers }).catch(() => null);
+            if (g) { a.cand.geometry = g; a.cand.approx = false; a.feature = { type: "Feature", properties: {}, geometry: g }; }
+            else steps.push("outline unavailable, so its bounding box was used");
+          }
           f = JSON.parse(JSON.stringify(a.feature));
           if (i.offset_km) f = G.move(f, i.offset_km, i.bearing_deg ?? 0);
           steps.push(`outline of ${a.label}`); break;
