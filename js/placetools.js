@@ -130,6 +130,7 @@ export function createPlaceTools(host) {
     lat: round(c.lonlat[1], 4), lon: round(c.lonlat[0], 4),
     ...(c.area_km2 != null ? { area_km2: c.area_km2 } : {}), ...(c.length_km != null ? { length_km: c.length_km } : {}),
     ...(c.distance_km != null ? { distance_km: c.distance_km, bearing_deg: c.bearing } : {}),
+    ...(c.outline ? { has_outline: true, note: "Anchors on its centre; use shape \"feature\" for the area itself." } : {}),
     ...(Object.keys(c.extra || {}).length ? { details: c.extra } : {}),
   });
 
@@ -201,7 +202,7 @@ export function createPlaceTools(host) {
             if (g) { a.cand.geometry = g; a.cand.approx = false; a.feature = { type: "Feature", properties: {}, geometry: g }; }
             else steps.push("outline unavailable, so its bounding box was used");
           }
-          f = JSON.parse(JSON.stringify(a.feature));
+          f = JSON.parse(JSON.stringify(a.cand?.outline ? { type: "Feature", properties: {}, geometry: a.cand.outline } : a.feature));
           if (i.also?.length) {
             const parts = i.also.map(resolve);
             for (const p of parts) {
@@ -216,6 +217,8 @@ export function createPlaceTools(host) {
             // let the analyst swap the publisher's outline for an invented shape (Beatrice, 16 Nov).
             const filled = G.fillHoles(f);
             if (filled.holes) { f = filled.feature; steps.push(`${filled.holes} hole${filled.holes > 1 ? "s" : ""} in the published outline filled (adds ${round(filled.addedKm2, 2)} km²), because the map can't edit holes yet`); }
+            const main = G.largestPart(f);
+            if (main.dropped) { f = main.feature; steps.push(`kept the main part; ${main.dropped} smaller part${main.dropped > 1 ? "s" : ""} (${round(main.droppedKm2, 2)} km², e.g. islands) left out, because the map can't edit multi-part shapes yet`); }
           }
           break;
         case "buffer":

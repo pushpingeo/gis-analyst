@@ -16,7 +16,7 @@ import * as turf from "./vendor/turf.js";
 
 const GAZETTEER = new Set(["wikidata", "osm-nominatim", "osm-overpass"]);
 const SETTLEMENT = /\b(city|town|village|hamlet|suburb|locality|settlement|municipality|populated place|neighbourhood|quarter|county|district|province|state|region|administrative)\b/i;
-const LARGE = /\b(salar|salt (flat|pan|lake)|lake|reservoir|basin|bay|lagoon|concession|licen[cs]e|lease|district|region|province|island|forest|park|reserve|desert|valley|plateau|mountain range|field)\b/i;
+const LARGE = /\b(county|council|administrative|boundary|municipality|state|salar|salt (flat|pan|lake)|lake|reservoir|basin|bay|lagoon|concession|licen[cs]e|lease|district|region|province|island|forest|park|reserve|desert|valley|plateau|mountain range|field)\b/i;
 const COMPASS = { N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 90, ESE: 112.5, SE: 135, SSE: 157.5, S: 180, SSW: 202.5, SW: 225, WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5 };
 const LEVELS = ["low", "medium", "high"];
 

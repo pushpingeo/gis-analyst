@@ -280,4 +280,25 @@ await test("feature search uses the atlas, and reports OpenStreetMap as not chec
   assert.ok(out.sources.find((s) => s.source === "AI Living World Atlas").found >= 0);
 });
 
+await test("an admin area anchors on its centre but builds as its outline, main part kept and the rest reported", async () => {
+  const sq = (x, y, d) => [[[x, y], [x + d, y], [x + d, y + d], [x, y + d], [x, y]]];
+  const host = memoryHost();
+  host.fetchFn = async (url) => {
+    const u = decodeURIComponent(String(url));
+    if (u.includes("nominatim") && u.includes("q=Fife")) return { ok: true, status: 200, json: async () => [{ osm_type: "relation", osm_id: 1, category: "boundary", type: "administrative", addresstype: "county", name: "Fife", display_name: "Fife, Scotland, United Kingdom", lat: "56.33", lon: "-3.0", importance: 0.6, address: { country: "United Kingdom" }, geojson: { type: "MultiPolygon", coordinates: [sq(-3.6, 56.0, 0.8), sq(-2.56, 56.18, 0.02)] } }] };
+    return fetchFn(url);
+  };
+  const t = createPlaceTools(host);
+  const r = await t.exec("find_place", { query: "Fife" });
+  const c = r.candidates.find((x) => x.has_outline);
+  assert.ok(c, "outline offered");
+  const out = await t.exec("make_place", { anchor: c.id, shape: "feature", words: "Fife", match: "named_place", reason: "x" });
+  const g = host.list[0].feature.geometry;
+  assert.equal(g.type, "Polygon");
+  assert.match(out.how, /1 smaller part/);
+  assert.equal(out.confidence, "high");
+  const pt = await t.exec("make_place", { anchor: c.id, shape: "point", words: "Fife", match: "named_place", reason: "x" });
+  assert.equal(pt.confidence, "medium", "a point for a county");
+});
+
 console.log(`${passed} place tests passed`);

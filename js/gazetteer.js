@@ -118,14 +118,21 @@ export async function searchNominatim(term, { near = null, country = null, fetch
     if (!r.ok) throw new Error(`Nominatim ${r.status}`);
     return r.json();
   });
-  return j.map((x) => candidate({
-    name: x.name || x.display_name.split(",")[0],
-    type: `${x.category}: ${x.type}`.replace(/_/g, " "),
-    geometry: x.geojson && x.geojson.type !== "Point" && x.category !== "boundary" && x.category !== "place"
-      ? x.geojson : { type: "Point", coordinates: [+x.lon, +x.lat] },
-    source: { id: "osm-nominatim", title: "OpenStreetMap (Nominatim search)", publisher: "OpenStreetMap contributors", licence: "ODbL 1.0", url: `https://www.openstreetmap.org/${x.osm_type}/${x.osm_id}` },
-    extra: { place: x.display_name, country: x.address?.country, importance: round(x.importance || 0, 3) },
-  }));
+  return j.map((x) => {
+    // Towns and admin areas anchor on their centre ("5 km round Linlithgow" means from the town, not its edge),
+    // but keep their outline for when the person asks for the area itself ("Fife").
+    const isArea = x.category === "boundary" || x.category === "place";
+    const poly = x.geojson && /Polygon/.test(x.geojson.type);
+    const c = candidate({
+      name: x.name || x.display_name.split(",")[0],
+      type: `${x.category}: ${x.type}${x.addresstype && x.addresstype !== x.type ? ` (${x.addresstype})` : ""}`.replace(/_/g, " "),
+      geometry: poly && !isArea ? x.geojson : { type: "Point", coordinates: [+x.lon, +x.lat] },
+      source: { id: "osm-nominatim", title: "OpenStreetMap (Nominatim search)", publisher: "OpenStreetMap contributors", licence: "ODbL 1.0", url: `https://www.openstreetmap.org/${x.osm_type}/${x.osm_id}` },
+      extra: { place: x.display_name, country: x.address?.country, importance: round(x.importance || 0, 3) },
+    });
+    if (poly && isArea) { c.outline = x.geojson; c.extra.outline_km2 = round(turf.area({ type: "Feature", properties: {}, geometry: x.geojson }) / 1e6, 1); }
+    return c;
+  });
 }
 
 // ---- Natural Earth towns (already loaded for the reference layer) ------------------------------

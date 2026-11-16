@@ -145,3 +145,11 @@ export function fillHoles(feature) {
   const out = { ...feature, geometry };
   return { feature: out, holes, addedKm2: (turf.area(out) - turf.area(feature)) / 1e6 };
 }
+
+// Keeps the largest part of a multipolygon (the map editor holds one polygon). Returns what was dropped.
+export function largestPart(feature) {
+  const g = feature.geometry;
+  if (!g || g.type !== "MultiPolygon" || g.coordinates.length < 2) return { feature, dropped: 0, droppedKm2: 0 };
+  const parts = g.coordinates.map((c) => ({ c, a: turf.area(turf.polygon(c)) })).sort((x, y) => y.a - x.a);
+  return { feature: { ...feature, geometry: { type: "Polygon", coordinates: parts[0].c } }, dropped: parts.length - 1, droppedKm2: parts.slice(1).reduce((n, p) => n + p.a, 0) / 1e6 };
+}
