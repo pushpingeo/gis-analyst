@@ -2,6 +2,33 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 17–18 Nov 2026 (overnight): cartography, step 3 closed
+- **Findings by theme** (`js/findings.js`): biodiversity green, land and livelihoods ochre, Indigenous Peoples
+  violet, cultural heritage pink, community health and safety blue, operating context slate; red stays for the
+  person's site. Checked with the dataviz palette validator (lightness, chroma, normal-vision pass; green/ochre in
+  the CVD 6–8 band, so the key and labels carry the theme too). The analyst tags each search with a theme
+  (`theme` on `find_features_near` and `get_data`; NTR 3.2-draft says to); otherwise feature type or atlas concept
+  decides, then "context".
+- **Emphasis by distance from the site's edge:** on site or within 1 km strong, 1–5 km medium, beyond faint.
+  Areas over 200 km² get an outline and the faintest fill and sit underneath; operating-context areas are quieter
+  still. Labels only for features within 1 km and the nearest three per theme; tap a point or outline for its name,
+  theme, distance and source. Dashed distance rings (1/5/20 km onshore, 2/10/50 km offshore) round the site searched.
+- **Map key** ("On the map", top right; below the hint on phones, closed by default there): one row per theme with a
+  count and a switch, and Clear. Rob's call to live with it for a day or two and revisit.
+- **Corridor clipping:** `make_place` takes `clip { to, within_km }` (to within a distance of a feature, or to an
+  outline). "A 1 km corridor along the M9 within 5 km of Linlithgow": 12.2 km² cut to 10.2 km², 25 s.
+- **Labels:** source, project and supplier columns and short all-capital codes aren't taken as names (road numbers
+  still are); descriptive fields (habitat, class, designation) are the fallback.
+- **Turn speed measured** (model and tool time per round in the log and the replay): corridor 25 s (8 s model over
+  4 rounds; was ~90 s), Rosebank screen 45 s (24 s model, 7 rounds), Linlithgow solar screen 28 s (16 s model,
+  5 rounds). Slowest single searches 10–15 s (settlement and protected-area searches waiting on OpenStreetMap or many
+  atlas layers). No further cuts needed now.
+- **Step 3 closed.** Parked, with reasons: atlas name index and catalogue export (atlas chat); admin boundaries as
+  places (OpenStreetMap outlines cover most asks); held-out confidence check and atlas-feature evaluation set (until a
+  place-finding evaluation rerun is wanted).
+- **Seen in testing, not fixed:** the analyst sometimes picks an odd theme (a place of worship as "indigenous",
+  flood zones as "context"); the key opens on a desktop-sized load even if the window is later narrowed.
+
 ## 17 Nov 2026 (night): fixes from Rob's Rosebank test
 - **Distances from the edge:** `find_features_near` measured from an area's centre; for areas and lines it now searches a
   circle covering the shape plus the radius and measures from the shape's edge (0 = inside), and reports `found` vs
