@@ -1,6 +1,6 @@
 ---
 name: place-finding
-version: 4.9
+version: 4.10
 description: Turn words into a place on the map. Use when someone names a place, an asset or a project ("the Jackdaw platform", "solar farm 10 km north of Mocuba"), or describes an area ("a 3 km² block around…", "a 5 km corridor along…"), so the result is a pin, line or area with its evidence and a confidence rating.
 ---
 
@@ -65,3 +65,6 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
 - **Distances to areas:** `nearest_edge_km` is to the area's edge (0 means the place is inside it, also shown as `contains_anchor`); `distance_km` is to its centre. For "within X km" use the edge.
 - **Say what wasn't checked.** If a source was `not_checked`, or the atlas reports `more_layers_not_checked`, say the list may be incomplete and why, in one line.
 - Coordinate data you're given is WGS84. If a source states another datum (e.g. ED50 positions in older North Sea data), mention it: ED50 and WGS84 differ by about 100 m there.
+
+## Operations
+The operations named above (`find_place`, `find_features_near`, `make_place` and the rest) are described in general terms in `operations.md`, beside this file, so the method can run in other settings with their own tools.
