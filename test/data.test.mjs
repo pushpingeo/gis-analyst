@@ -7,6 +7,7 @@ import * as R from "../js/reference.js";
 import { createPlaceTools } from "../js/placetools.js";
 import { keyAttributes, geometryDistanceKm } from "../js/datatools.js";
 import { rateConfidence } from "../js/confidence.js";
+import * as G from "../js/geometry.js";
 
 let passed = 0;
 const test = async (name, fn) => { await fn(); passed++; console.log("ok", name); };
@@ -35,6 +36,18 @@ let overloadOnce = false;
 async function atlas(tool, args) {
   atlasCalls.push([tool, args]);
   if (overloadOnce) { overloadOnce = false; throw new Error("atlas: D1_ERROR: D1 DB is overloaded. Too many resources consumed within a 10 second window."); }
+  if (tool === "find_datasets" && args.concept === "pipeline") return { matches: 1, results: [{ id: "pipe", title: "UKCS pipelines", publisher: "North Sea Transition Authority", publisher_type: "regulator", capabilities: ["query"], geometry: ["line"], licence: "NSTA Open User Licence" }] };
+  if (tool === "find_datasets" && args.concept) return { matches: 0, results: [] };
+  if (tool === "fetch_features" && args.id === "pipe") {
+    // A 10 km square field at Mars: 4 lines inside, 8 just outside its east edge (0.5–4 km), 3 far away (25 km).
+    const east = turf.destination(MARS, 5, 90).geometry.coordinates[0];
+    const kmE = (km) => east + km / 98.2; // degrees of longitude per km at 28° N, near enough for a fixture
+    const line = (x, name) => ({ type: "Feature", geometry: { type: "LineString", coordinates: [[x, MARS[1] - 0.01], [x, MARS[1] + 0.01]] }, properties: { name } });
+    const inside = [0, 1, 2, 3].map((i) => line(MARS[0] + i * 0.01, `Flowline ${i}`));
+    const near = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map((km) => line(kmE(km), `Export ${km}`));
+    const far = [25, 26, 27].map((km) => line(kmE(km), `Far ${km}`));
+    return { returned: 15, features: [...far, ...near, ...inside] };
+  }
   if (tool === "find_datasets") {
     if (/viirs|thermal/i.test(args.text)) return { matches: 5, results: [WMS, VIIRS, { ...VIIRS, id: "dup" }, LOCAL, OPEN] };
     if (/sensitive/i.test(args.text)) return { matches: 2, results: [LOCAL, OPEN] };
@@ -204,6 +217,39 @@ await test("licence classes", async () => {
   assert.equal(classifyLicence("not stated").class, "unknown");
   assert.equal(classifyLicence("").class, "unknown");
   assert.equal(classifyLicence("Geographic Information Network of Alaska (GINA) and BLM Alaska Fire Service").class, "stated");
+});
+
+await test("find_features_near from an area: distances from its edge, all found counted, findings kept on the map", async () => {
+  const h = host();
+  const added = [];
+  h.addFindings = (list, group) => added.push(...list.map((c) => [c.name, group]));
+  h.list.push({ name: "Area 1", feature: G.squareAround(MARS, 100, 0), origin: { method: "words", confidence: "high" }, status: "proposed", edits: [] });
+  const t = createPlaceTools(h);
+  const r = await t.exec("find_features_near", { anchor: "Area 1", feature_type: "pipeline", radius_km: 2.2 });
+  assert.match(r.measured_from, /edge of Area 1/);
+  const names = r.candidates.map((c) => c.name);
+  assert.deepEqual(names.slice(0, 4).sort(), ["Flowline 0", "Flowline 1", "Flowline 2", "Flowline 3"]);
+  assert.ok(r.candidates.slice(0, 4).every((c) => c.distance_km === 0));
+  assert.deepEqual(names.slice(4), ["Export 0.5", "Export 1", "Export 1.5", "Export 2"]);
+  assert.equal(r.found, 8);
+  assert.equal(added.length, 8);
+  assert.equal(added[0][1], "pipeline");
+  // Nothing found in a later search leaves the findings alone (no call that clears them).
+  await t.exec("find_features_near", { anchor: "Area 1", feature_type: "river", radius_km: 2 });
+  assert.equal(added.length, 8);
+});
+
+await test("show_on_map: fits to findings, or clears them", async () => {
+  const h = host();
+  let shown = null, cleared = false;
+  h.showFindings = (ids) => { shown = ids; return { shown: ids?.length || 3, on_map: 3 }; };
+  h.clearFindings = () => { cleared = true; };
+  const t = createPlaceTools(h);
+  assert.equal((await t.exec("show_on_map", {})).shown, 3);
+  assert.equal(shown, undefined);
+  assert.equal((await t.exec("show_on_map", { ids: ["C2"] })).shown, 1);
+  assert.equal((await t.exec("show_on_map", { clear: true })).cleared, true);
+  assert.ok(cleared);
 });
 
 await test("keyAttributes and geometryDistanceKm", () => {

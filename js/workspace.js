@@ -15,7 +15,7 @@ const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
 const ASSETS = (() => { try { return JSON.parse($("asset-versions")?.textContent || "{}"); } catch { return {}; } })();
 const asset = (path) => ASSETS[path] || path;
-const C = { ink: "#15303c", pole: "#d1352a", white: "#ffffff", sea: "#2b6a80" };
+const C = { ink: "#15303c", pole: "#d1352a", white: "#ffffff", sea: "#2b6a80", find: "#b7651d" };
 const BASEMAP = "https://tiles.openfreemap.org/styles/positron";
 
 // ---- reference data -------------------------------------------------------------
@@ -110,8 +110,15 @@ function start() {
   map.addSource("cands", { type: "geojson", data: turf.featureCollection([]) });
   map.addLayer({ id: "cands-line", type: "line", source: "cands", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": C.sea, "line-width": 1.2, "line-dasharray": [2, 2] } });
   map.addLayer({ id: "cands-pt", type: "circle", source: "cands", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 4, "circle-color": C.white, "circle-stroke-color": C.sea, "circle-stroke-width": 2 } });
+  // Findings: features from data searches (protected areas, pipelines, settlements…). They stay on the map for the
+  // session, labelled by name, until the person clears them; a later search never wipes them (Rosebank, 17 Nov).
+  map.addSource("findings", { type: "geojson", data: turf.featureCollection([]) });
+  map.addLayer({ id: "find-fill", type: "fill", source: "findings", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": C.find, "fill-opacity": 0.08 } });
+  map.addLayer({ id: "find-line", type: "line", source: "findings", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": C.find, "line-width": 1.6 } });
+  map.addLayer({ id: "find-pt", type: "circle", source: "findings", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 4.5, "circle-color": C.find, "circle-stroke-color": C.white, "circle-stroke-width": 1.5 } });
   if (map.getStyle().glyphs) {
     const text = { "text-size": 12, "text-font": ["Noto Sans Bold"], "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": true };
+    map.addLayer({ id: "find-label", type: "symbol", source: "findings", layout: { ...text, "text-field": ["get", "label"], "text-size": 11, "symbol-placement": "point" }, paint: { "text-color": C.find, "text-halo-color": C.white, "text-halo-width": 1.4 } });
     map.addLayer({ id: "cands-label", type: "symbol", source: "cands", layout: { ...text, "text-field": ["get", "label"], "text-size": 11 }, paint: { "text-color": C.sea, "text-halo-color": C.white, "text-halo-width": 1.4 } });
     map.addLayer({ id: "aoi-label", type: "symbol", source: "aoi", layout: { ...text, "text-field": ["get", "label"] }, paint: { "text-color": C.ink, "text-halo-color": C.white, "text-halo-width": 1.6 } });
   }
@@ -171,8 +178,24 @@ function scheduleRefresh() {
 const isGuide = (f) => ["selectionPoint", "midPoint", "closingPoint", "snappingPoint", "coordinatePoint"].some((k) => f.properties?.[k]);
 
 function showCandidates(list) {
-  const feats = list.map((c) => ({ type: "Feature", geometry: c.geometry.type === "Point" ? c.geometry : c.geometry, properties: { label: `${c.id} ${c.name || ""}`.trim() } }));
+  const feats = list.map((c) => ({ type: "Feature", geometry: c.geometry, properties: { label: c.name || c.type || "" } }));
   map.getSource("cands")?.setData(turf.featureCollection(feats));
+}
+
+// Findings stay until cleared, one entry per feature id; the analyst can bring them into view with show_on_map.
+const findings = new Map();
+function addFindings(list, group) {
+  for (const c of list) findings.set(c.id, { type: "Feature", geometry: c.geometry, properties: { label: c.name || c.type || "", group: group || "" } });
+  map.getSource("findings")?.setData(turf.featureCollection([...findings.values()]));
+}
+function clearFindings() { findings.clear(); map.getSource("findings")?.setData(turf.featureCollection([])); }
+function showFindings(ids) {
+  const feats = ids?.length ? ids.map((id) => findings.get(String(id).toUpperCase())).filter(Boolean) : [...findings.values()];
+  if (!feats.length) return { shown: 0 };
+  const focus = places.get(selectedId) || [...places.values()].at(-1);
+  const all = turf.featureCollection([...feats, ...(focus ? [focus.feature] : [])]);
+  map.fitBounds(turf.bbox(all), { padding: fitPadding(), maxZoom: 14 });
+  return { shown: feats.length, on_map: findings.size };
 }
 
 // ---- modes and hints ---------------------------------------------------------------
@@ -275,6 +298,9 @@ const host = {
   findPlace: placeByName,
   skillText: (name) => skills[name]?.body || "",
   onCandidates: showCandidates,
+  addFindings,
+  showFindings,
+  clearFindings,
   offerChoices: (o) => makeChoiceCard(o),
   addPlace({ feature, origin, scale }) {
     const id = crypto.randomUUID();
@@ -528,6 +554,19 @@ const loadedSkills = new Set();
 $("ask").addEventListener("submit", (e) => { e.preventDefault(); send(say.value.trim()); });
 document.querySelectorAll("[data-example]").forEach((b) => b.addEventListener("click", () => send(b.textContent.trim())));
 
+// The whole session, tool inputs and outputs included, for checking what the analyst did. Kept in the page only;
+// "Download the log" in any "How I worked this out" saves it as JSON, and window.toblerLog holds it for tests.
+const sessionLog = [];
+window.toblerLog = sessionLog;
+function downloadLog() {
+  const blob = new Blob([JSON.stringify({ page: location.href, saved: new Date().toISOString(), turns: sessionLog }, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `tobler-log-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
 async function send(text) {
   if (!text || busy || !draw) return;
   busy = true;
@@ -542,6 +581,12 @@ async function send(text) {
   activity("Thinking…", true);
   showCandidates([]);
   const steps = trace.querySelector("ol");
+  const save = el("button", "Download the log", "log-link");
+  save.type = "button";
+  save.addEventListener("click", downloadLog);
+  trace.append(save);
+  const turnLog = { at: new Date().toISOString(), user: text, events: [] };
+  sessionLog.push(turnLog);
   try {
     const summary = await projectSummary(ref, host.places(), focusName, viewBounds());
     const skillList = Object.values(skills);
@@ -556,12 +601,15 @@ async function send(text) {
         if (ev.type === "tool_start") activity(`${activityFor(ev.name, ev.input)}…`, true);
         if (ev.type === "tool" && ev.name === "load_skill" && !ev.error) loadedSkills.add(ev.input?.name);
         if (ev.type === "tool") {
+          turnLog.events.push({ tool: ev.name, input: ev.input, ...(ev.error ? { error: ev.error } : { output: ev.output }) });
           steps.append(el("li", traceLine(ev), ev.error ? "err" : ""));
           activity("Thinking…", true);
         }
-        if (ev.type === "warning") steps.append(el("li", ev.message, "err"));
+        if (ev.type === "warning") { steps.append(el("li", ev.message, "err")); turnLog.events.push({ warning: ev.message }); }
       },
     });
+    turnLog.reply = res.text;
+    turnLog.usage = res.usage;
     reply.replaceChildren(renderText(res.text || "Done."));
     if (steps.children.length) reply.append(trace);
     remember("user", text);
@@ -573,6 +621,7 @@ async function send(text) {
       ? `${err.message} You can carry on drawing and editing; the analyst will be back tomorrow.`
       : `That didn't work: ${err.message}. Nothing was changed by this request; try again.`));
     reply.classList.add("error");
+    turnLog.error = String(err.message || err);
     activity("");
   } finally {
     busy = false;
@@ -589,7 +638,7 @@ function traceLine(ev) {
   switch (ev.name) {
     case "load_skill": return `Loaded the ${i.name} skill`;
     case "find_place": return `Searched for “${i.query}”: ${o.candidates?.length || 0} found${o.candidates?.length ? ` (${o.candidates.slice(0, 3).map((c) => `${c.name}, ${c.source.split(" – ")[0]}`).join("; ")})` : ""}`;
-    case "find_features_near": return `Looked for ${i.feature_type} within ${i.radius_km} km of ${o.anchor}: ${o.found} found`;
+    case "find_features_near": return `Looked for ${i.feature_type} within ${i.radius_km} km of ${o.anchor}: ${o.found} found${o.not_listed ? ` (nearest ${o.listed} listed)` : ""}`;
     case "make_place": return `Built ${o.place}: ${o.how}`;
     case "edit_place": return `Changed ${o.place}: ${o.changed}`;
     case "get_place": return `Read ${i.place}`;

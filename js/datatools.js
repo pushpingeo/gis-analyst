@@ -203,7 +203,7 @@ export function createDataTools(host) {
       found.forEach((c) => { c._fromCentre = turf.distance(centre, c.lonlat); });
       found.sort((x, y) => x.distance_km - y.distance_km || x._fromCentre - y._fromCentre);
       const kept = found.map((c) => ({ ...c, id: host.keep(c) }));
-      if (kept.length) host.onCandidates?.(kept);
+      if (kept.length) host.onCandidates?.(kept, d.title);
       const inside = kept.filter((c) => c.distance_km === 0).length;
       const returned = g.returned ?? (g.features || []).length;
       return {

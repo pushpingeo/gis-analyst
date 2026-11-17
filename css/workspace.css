@@ -157,6 +157,7 @@ a { color: var(--sea); }
 .trace ol { margin: 6px 0 0; padding-left: 20px; }
 .trace li { margin: 2px 0; }
 .trace li.err { color: var(--pole); }
+.trace .log-link { margin: 6px 0 0 20px; padding: 0; border: 0; background: none; color: var(--sea); font: inherit; text-decoration: underline; cursor: pointer; }
 .ask.busy .send { opacity: .4; pointer-events: none; }
 
 /* ---- composer ---- */

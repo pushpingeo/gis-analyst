@@ -6,7 +6,7 @@ import * as G from "./geometry.js";
 import * as R from "./reference.js";
 import { rateConfidence, runCheck, MATCHES } from "./confidence.js";
 import { atlasFindNamed, NAMED_KINDS, describeChecked } from "./atlasfeatures.js";
-import { DATA_TOOL_DEFS, createDataTools } from "./datatools.js";
+import { DATA_TOOL_DEFS, createDataTools, geometryDistanceKm } from "./datatools.js";
 import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES } from "./gazetteer.js";
 
 // Common names that aren't Natural Earth's own, and seas (energy basins especially) by rough box.
@@ -31,6 +31,8 @@ const SEAS = {
 };
 
 const GENERIC_WORDS = /^(the|of|a|an|platform|platforms|field|fields|block|blocks|licen[cs]e|lease|mine|mines|farm|wind|solar|offshore|onshore|oil|gas|plant|power|station|project|site|terminal|port|harbour|harbor|tlp|spar|fpso|installation|facility|development|area|park|reserve)$/i;
+
+const walkCoords = (g) => { const out = []; const w = (c) => (typeof c[0] === "number" ? out.push(c) : c.forEach(w)); w(g.coordinates); return out; };
 
 const round = (v, d = 3) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
 
@@ -59,7 +61,7 @@ export function placeToolDefs(skills) {
     },
     {
       name: "find_features_near",
-      description: `Find OpenStreetMap features of a type within a radius of an anchor (a candidate or a place), with distance and bearing from it. Assets come largest first, everything else nearest first. Use it for "schools near X" or "hospitals within 5 km of Area 1", and to find an asset once a town anchors the search. One call does the whole search: don't search by name for kinds of things. Types: ${Object.keys(FEATURE_TYPES).join(", ")}.`,
+      description: `Find features of a type (from the atlas catalogue and OpenStreetMap) within a radius of an anchor (a candidate or a place). For an area or line, distances are from its edge (0 = inside or touching); for a point, from the point, with bearing. Reports how many were found in all and how many are listed. Found features go on the map and stay there. Assets near a point come largest first, everything else nearest first. Use it for "schools near X" or "hospitals within 5 km of Area 1", and to find an asset once a town anchors the search. One call does the whole search: don't search by name for kinds of things. Types: ${Object.keys(FEATURE_TYPES).join(", ")}.`,
       input_schema: {
         type: "object",
         properties: {
@@ -127,6 +129,11 @@ export function placeToolDefs(skills) {
       input_schema: { type: "object", properties: { place: { type: "string" } }, required: ["place"] },
     },
     ...DATA_TOOL_DEFS,
+    {
+      name: "show_on_map",
+      description: "Bring findings into view: fits the map to the given feature ids (from find_features_near or get_data), or to everything found so far, together with the place in focus. Findings already stay on the map; use this when the person asks to see them. clear: true removes all findings from the map.",
+      input_schema: { type: "object", properties: { ids: { type: "array", items: { type: "string" }, description: "Feature ids; leave out for all findings" }, clear: { type: "boolean" } } },
+    },
   ];
 }
 
@@ -280,10 +287,26 @@ export function createPlaceTools(host) {
 
     async find_features_near({ anchor, feature_type, radius_km, name }) {
       const a = resolve(anchor);
-      const r = await findFeaturesNear(a.lonlat, feature_type, radius_km, { name, fetchFn: host.fetchFn, headers: host.headers, atlas: host.atlas || null });
-      const list = r.candidates.map((c) => cands.get(keep(c)));
-      host.onCandidates?.(list);
-      return { anchor: a.label, feature_type, radius_km, found: r.total, sources: r.sources, wind_turbines: r.wind_turbines, ...(r.note ? { note: r.note } : {}), candidates: list.map(compact) };
+      const g = a.feature.geometry;
+      const shaped = g.type !== "Point";
+      // For an area or line, search a circle that covers the shape plus the radius, then measure each feature from
+      // the shape's edge (Rosebank, 17 Nov: distances were from the field's centre and read as from its edge).
+      const reach = shaped ? Math.max(...walkCoords(g).map((c) => turf.distance(a.lonlat, c))) : 0;
+      const r = await findFeaturesNear(a.lonlat, feature_type, Math.min(radius_km + reach, 50), { name, fetchFn: host.fetchFn, headers: host.headers, atlas: host.atlas || null, limit: shaped ? 200 : 15 });
+      let found = r.candidates;
+      if (shaped) {
+        for (const c of found) { const d = geometryDistanceKm(g, c.geometry); c.distance_km = d == null ? null : round(d, 2); delete c.bearing; delete c.edge_km; }
+        found = found.filter((c) => c.distance_km != null && c.distance_km <= radius_km).sort((x, y) => x.distance_km - y.distance_km);
+      }
+      const total = shaped ? found.length : r.total;
+      const list = found.slice(0, 15).map((c) => cands.get(keep(c)));
+      if (list.length) (host.addFindings ? host.addFindings(list, feature_type) : host.onCandidates?.(list));
+      return {
+        anchor: a.label, feature_type, radius_km, measured_from: shaped ? `the edge of ${a.label} (0 = inside or touching)` : `the point ${a.label}`,
+        found: total, listed: list.length, ...(total > list.length ? { not_listed: `${total - list.length} more found but not listed (nearest ${list.length} shown). Say "${total} found", not ${list.length}.` } : {}),
+        ...(shaped && reach + radius_km > 50 ? { note_reach: "The shape is large, so the search was capped at 50 km from its centre; features further along it may be missed." } : {}),
+        sources: r.sources, wind_turbines: r.wind_turbines, ...(r.note ? { note: r.note } : {}), candidates: list.map(compact),
+      };
     },
 
     async make_place(i) {
@@ -416,10 +439,15 @@ export function createPlaceTools(host) {
     resolve,
     area: (ref) => catalogueArea(ref, null),
     keep: (c) => keep(c),
-    onCandidates: (list) => host.onCandidates?.(list.map((c) => cands.get(c.id))),
+    onCandidates: (list, group) => { const l = list.map((c) => cands.get(c.id)); host.addFindings ? host.addFindings(l, group) : host.onCandidates?.(l); },
     now: host.now,
   });
   run.find_data = (i) => data.find_data(i);
+  run.show_on_map = async ({ ids, clear }) => {
+    if (clear) { host.clearFindings?.(); return { cleared: true }; }
+    const r = host.showFindings ? host.showFindings(ids) : { shown: 0 };
+    return r.shown ? { ...r, note: "The map now shows these with the place in focus." } : { shown: 0, note: "Nothing to show: no findings with those ids are on the map." };
+  };
   run.get_data = (i) => data.get_data(i);
 
   return {
