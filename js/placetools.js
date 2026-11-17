@@ -5,6 +5,7 @@ import * as turf from "./vendor/turf.js";
 import * as G from "./geometry.js";
 import * as R from "./reference.js";
 import { rateConfidence, runCheck, MATCHES } from "./confidence.js";
+import { atlasFindNamed, NAMED_KINDS, describeChecked } from "./atlasfeatures.js";
 import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES } from "./gazetteer.js";
 
 const round = (v, d = 3) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
@@ -18,13 +19,15 @@ export function placeToolDefs(skills) {
     },
     {
       name: "find_place",
-      description: "Search for a named place, asset or feature: authoritative named-feature layers from the atlas (NSTA offshore installations, fields and licensing blocks; The Crown Estate and Crown Estate Scotland offshore wind farm lease areas), OpenStreetMap (Nominatim), Wikidata (good for named mines, dams, power plants and ports) and Natural Earth towns. Returns candidates with ids (C1, C2…), type, source, position and size. Give a block reference like 30/2 to find a UK licensing block.",
+      description: "Search for a named place, asset or feature. Always searches OpenStreetMap (Nominatim), Wikidata (good for named mines, dams, power plants and ports), Natural Earth towns and a few fast layers (NSTA offshore installations, fields and UK licensing blocks; Crown Estate and Crown Estate Scotland offshore wind lease areas). Give `kind` and `area` to also search the AI Living World Atlas catalogue: it finds the published layers that hold that kind of thing in that area (any country) and searches them for the name. Do that for things OpenStreetMap rarely holds: licence blocks and concessions, fields, wells, leases, protected areas, official boundaries, numbered roads. The reply lists the layers searched, so you can say what was and wasn't checked. Returns candidates with ids (C1, C2…), type, source, position and size.",
       input_schema: {
         type: "object",
         properties: {
-          query: { type: "string", description: "The name to search for, e.g. 'Jackdaw', 'Mocuba', '30/2', 'Lake Turkana'" },
+          query: { type: "string", description: "The name or reference to search for, e.g. 'Jackdaw', 'Mocuba', '30/2', 'OML 145', 'Lake Turkana'" },
           near: { type: "string", description: "Optional: a candidate id or place name to search near" },
           country: { type: "string", description: "Optional ISO 3166 two-letter country code to restrict OpenStreetMap results" },
+          kind: { type: "string", enum: Object.keys(NAMED_KINDS), description: "Optional: what kind of thing it is, to search the atlas catalogue for it" },
+          area: { type: "string", description: "With kind: where to look. A country name (its waters are included), a candidate id or a place name. Leave it out to use the map view." },
         },
         required: ["query"],
       },
@@ -140,12 +143,54 @@ export function createPlaceTools(host) {
     return { place: p.name, status: p.status, summary: R.summaryLine(d), scale: d.scale, area_km2: d.area_km2, length_km: d.length_km, countries: d.countries, offshore: d.offshore };
   }
 
+  // Where to search the catalogue: a country (with a margin for its waters), a candidate or place, or the map view.
+  async function catalogueArea(area, nearAt) {
+    if (area) {
+      try {
+        const countries = await host.ref.get("countries");
+        const want = String(area).trim().toLowerCase();
+        const hit = countries.features.filter((f) => [f.properties.name, f.properties.iso, f.properties.sovereign].some((v) => v && v.toLowerCase() === want));
+        if (hit.length) {
+          const b = turf.bbox({ type: "FeatureCollection", features: hit });
+          return { bbox: [b[0] - 2.5, b[1] - 2.5, b[2] + 2.5, b[3] + 2.5].map((v, i) => round(Math.max(Math.min(v, i % 2 ? 85 : 180), i % 2 ? -85 : -180), 3)), label: `${hit[0].properties.name} and its waters` };
+        }
+      } catch { /* reference not loaded */ }
+      try {
+        const a = resolve(area);
+        const b = /Polygon|Line/.test(a.feature.geometry.type) ? turf.bbox(a.feature) : null;
+        const pad = 0.5;
+        return { bbox: b ? [b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad] : [a.lonlat[0] - 1, a.lonlat[1] - 1, a.lonlat[0] + 1, a.lonlat[1] + 1], label: `around ${a.label}` };
+      } catch { /* not a candidate or place */ }
+    }
+    if (nearAt) return { bbox: [nearAt[0] - 1, nearAt[1] - 1, nearAt[0] + 1, nearAt[1] + 1], label: "around the 'near' anchor" };
+    const v = host.view?.();
+    if (v) return { bbox: v, label: "the map view" };
+    return null;
+  }
+
+  async function searchCatalogue(query, kind, area, nearAt) {
+    if (!host.atlas) return { report: { not_checked: "The atlas isn't connected here." } };
+    const where = await catalogueArea(area, nearAt);
+    if (!where) return { report: { not_checked: `"${area}" isn't a country, candidate or place, and there's no map view: find the area first.` } };
+    try {
+      const r = await atlasFindNamed(query, kind, where.bbox, { call: host.atlas });
+      return { candidates: r.candidates, report: {
+        searched: `${kind} layers covering ${where.label}`, found: r.candidates.length,
+        layers_checked: describeChecked(r.checked), layers_found: r.layers_found,
+        ...(r.layers_not_checked ? { more_layers_not_checked: r.layers_not_checked } : {}),
+        ...(r.layers_found ? {} : { note: `The catalogue has no ${kind} layers covering ${where.label}.` }),
+      } };
+    } catch (e) {
+      return { report: { not_checked: String(e.message || e).slice(0, 160) } };
+    }
+  }
+
   const run = {
     async load_skill({ name }) {
       return { skill: name, method: host.skillText(name) };
     },
 
-    async find_place({ query, near, country }) {
+    async find_place({ query, near, country, kind, area }) {
       // "near" is a hint: if it isn't a candidate or place yet, search without it rather than fail the call.
       let nearAt = null, nearNote = null;
       if (near) { try { nearAt = resolve(near).lonlat; } catch { nearNote = `"${near}" isn't a candidate id or place yet, so the search wasn't narrowed to it. Find it first if you need it.`; } }
@@ -161,12 +206,14 @@ export function createPlaceTools(host) {
       if (nom.status === "fulfilled") results.push(...nom.value); else errors.push(`OpenStreetMap search: ${nom.reason?.message}`);
       if (wd.status === "fulfilled") results.push(...wd.value); else errors.push(`Wikidata search: ${wd.reason?.message}`);
       try { results.push(...searchNaturalEarth(await host.ref.get("places"), query)); } catch { /* reference not loaded */ }
+      const atlas = kind ? await searchCatalogue(query, kind, area, nearAt) : null;
+      if (atlas?.candidates?.length) results.unshift(...atlas.candidates);
       const list = results.map((c) => {
         if (nearAt) { c.distance_km = round(turf.distance(nearAt, c.lonlat), 1); c.bearing = Math.round((turf.bearing(nearAt, c.lonlat) + 360) % 360); }
         return cands.get(keep(c));
       });
       host.onCandidates?.(list);
-      return { query, candidates: list.slice(0, 12).map(compact), ...(errors.length ? { problems: errors } : {}), ...(nearNote ? { near_ignored: nearNote } : {}),
+      return { query, candidates: list.slice(0, 12).map(compact), ...(atlas ? { atlas: atlas.report } : {}), ...(errors.length ? { problems: errors } : {}), ...(nearNote ? { near_ignored: nearNote } : {}),
         note: list.length ? undefined : "Nothing found. Try another spelling, a shorter name, or the nearest town and find_features_near." };
     },
 

@@ -304,4 +304,73 @@ await test("an admin area anchors on its centre but builds as its outline, main 
   assert.equal(pt.confidence, "medium", "a point for a county");
 });
 
+await test("a named licence block is found by searching the catalogue's layers for that country", async () => {
+  const sq = (x, y, d) => ({ type: "Polygon", coordinates: [[[x, y], [x + d, y], [x + d, y + d], [x, y + d], [x, y]]] });
+  const asked = [];
+  const host = memoryHost();
+  host.ref = { get: async (k) => (k === "countries" ? { type: "FeatureCollection", features: [{ type: "Feature", properties: { name: "Nigeria", iso: "NGA" }, geometry: sq(3, 4.3, 10) }] } : { type: "FeatureCollection", features: [] }) };
+  host.atlas = async (tool, args) => {
+    if (tool === "find_datasets") {
+      assert.ok(args.bbox[1] < 4.3 - 2, "country search includes its waters");
+      return { matches: 3, results: args.concept === "oil-gas" ? [
+        { id: "wells", title: "Wells", publisher: "Ministry", publisher_type: "central-gov" },
+        { id: "junk", title: "KY Oil and Gas Wells", publisher: "Kentucky", publisher_type: "unknown", extent_may_be_overstated: true },
+        { id: "blocks", title: "Petroleum licence blocks", publisher: "Regulator", publisher_type: "regulator" },
+      ] : [] };
+    }
+    asked.push(args.id);
+    assert.equal(args.text, "145", "server search on the distinctive part");
+    if (args.id === "blocks") return { returned: 2, features: [
+      { type: "Feature", properties: { lic_type: "OML", number: "145", operator: "X" }, geometry: sq(5, 3.5, 0.3) },
+      { type: "Feature", properties: { lic_type: "OML", number: "1450" }, geometry: sq(6, 3.5, 0.3) },
+    ] };
+    return { returned: 1, features: [{ type: "Feature", properties: { name: "OML 145 well" }, geometry: { type: "Point", coordinates: [5.1, 3.6] } }] };
+  };
+  host.fetchFn = async () => ({ ok: true, status: 200, json: async () => [] });
+  const t = createPlaceTools(host);
+  const r = await t.exec("find_place", { query: "OML 145", kind: "licence block or concession", area: "Nigeria" });
+  assert.equal(asked[0], "blocks", "licence layer asked first");
+  assert.ok(!asked.includes("junk"), "overstated extents skipped");
+  const c = r.candidates[0];
+  assert.match(c.source, /licence blocks/);
+  assert.ok(c.area_km2 > 0, "comes with its outline");
+  assert.equal(r.atlas.found, 1, "1450 isn't 145; the well point is the wrong geometry");
+  assert.ok(r.atlas.layers_checked.some((x) => /wrong geometry/.test(x)));
+  assert.match(r.atlas.searched, /Nigeria and its waters/);
+});
+
+await test("with no licence layers there, the reply says so rather than pointing elsewhere", async () => {
+  const host = memoryHost();
+  host.ref = { get: async () => ({ type: "FeatureCollection", features: [] }) };
+  host.view = () => [2, 3, 9, 7];
+  host.atlas = async () => ({ matches: 0, results: [] });
+  host.fetchFn = async () => ({ ok: true, status: 200, json: async () => [] });
+  const t = createPlaceTools(host);
+  const r = await t.exec("find_place", { query: "OML 145", kind: "licence block or concession" });
+  assert.equal(r.atlas.layers_found, 0);
+  assert.match(r.atlas.note, /no licence block or concession layers covering the map view/);
+});
+
+await test("a road search skips junction-point layers and keeps going until it finds lines", async () => {
+  const host = memoryHost();
+  const asked = [];
+  host.atlas = async (tool, args) => {
+    if (tool === "find_datasets") return { matches: 25, results: [
+      ...Array.from({ length: 22 }, (_, i) => ({ id: `j${i}`, title: `Motorway junctions ${i}`, publisher: "Roads agency", publisher_type: "central-gov" })),
+      { id: "lines", title: "Open Roads", publisher: "Mapping agency", publisher_type: "mapping-agency" },
+    ] };
+    asked.push(args.id);
+    if (args.id === "lines") return { returned: 1, features: [{ type: "Feature", properties: { road_number: "M9" }, geometry: { type: "LineString", coordinates: [[host.at[0] - 0.05, host.at[1]], [host.at[0] + 0.05, host.at[1] + 0.01]] } }] };
+    return { returned: 1, features: [{ type: "Feature", properties: { name: "M9 J3" }, geometry: { type: "Point", coordinates: host.at } }] };
+  };
+  const t = createPlaceTools(host);
+  const town = await t.exec("find_place", { query: "Jackdaw" });
+  const { lon, lat } = town.candidates[0];
+  host.at = [lon, lat];
+  const out = await t.exec("find_features_near", { anchor: town.candidates[0].id, feature_type: "main road", radius_km: 50, name: "M9" });
+  assert.equal(asked[0], "lines", "line layer asked before junction layers");
+  const atl = out.sources.find((s) => s.source === "AI Living World Atlas");
+  assert.ok(atl.found >= 1);
+});
+
 console.log(`${passed} place tests passed`);

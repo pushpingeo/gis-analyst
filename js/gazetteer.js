@@ -4,7 +4,7 @@
 // No DOM, so it runs in the page and in the evaluation. fetchFn is injectable for tests and for Node.
 import * as turf from "./vendor/turf.js";
 import { fetchOverpass, OVERPASS_ENDPOINTS } from "./tools.js";
-import { atlasFeaturesNear, ATLAS_CONCEPTS } from "./atlasfeatures.js";
+import { atlasFeaturesNear, ATLAS_CONCEPTS, describeChecked } from "./atlasfeatures.js";
 
 const round = (v, d = 4) => Math.round(v * 10 ** d) / 10 ** d;
 
@@ -242,7 +242,7 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
   const cands = [];
   if (at.status === "fulfilled" && at.value) {
     cands.push(...at.value.candidates);
-    sources.push({ source: "AI Living World Atlas", found: at.value.total, layers_checked: at.value.checked.map((x) => `${x.dataset} (${x.publisher})${x.error ? ": failed" : `: ${x.returned}`}`),
+    sources.push({ source: "AI Living World Atlas", found: at.value.total, layers_checked: describeChecked(at.value.checked),
       ...(at.value.layers_not_checked ? { more_layers_not_checked: at.value.layers_not_checked } : {}) });
   } else if (atlas && ATLAS_CONCEPTS[featureType]) sources.push({ source: "AI Living World Atlas", not_checked: String(at.reason?.message || at.reason || "unavailable").slice(0, 120) });
   if (osm.status === "fulfilled") { cands.push(...osm.value.candidates); sources.push({ source: "OpenStreetMap", found: osm.value.total, ...(osm.value.note ? { note: osm.value.note } : {}) }); }

@@ -263,6 +263,7 @@ const host = {
   get anchors() { return anchors; },
   fetchFn: (...a) => fetch(...a),
   atlas: atlasViaWorker,
+  view: () => viewBounds(),
   headers: {},
   places: () => [...places.values()],
   findPlace: placeByName,
