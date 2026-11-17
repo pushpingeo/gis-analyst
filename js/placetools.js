@@ -50,7 +50,7 @@ export function placeToolDefs(skills) {
         type: "object",
         properties: {
           anchor: { type: "string", description: "Candidate id or existing place name" },
-          also: { type: "array", items: { type: "string" }, description: "With shape 'feature': more candidate ids whose outlines are joined with the anchor's, e.g. the A, B and C parts of one wind farm" },
+          also: { type: "array", items: { type: "string" }, description: "With shape 'feature': more candidate ids whose outlines are joined with the anchor's, e.g. the A, B and C parts of one wind farm. With shape 'buffer': more pieces of the same thing (road or river segments) buffered and joined into one corridor." },
           shape: { type: "string", enum: ["point", "square", "circle", "rectangle", "feature", "buffer"] },
           area_km2: { type: "number" }, side_km: { type: "number" }, radius_km: { type: "number" },
           width_km: { type: "number", description: "East–west size before rotation" }, height_km: { type: "number", description: "North–south size before rotation" },
@@ -217,20 +217,26 @@ export function createPlaceTools(host) {
             steps.push(`outlines of ${[a.label, ...parts.map((p) => p.label)].join(", ")}, joined`);
           } else steps.push(`outline of ${a.label}`);
           if (i.offset_km) f = G.move(f, i.offset_km, i.bearing_deg ?? 0);
-          {
-            // The map editor can't hold holes. Fill them, and say so with the area it adds, rather than
-            // let the analyst swap the publisher's outline for an invented shape (Beatrice, 16 Nov).
-            const filled = G.fillHoles(f);
-            if (filled.holes) { f = filled.feature; steps.push(`${filled.holes} hole${filled.holes > 1 ? "s" : ""} in the published outline filled (adds ${round(filled.addedKm2, 2)} km²), because the map can't edit holes yet`); }
-            const main = G.largestPart(f);
-            if (main.dropped) { f = main.feature; steps.push(`kept the main part; ${main.dropped} smaller part${main.dropped > 1 ? "s" : ""} (${round(main.droppedKm2, 2)} km², e.g. islands) left out, because the map can't edit multi-part shapes yet`); }
-          }
           break;
         case "buffer":
           if (!i.buffer_km) throw new Error("A buffer needs buffer_km.");
           f = turf.buffer(i.offset_km ? G.move(a.feature, i.offset_km, i.bearing_deg ?? 0) : a.feature, i.buffer_km, { units: "kilometers", steps: 16 });
-          steps.push(`${i.buffer_km} km buffer around ${a.label}`); break;
+          if (i.also?.length) {
+            // Several pieces of one thing (the segments of a road or river): buffer each and join them.
+            const parts = i.also.map(resolve);
+            for (const p of parts) f = turf.union(turf.featureCollection([f, turf.buffer(p.feature, i.buffer_km, { units: "kilometers", steps: 16 })])) || f;
+            steps.push(`${i.buffer_km} km buffer around ${[a.label, ...parts.map((p) => p.label)].join(", ")}, joined`);
+          } else steps.push(`${i.buffer_km} km buffer around ${a.label}`);
+          break;
         default: throw new Error(`Unknown shape ${i.shape}.`);
+      }
+      {
+        // The map editor can't hold holes. Fill them, and say so with the area it adds, rather than
+        // let the analyst swap the publisher's outline for an invented shape (Beatrice, 16 Nov).
+        const filled = G.fillHoles(f);
+        if (filled.holes) { f = filled.feature; steps.push(`${filled.holes} hole${filled.holes > 1 ? "s" : ""} in the outline filled (adds ${round(filled.addedKm2, 2)} km²), because the map can't edit holes yet`); }
+        const main = G.largestPart(f);
+        if (main.dropped) { f = main.feature; steps.push(`kept the main part; ${main.dropped} smaller part${main.dropped > 1 ? "s" : ""} (${round(main.droppedKm2, 2)} km², e.g. islands) left out, because the map can't edit multi-part shapes yet`); }
       }
       if (i.rotation_deg && !["square", "rectangle", "point"].includes(i.shape)) { f = G.rotate(f, i.rotation_deg); steps.push(`rotated ${i.rotation_deg}°`); }
       else if (i.rotation_deg && ["square", "rectangle"].includes(i.shape)) steps.push(`rotated ${i.rotation_deg}°`);

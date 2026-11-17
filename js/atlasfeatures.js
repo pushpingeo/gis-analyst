@@ -18,12 +18,22 @@ export const ATLAS_CONCEPTS = {
   "port or terminal": { concept: "port-airport", keep: /port|terminal|harbour|harbor|jetty|wharf/i },
   "airport": { concept: "port-airport", keep: /airport|aerodrome|airfield/i },
   "settlement": { concept: "settlement" },
+  "school": { concept: "school" },
+  "hospital or clinic": { concept: "health-facility" },
+  "park or green space": { concept: "greenspace" },
+  "main road": { concept: "road" },
+  "railway": { concept: "rail" },
+  "river": { concept: "river" },
+  "pipeline": { concept: "pipeline" },
+  "power line": { concept: "power-line" },
+  "protected area": { concept: "protected-area" },
+  "heritage site": { concept: "heritage-site" },
 };
 
 // The atlas's publisher types for official bodies: "central-gov", "local-gov", "public-body", "intergovernmental"…
 const AUTHORITATIVE = /gov|public-body|intergov|regulator|mapping-agency/i;
 const NAME_KEYS = /^(name|site_?name|plant_?name|plant___project_name|project_?name|mine_?name|facility_?name|dep_?name|title|label|nom|nombre|naam|bezeichnung)$/i;
-const NAMEISH = /name|project|plant|site|mine|facility|title/i;
+const NAMEISH = /name|project|plant|site|mine|facility|title|^ref$|road_?num|roadnumber|route/i;
 const TYPEISH = /^(type|.*_?type|commod.*|fuel|technology|source|status|primary_fuel|dep_type)$/i;
 
 function pickName(p) {
@@ -56,7 +66,8 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
         const nm = pickName(p);
         const ty = pickType(p);
         if (map.keep && !map.keep.test(`${ty} ${d.title}`)) continue;
-        if (name && !(nm || "").toLowerCase().includes(name.toLowerCase())) continue;
+        // A name filter matches any text attribute: road numbers ("M9") often sit in their own field.
+        if (name && !Object.values(p).some((v) => typeof v === "string" && v.toLowerCase().includes(name.toLowerCase()))) continue;
         let c;
         try {
           c = candidate({

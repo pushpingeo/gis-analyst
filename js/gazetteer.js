@@ -171,6 +171,13 @@ export const FEATURE_TYPES = {
   "railway station": ['nwr["railway"~"^(station|halt)$"]'],
   "park or green space": ['nwr["leisure"~"^(park|nature_reserve|recreation_ground)$"]'],
   "residential area": ['way["landuse"="residential"]'],
+  "main road": ['way["highway"~"^(motorway|trunk|primary)$"]'],
+  "railway": ['way["railway"="rail"]'],
+  "river": ['way["waterway"~"^(river|canal)$"]'],
+  "pipeline": ['way["man_made"="pipeline"]'],
+  "power line": ['way["power"="line"]'],
+  "protected area": ['nwr["boundary"="protected_area"]', 'nwr["leisure"="nature_reserve"]'],
+  "heritage site": ['nwr["heritage"]', 'nwr["historic"~"^(castle|monument|archaeological_site|ruins)$"]'],
 };
 
 // When Overpass is down, everyday features can still be found through Nominatim's search phrases.
