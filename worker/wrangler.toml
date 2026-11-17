@@ -1,0 +1,32 @@
+name = "tobler-api"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+workers_dev = true
+
+[vars]
+MODEL = "claude-haiku-5-5"
+MAX_TOKENS = "8000"
+# Origins the Worker serves, no trailing slash. localhost is for local tests.
+ALLOWED_ORIGINS = "https://asktobler.com,https://www.asktobler.com,https://pushpingeo.github.io,http://localhost:8000"
+# Claude calls: a conversation turn is a few calls.
+PER_VISITOR_DAILY = "200"
+TOTAL_DAILY = "5000"
+# Atlas calls (no Anthropic cost; one map search can be ~20 calls).
+ATLAS_PER_VISITOR_DAILY = "2000"
+
+# Secrets (set by .github/workflows/worker-deploy.yml, never pasted):
+#   ANTHROPIC_API_KEY, ATLAS_MCP_KEY
+
+# Counters: one object per visitor per day, one for the daily total.
+[[durable_objects.bindings]]
+name = "COUNTER"
+class_name = "Counter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Counter"]
+
+# The atlas, reached directly (workers.dev fetches between Workers on one account fail with 1042).
+[[services]]
+binding = "ATLAS"
+service = "atlas-mcp"

@@ -1,0 +1,48 @@
+name: Worker deploy
+# Tests and deploys tobler-api (worker/), loads its secrets from the repo's secrets, then checks it live.
+# Runs when worker/ changes on main, or by hand.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['worker/**', '.github/workflows/worker-deploy.yml']
+concurrency: { group: worker-deploy, cancel-in-progress: false }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults: { run: { working-directory: worker } }
+    env:
+      CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+      CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - name: Local tests (fake upstreams)
+        run: npm test
+      - name: Deploy
+        run: npx wrangler deploy
+      - name: Load secrets into the Worker
+        env:
+          ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}"
+          ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}"
+        run: |
+          jq -n '{ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY, ATLAS_MCP_KEY: env.ATLAS_MCP_KEY}' > /tmp/secrets.json
+          npx wrangler secret bulk /tmp/secrets.json
+          rm /tmp/secrets.json
+      - name: Check it live
+        run: |
+          sleep 10
+          U=https://tobler-api.robdunfey.workers.dev
+          O="Origin: https://asktobler.com"
+          echo "--- health"; curl -s $U/health; echo
+          echo "--- refused origin"; curl -s -o /dev/null -w '%{http_code}\n' -X POST $U/v1/messages -H 'Origin: https://example.com' -d '{}'
+          echo "--- atlas (vocabulary)"
+          a=$(curl -s -w '\n%{http_code}' -X POST $U/atlas -H "$O" -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"vocabulary","arguments":{}}}')
+          echo "$a" | tail -1; echo "$a" | head -1 | cut -c1-200
+          echo "--- claude (5 tokens)"
+          c=$(curl -s -w '\n%{http_code}' -X POST $U/v1/messages -H "$O" -H 'content-type: application/json' -d '{"max_tokens":5,"messages":[{"role":"user","content":"Say ok"}]}')
+          echo "$c" | tail -1; echo "$c" | head -1 | jq -c '{model, content, error}'
+          [ "$(echo "$a" | tail -1)" = 200 ] && [ "$(echo "$c" | tail -1)" = 200 ]
