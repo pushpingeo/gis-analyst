@@ -14,6 +14,8 @@ const ref = R.createReference(async (n) => JSON.parse(readFileSync(`data/ref/${n
 const anchors = JSON.parse(readFileSync("catalogue/anchors.json", "utf8")).sources;
 const trusted = JSON.parse(readFileSync("catalogue/trusted.json", "utf8"));
 const skill = parseSkill(readFileSync("skills/place-finding/SKILL.md", "utf8"));
+const ntr = parseSkill(readFileSync("skills/ntr-screening/SKILL.md", "utf8"));
+const allSkills = [skill, ntr];
 let spend = { input: 0, output: 0 };
 
 async function callClaude({ system, messages, tools }) {
@@ -42,7 +44,7 @@ for (const conv of convs) {
     atlas: process.env.ATLAS_MCP_KEY ? (tool, args) => atlasCall(tool, args) : null,
     places: () => list,
     findPlace: (n) => list.find((p) => p.name.toLowerCase() === String(n).toLowerCase()),
-    skillText: () => skill.body,
+    skillText: (n) => (allSkills.find((x) => x.name === n) || skill).body,
     addPlace({ feature, origin }) { const p = { name: `Area ${list.length + 1}`, feature, origin, status: "proposed", edits: [] }; list.push(p); return p; },
     updatePlace(name, feature, words) { const p = this.findPlace(name); p.feature = feature; p.edits.push({ change: words }); },
     renamePlace(name, to) { this.findPlace(name).name = to; },
@@ -56,14 +58,15 @@ for (const conv of convs) {
     console.log(`\n> ${text}`);
     try {
       const res = await runTurn({
-        system: systemPrompt({ skills: [skill], loaded, comingSoon: ["risk screening (NTR), net developable area and constraints-and-access analysis"] }),
+        system: systemPrompt({ skills: allSkills, loaded, comingSoon: ["net developable area and constraints-and-access analysis"] }),
         messages: buildMessages({ recent, summary: await projectSummary(ref, list, list.at(-1)?.name), userText: text }),
-        tools: placeToolDefs([skill]),
+        tools: placeToolDefs(allSkills),
+        maxRounds: 14,
         exec: (name, input) => tools.exec(name, input),
         callClaude,
         onEvent: (ev) => {
           if (ev.type !== "tool") return;
-          if (ev.name === "load_skill") loaded = [skill];
+          if (ev.name === "load_skill") { const k = allSkills.find((x) => x.name === ev.input?.name); if (k && !loaded.includes(k)) loaded = [...loaded, k]; }
           const o = ev.output || {};
           const brief = ev.error ? `ERROR ${ev.error}`
             : ev.name === "find_features_near" ? `${o.found} found; sources ${JSON.stringify(o.sources)}; top: ${(o.candidates || []).slice(0, 5).map((c) => `${c.name} (${c.distance_km} km, ${c.source})`).join("; ")}`

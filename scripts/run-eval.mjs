@@ -23,7 +23,7 @@ const MAX_TOKENS = 8000; // same cap as the public Worker
 
 const readJson = (f) => (existsSync(f) ? JSON.parse(readFileSync(f)) : null);
 const catalogue = JSON.parse(readFileSync("catalogue/catalogue.json"));
-const skillText = readFileSync("skills/ntr-screening/SKILL.md", "utf8");
+const skillText = readFileSync("skills/ntr-screening-ifc/SKILL.md", "utf8");
 const skillSha = createHash("sha256").update(skillText).digest("hex").slice(0, 12);
 let { sites } = JSON.parse(readFileSync("data/eval-sites.json"));
 // --sites=dev or --sites=test use the fixed split in data/eval-split.json; otherwise a list of ids or "all".

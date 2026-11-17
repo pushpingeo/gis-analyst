@@ -13,7 +13,7 @@ const data = prepareData({ catalogue, site, footprintKm: 5, osm, gbif: gbifSnap,
 
 // The project name must never reach the model.
 assert.ok(!userPrompt(site, 5).includes("Trishuli"));
-assert.ok(!systemPrompt({ skillOn: true, skillText: readFileSync("skills/ntr-screening/SKILL.md", "utf8"), deskResearch: true }).includes("Trishuli"));
+assert.ok(!systemPrompt({ skillOn: true, skillText: readFileSync("skills/ntr-screening-ifc/SKILL.md", "utf8"), deskResearch: true }).includes("Trishuli"));
 assert.equal(toolDefs({ deskResearch: false }).length, 4);
 assert.equal(toolDefs({ deskResearch: true }).at(-1).type, "web_search_20250305");
 

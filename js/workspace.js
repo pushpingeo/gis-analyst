@@ -9,6 +9,7 @@ import { placeToolDefs, createPlaceTools, projectSummary } from "./placetools.js
 import { parseSkill, systemPrompt, buildMessages, runTurn, activityFor } from "./converse.js";
 import { callClaude, LimitReached } from "./claude.js";
 import { atlasViaWorker, firmsViaWorker } from "./atlasclient.js";
+import { CONFIG } from "./config.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
@@ -306,7 +307,7 @@ const host = {
 const tools = createPlaceTools(host);
 
 Promise.all([
-  fetch(asset("skills/place-finding/SKILL.md")).then((r) => r.text()).then((t) => { const s = parseSkill(t); skills[s.name] = s; }),
+  ...["skills/place-finding/SKILL.md", "skills/ntr-screening/SKILL.md"].map((f) => fetch(asset(f)).then((r) => r.text()).then((t) => { const s = parseSkill(t); skills[s.name] = s; })),
   fetch(asset("catalogue/anchors.json")).then((r) => r.json()).then((j) => { anchors = j.sources; }),
   fetch(asset("catalogue/trusted.json")).then((r) => r.json()).then((j) => { trusted = j; }),
 ]).catch((e) => note(`Something the analyst needs didn't load: ${e.message}`));
@@ -545,9 +546,10 @@ async function send(text) {
     const summary = await projectSummary(ref, host.places(), focusName, viewBounds());
     const skillList = Object.values(skills);
     const res = await runTurn({
-      system: systemPrompt({ skills: skillList, loaded: skillList.filter((s) => loadedSkills.has(s.name)), comingSoon: ["risk screening (NTR), net developable area and constraints-and-access analysis"] }),
+      system: systemPrompt({ skills: skillList, loaded: skillList.filter((s) => loadedSkills.has(s.name)), comingSoon: ["net developable area and constraints-and-access analysis"] }),
       messages: buildMessages({ recent, summary, userText: text }),
       tools: placeToolDefs(skillList),
+      maxRounds: CONFIG.workspaceRounds || 10,
       exec: (name, input) => tools.exec(name, input),
       callClaude,
       onEvent: (ev) => {

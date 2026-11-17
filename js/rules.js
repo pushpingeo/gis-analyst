@@ -3,7 +3,7 @@
 const within = (s, concept, km) => !s[concept]?.not_checked && (s[concept]?.nearest?.[0]?.distance_km ?? Infinity) <= km;
 const any = (s, concepts, km) => concepts.some((c) => within(s, c, km));
 
-// Mechanical reading of skills/ntr-screening/SKILL.md. The agent should do better than this.
+// Mechanical reading of skills/ntr-screening-ifc/SKILL.md. The agent should do better than this.
 export function rules(s, asset, species = null) {
   const threatened = (species?.species || []).some((x) => x.nearest_km <= 5);
   const ps5 = any(s, ["settlement", "residential-land", "informal-settlement", "farmland"], 1) && !within(s, "industrial-land", 0);

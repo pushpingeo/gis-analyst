@@ -103,7 +103,7 @@ window.addEventListener("unhandledrejection", (e) => { $("status").textContent =
 const [catalogue, evalSites, skillText] = await Promise.all([
   fetch("catalogue/catalogue.json").then((r) => r.json()),
   fetch("data/eval-sites.json").then((r) => r.json()),
-  fetch("skills/ntr-screening/SKILL.md", { cache: "no-store" }).then((r) => r.text()),
+  fetch("skills/ntr-screening-ifc/SKILL.md", { cache: "no-store" }).then((r) => r.text()),
 ]);
 // Never run "skill on" with something that isn't the skill (e.g. an error page).
 const skillOk = /^---\s*\nname: ntr-screening/.test(skillText);

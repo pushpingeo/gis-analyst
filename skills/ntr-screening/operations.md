@@ -1,37 +1,29 @@
-# Operations used by the NTR screening skill
+# Operations used by the NTR screening skill (v3)
 
-What each operation must do in any setting, then the tool that does it in Tobler's lab agent (`js/agent.js`,
-`js/tools.js`). The SKILL.md method (v2) is the evaluated text and doesn't name these; it says "gather the evidence
-with the tools: list the catalogue, then check every concept, the threatened species records and the named places".
-In step 4 the workspace version will also use the catalogue tools (`find_data`, `get_data`).
+What each operation must do in any setting, then the Tobler tool that does it. All coordinates WGS84; distances
+geodesic and measured from the footprint edge.
 
-## List the catalogue
-- **Does:** lists the concepts (kinds of evidence) the catalogue can search for the site: id, label, the IFC
-  Performance Standard each informs, source, search radius and caveats.
-- **Tobler:** `list_concepts`.
+## Read the site
+- **Does:** returns the site's geometry details: size, whether it's offshore, country, distance to coast, nearby towns.
+- **Tobler:** `get_place` (and the project summary each turn).
 
-## Check a concept
-- **Does:** finds map features for one or more concepts near the site: counts by distance band (on site, within
-  1 km, 1–5 km, 5–20 km) and the nearest named features with distances from the footprint edge.
-- **Returns:** features, or "not checked" with the reason when the source fails.
-- **Tobler:** `find_features` (OpenStreetMap today; the atlas in step 4).
+## Find datasets about a topic for an area
+- **Does:** searches a curated list of trusted services first (e.g. NASA FIRMS for thermal hotspots), then a catalogue
+  of published map layers by words in titles and publishers, for the site's area. Returns each dataset's publisher,
+  whether it's trusted, licence (as stated) and its class (open, non-commercial, not stated, Esri Master License),
+  coverage, and whether its features can be fetched. Leaves out datasets the person isn't licensed to use, and says so.
+- **Tobler:** `find_data` (`js/datatools.js`; trusted list `catalogue/trusted.json`; catalogue = AI Living World Atlas).
 
-## Threatened species records
-- **Does:** occurrence records (GBIF) within 5 km of the footprint for species the IUCN Red List rates Critically
-  Endangered or Endangered, grouped by species, plus a species count within 20 km. Records are sightings and
-  specimens, not ranges.
-- **Tobler:** `threatened_species_records`.
+## Fetch a dataset's features for the site
+- **Does:** fetches one dataset's features within a distance of the site, measures each from the site's edge (0 = on
+  site), and returns them nearest first with name, distance, key attributes (dates, types), publisher, licence and when
+  it was checked. Time-aware sources (satellite detections) take a number of recent days. Failures are "not checked".
+- **Tobler:** `get_data`.
 
-## Named places
-- **Does:** named places and features within 20 km (settlements, municipalities, rivers, protected and heritage
-  sites) with types, distances and encyclopaedia links; point locations only. Useful for desk research.
-- **Tobler source:** Wikidata.
-- **Tobler:** `named_places`.
-
-## Desk research (optional)
-- **Does:** a handful of web searches about the place (not the project), each finding cited with URL and date and
-  labelled *desk research*.
-- **Tobler:** the model's web search tool, off by default.
+## Everyday features near the site
+- **Does:** settlements, schools, hospitals and clinics, places of worship, cemeteries, main roads, railways, rivers,
+  parks, power lines and pipelines near the site, from the catalogue and OpenStreetMap, with distance and bearing.
+- **Tobler:** `find_features_near`.
 
 ## Failures, in any setting
-A concept the catalogue lacks, or a source that fails, is a data gap, not an absence. Report it as *not checked*.
+A source that fails or isn't reached is reported as *not checked*, never as *nothing found*. Say which.

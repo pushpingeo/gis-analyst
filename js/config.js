@@ -6,4 +6,6 @@ export const CONFIG = {
   model: "claude-haiku-5-5",
   maxTokens: 8000,
   maxRounds: 10,
+  // The workspace analyst: a screening asks for many datasets, so it gets more rounds per turn.
+  workspaceRounds: 14,
 };
