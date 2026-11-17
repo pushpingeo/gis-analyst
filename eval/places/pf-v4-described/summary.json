@@ -1,0 +1,59 @@
+{
+ "label": "pf-v4-described",
+ "set": "described",
+ "model": "claude-haiku-5-5",
+ "skill_version": "4.2",
+ "created": "2026-11-17T00:25:16.837Z",
+ "sites": 48,
+ "placed": 46,
+ "errors": 0,
+ "median_error_km": 2.46,
+ "within_1km": 39,
+ "within_5km": 70,
+ "within_10km": 80,
+ "truth_inside_shape": 4,
+ "by_confidence": {
+  "high": {
+   "n": 11,
+   "median_km": 1.61,
+   "within_1km": 45,
+   "within_10km": 82
+  },
+  "medium": {
+   "n": 20,
+   "median_km": 2.88,
+   "within_1km": 40,
+   "within_10km": 95
+  },
+  "low": {
+   "n": 15,
+   "median_km": 5.58,
+   "within_1km": 33,
+   "within_10km": 60
+  }
+ },
+ "atlas": {
+  "used": true,
+  "reachable_at_start": true
+ },
+ "overpass": {
+  "reachable_at_start": false,
+  "feature_searches": 84,
+  "feature_searches_failed": 15
+ },
+ "checks": {
+  "given": 48,
+  "failed": 14
+ },
+ "earlier_pins": {
+  "note": "The original pins in the evaluation set, before Rob checked them against imagery",
+  "n": 48,
+  "median_error_km": 0.535,
+  "within_1km": 56,
+  "within_10km": 83
+ },
+ "tokens": {
+  "input": 2680473,
+  "output": 156043
+ }
+}

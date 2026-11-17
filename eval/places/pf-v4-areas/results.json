@@ -1,0 +1,494 @@
+[
+ {
+  "case": "jackdaw-square",
+  "words": "A 3 km² square around the Jackdaw platform in the North Sea",
+  "placed": true,
+  "shape": "Polygon",
+  "iou": 1,
+  "centre_error_km": 0,
+  "area_ratio": 1,
+  "anchor": "JACKDAW",
+  "anchor_source": "nsta-surface-installations",
+  "steps": [
+   "square of 3 km² centred there"
+  ],
+  "confidence": "high",
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've built a 3 km² square, Area 1, centred on the JACKDAW platform in the North Sea. The platform is from the NSTA UKCS offshore infrastructure layer (active, operator Adura Energy), so confidence is high. The square sits about 257 km offshore.\n\nThe NSTA layer lists the platform's coordinates as ED50, which differs from WGS84 by about 100 m. That's negligible at this 3 km² scale.\n\nIs this the square you meant, or did you want it offset or with a different shape?",
+  "usage": {
+   "input_tokens": 21781,
+   "output_tokens": 637
+  },
+  "seconds": 5,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Jackdaw"
+    },
+    "n": 8
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C1",
+     "shape": "square",
+     "area_km2": 3,
+     "words": "A 3 km² square around the Jackdaw platform in the North Sea",
+     "match": "name_and_type",
+     "reason": "JACKDAW platform (NSTA UKCS offshore infrastructure, active, operator Adura Energy) matched by name and type; square centred on its surface point."
+    }
+   }
+  ]
+ },
+ {
+  "case": "block-30-2",
+  "words": "North Sea licensing block 30/2",
+  "placed": true,
+  "shape": "Polygon",
+  "iou": 1,
+  "centre_error_km": 0,
+  "area_ratio": 1,
+  "anchor": "30/2",
+  "anchor_source": "nsta-blocks",
+  "steps": [
+   "outline of 30/2"
+  ],
+  "confidence": "high",
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've built Area 1 as the outline of UK licensing block 30/2, from the North Sea Transition Authority's UKCS blocks layer. It covers about 225 km² of open sea, roughly 252 km from the coast (nearest town Aberdeen, 268 km). Confidence is high.\n\nIs this the block you meant?",
+  "usage": {
+   "input_tokens": 27854,
+   "output_tokens": 492
+  },
+  "seconds": 4,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "30/2"
+    },
+    "n": 6
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C1",
+     "shape": "feature",
+     "words": "North Sea licensing block 30/2",
+     "match": "name_and_type",
+     "reason": "UK offshore licensing block 30/2 from the NSTA UKCS blocks layer, matched by name and type."
+    }
+   }
+  ]
+ },
+ {
+  "case": "brent-field",
+  "words": "The outline of the Brent oil field",
+  "placed": true,
+  "shape": "Polygon",
+  "iou": 1,
+  "centre_error_km": 0,
+  "area_ratio": 1,
+  "anchor": "BRENT",
+  "anchor_source": "nsta-fields",
+  "steps": [
+   "outline of BRENT"
+  ],
+  "confidence": "high",
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've built Area 1 from the NSTA outline of the Brent oil field (the BRENT field record, operator Shell, production ceased). It covers about 78 km² in the northern North Sea, roughly 137 km from the coast. Confidence is high, since it's the authoritative field outline matched by name.\n\nIs this the outline you wanted, or did you mean the Brent platforms or the wider Brent area?",
+  "usage": {
+   "input_tokens": 29513,
+   "output_tokens": 499
+  },
+  "seconds": 6,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Brent"
+    },
+    "n": 12
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C5",
+     "shape": "feature",
+     "words": "The outline of the Brent oil field",
+     "match": "name_and_type",
+     "reason": "NSTA UKCS offshore hydrocarbon fields layer has a field named BRENT (oil), operator Shell, production ceased; its own outline is used."
+    }
+   }
+  ]
+ },
+ {
+  "case": "forties-offset",
+  "words": "A 2 km² square 10 km north of the Forties Alpha platform",
+  "placed": true,
+  "shape": "Polygon",
+  "iou": 1,
+  "centre_error_km": 0,
+  "area_ratio": 1,
+  "anchor": "FORTIES ALPHA",
+  "anchor_source": "nsta-surface-installations",
+  "steps": [
+   "moved 10 km on a bearing of 0° from FORTIES ALPHA",
+   "square of 2 km² centred there"
+  ],
+  "confidence": "medium",
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've built \"Area 1\": a 2 km² square centred 10 km due north of the Forties Alpha platform (NSTA UKCS infrastructure layer, active, operated by Apache). The distance check passes. Confidence is medium, because the square is placed by offset from the platform rather than found as a feature itself.\n\nIs the centre of the square the right reference point, or did you mean the square's edge to sit 10 km north?",
+  "usage": {
+   "input_tokens": 19559,
+   "output_tokens": 704
+  },
+  "seconds": 5,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Forties Alpha"
+    },
+    "n": 1
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C1",
+     "shape": "square",
+     "area_km2": 2,
+     "offset_km": 10,
+     "bearing_deg": 0,
+     "match": "name_and_type",
+     "reason": "FORTIES ALPHA is an active platform in the NSTA UKCS infrastructure layer; the 2 km² square is offset 10 km due north of it.",
+     "words": "A 2 km² square 10 km north of the Forties Alpha platform",
+     "checks": [
+      {
+       "against": "C1",
+       "expected_km": 10,
+       "direction": "S"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "case": "linlithgow-palace",
+  "words": "Everything within 5 km of Linlithgow Palace in Scotland",
+  "placed": true,
+  "shape": "Polygon",
+  "iou": 0.972,
+  "centre_error_km": 0.111,
+  "area_ratio": 1,
+  "anchor": "Linlithgow Palace",
+  "anchor_source": "wikidata",
+  "steps": [
+   "circle of radius 5 km"
+  ],
+  "confidence": "medium",
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I drew a 5 km circle around Linlithgow Palace as **Area 1** (about 78 km²). It matched the palace by name and type in Wikidata, and OpenStreetMap places it within about 100 m. Confidence is medium because you gave no distance checks to test it against.\n\nI searched the circle for the main feature types. Here is what came back:\n\n- **Settlements (Scottish Government):** Linlithgow, Whitecross, Bo'ness and Bridgend.\n- **Schools:** 15, including Linlithgow Academy, Linlithgow Primary and Bo'ness Academy.\n- **Hospitals and clinics:** 3, including St Michael's Hospital and Bo'ness Hospital.\n- **Places of worship:** 15, including St Michael's Parish Church, next to the palace.\n- **Railway stations:** 5, including Linlithgow and Bo'ness.\n- **Parks and green spaces:** 15, including The Peel, Rosemount Park and Beecraigs Country Park (just outside the circle).\n- **Mines and quarries:** Mostly geological layers rather than working sites. These are BGS oil shale seam outlines, which are not mines, so I'd treat that list as weak.\n- **Power plants:** None found in the national datasets. The OpenStreetMap check failed.\n- **Substations:** Not returned. The OpenStreetMap service was not answering.\n\nThe school, hospital, worship, station and park lists came from a fallback search, so they may miss some smaller features. Some results (for example the oil shale and hard rock layers) lie outside 5 km, so check the cards before relying on them.\n\nDo you want me to retry the substation and power plant searches later when OpenStreetMap is responding?",
+  "usage": {
+   "input_tokens": 44256,
+   "output_tokens": 2767
+  },
+  "seconds": 71,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Linlithgow Palace",
+     "country": "GB"
+    },
+    "n": 2
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C2",
+     "shape": "circle",
+     "radius_km": 5,
+     "words": "Everything within 5 km of Linlithgow Palace",
+     "match": "name_and_type",
+     "reason": "Linlithgow Palace matched by name and type (castle) in Wikidata, with OpenStreetMap agreeing within about 100 m; 5 km circle drawn around it."
+    }
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Area 1",
+     "feature_type": "settlement",
+     "radius_km": 5
+    },
+    "n": 4
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Area 1",
+     "feature_type": "school",
+     "radius_km": 5
+    },
+    "n": 15
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Area 1",
+     "feature_type": "hospital or clinic",
+     "radius_km": 5
+    },
+    "n": 3
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Area 1",
+     "feature_type": "place of worship",
+     "radius_km": 5
+    },
+    "n": 15
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Area 1",
+     "feature_type": "railway station",
+     "radius_km": 5
+    },
+    "n": 5
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Area 1",
+     "feature_type": "park or green space",
+     "radius_km": 5
+    },
+    "n": 15
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Area 1",
+     "feature_type": "power plant (any)",
+     "radius_km": 5
+    },
+    "n": 0
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Area 1",
+     "feature_type": "substation",
+     "radius_km": 5
+    },
+    "error": "OpenStreetMap's Overpass service isn't answering right now (all three public servers failed a moment ago)."
+   },
+   {
+    "name": "find_features_near",
+    "input": {
+     "anchor": "Area 1",
+     "feature_type": "mine or quarry",
+     "radius_km": 5
+    },
+    "n": 15
+   }
+  ]
+ },
+ {
+  "case": "edinburgh-castle",
+  "words": "A 2 km radius around Edinburgh Castle",
+  "placed": true,
+  "shape": "Polygon",
+  "iou": 0.979,
+  "centre_error_km": 0.034,
+  "area_ratio": 1,
+  "anchor": "Edinburgh Castle",
+  "anchor_source": "osm-nominatim",
+  "steps": [
+   "circle of radius 2 km"
+  ],
+  "confidence": "high",
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've built Area 1: a 2 km radius circle (about 12.6 km²) centred on Edinburgh Castle in the Old Town. The castle was matched by name in OpenStreetMap, and Wikidata's castle point sits within a few metres of it, so confidence is high.\n\nIs the circle centred where you wanted, or should the centre be on a different point?",
+  "usage": {
+   "input_tokens": 20236,
+   "output_tokens": 582
+  },
+  "seconds": 5,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Edinburgh Castle",
+     "country": "GB"
+    },
+    "n": 5
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C1",
+     "shape": "circle",
+     "radius_km": 2,
+     "words": "2 km radius around Edinburgh Castle",
+     "match": "named_place",
+     "reason": "OpenStreetMap castle named Edinburgh Castle in Old Town, Edinburgh; Wikidata's castle point (C2) lies within a few metres of it."
+    }
+   }
+  ]
+ },
+ {
+  "case": "hoover-dam",
+  "words": "A 1 km circle centred on the Hoover Dam",
+  "placed": true,
+  "shape": "Polygon",
+  "iou": 0.975,
+  "centre_error_km": 0.02,
+  "area_ratio": 1,
+  "anchor": "Q172822",
+  "anchor_source": "wikidata",
+  "steps": [
+   "circle of radius 1 km"
+  ],
+  "confidence": "medium",
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've built Area 1: a 1 km radius circle (about 3.14 km²) centred on the Hoover Dam on the Colorado River, on the Nevada–Arizona border. The dam was matched by name and type in Wikidata, and OpenStreetMap's dam point agrees within about 200 m, so confidence is medium. The circle lies about 9.4 km from Boulder City.\n\nIs this the circle you meant?",
+  "usage": {
+   "input_tokens": 21046,
+   "output_tokens": 606
+  },
+  "seconds": 5,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Hoover Dam"
+    },
+    "n": 8
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C4",
+     "shape": "circle",
+     "radius_km": 1,
+     "words": "A 1 km circle centred on the Hoover Dam",
+     "match": "name_and_type",
+     "reason": "Wikidata item Q172822 is the Hoover Dam, an arch-gravity hydroelectric dam on the Colorado River; OpenStreetMap's dam point (C1) agrees within about 200 m."
+    }
+   }
+  ]
+ },
+ {
+  "case": "kilimanjaro-rectangle",
+  "words": "A rectangle 10 km east–west by 4 km north–south centred on the summit of Kilimanjaro",
+  "placed": true,
+  "shape": "Polygon",
+  "iou": 0.978,
+  "centre_error_km": 0.043,
+  "area_ratio": 1,
+  "anchor": "Uhuru Peak",
+  "anchor_source": "wikidata",
+  "steps": [
+   "rectangle 10 × 4 km"
+  ],
+  "confidence": "medium",
+  "offered_choices": 0,
+  "chose_recommended": false,
+  "text": "I've built Area 1: a 10 km east–west by 4 km north–south rectangle (40 km²) centred on Uhuru Peak, the highest point of Kibo, which is the summit of Kilimanjaro. It sits in Tanzania, about 29 km from Moshi. Confidence is medium, since the peak was matched by name and type but there was no distance check to test it against.\n\nIs Uhuru Peak the summit you meant, or did you want a different point on the mountain?",
+  "usage": {
+   "input_tokens": 29399,
+   "output_tokens": 841
+  },
+  "seconds": 7,
+  "tools": [
+   {
+    "name": "load_skill",
+    "input": {
+     "name": "place-finding"
+    }
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Kilimanjaro"
+    },
+    "n": 5
+   },
+   {
+    "name": "find_place",
+    "input": {
+     "query": "Uhuru Peak",
+     "near": "C3"
+    },
+    "n": 3
+   },
+   {
+    "name": "make_place",
+    "input": {
+     "anchor": "C7",
+     "shape": "rectangle",
+     "width_km": 10,
+     "height_km": 4,
+     "words": "A rectangle 10 km east–west by 4 km north–south centred on the summit of Kilimanjaro",
+     "match": "name_and_type",
+     "reason": "Summit taken as Uhuru Peak, the highest point of Kibo (Wikidata, CC0), the summit of Mount Kilimanjaro."
+    }
+   }
+  ]
+ }
+]

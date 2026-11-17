@@ -1,0 +1,63 @@
+{
+ "label": "pf-v4-areas",
+ "set": "areas",
+ "model": "claude-haiku-5-5",
+ "skill_version": "4.2",
+ "created": "2026-11-16T23:54:58.177Z",
+ "cases": 8,
+ "placed": 8,
+ "overpass_reachable_at_start": false,
+ "atlas_reachable_at_start": true,
+ "iou_at_least_0_8": 8,
+ "mean_iou": 0.988,
+ "per_case": [
+  {
+   "case": "jackdaw-square",
+   "iou": 1,
+   "centre_error_km": 0,
+   "area_ratio": 1
+  },
+  {
+   "case": "block-30-2",
+   "iou": 1,
+   "centre_error_km": 0,
+   "area_ratio": 1
+  },
+  {
+   "case": "brent-field",
+   "iou": 1,
+   "centre_error_km": 0,
+   "area_ratio": 1
+  },
+  {
+   "case": "forties-offset",
+   "iou": 1,
+   "centre_error_km": 0,
+   "area_ratio": 1
+  },
+  {
+   "case": "linlithgow-palace",
+   "iou": 0.972,
+   "centre_error_km": 0.111,
+   "area_ratio": 1
+  },
+  {
+   "case": "edinburgh-castle",
+   "iou": 0.979,
+   "centre_error_km": 0.034,
+   "area_ratio": 1
+  },
+  {
+   "case": "hoover-dam",
+   "iou": 0.975,
+   "centre_error_km": 0.02,
+   "area_ratio": 1
+  },
+  {
+   "case": "kilimanjaro-rectangle",
+   "iou": 0.978,
+   "centre_error_km": 0.043,
+   "area_ratio": 1
+  }
+ ]
+}
