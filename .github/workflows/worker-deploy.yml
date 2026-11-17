@@ -30,7 +30,9 @@ jobs:
           ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}"
           FIRMS_MAP_KEY: "${{ secrets.FIRMS_MAP_KEY }}"
         run: |
-          jq -n '{ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY, ATLAS_MCP_KEY: env.ATLAS_MCP_KEY, FIRMS_MAP_KEY: env.FIRMS_MAP_KEY}' > /tmp/secrets.json
+          # Only secrets that are set in the repo: an empty one would overwrite a key set some other way.
+          jq -n '{ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY, ATLAS_MCP_KEY: env.ATLAS_MCP_KEY, FIRMS_MAP_KEY: env.FIRMS_MAP_KEY} | with_entries(select(.value != ""))' > /tmp/secrets.json
+          echo "Loading: $(jq -r 'keys | join(", ")' /tmp/secrets.json)"
           npx wrangler secret bulk /tmp/secrets.json
           rm /tmp/secrets.json
       - name: Check it live
