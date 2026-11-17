@@ -4,6 +4,25 @@ Tobler and the atlas are worked on in separate chats (decided 17 Nov). Tobler do
 What Tobler can rely on is written down in the atlas repo's `docs/mcp-tools.md`. When Tobler needs something
 new from the atlas, add it here (newest first), tell Rob, and he passes it to the atlas chat.
 
+- **17 Nov (late evening), URGENT: `fetch_features` says "No dataset with id …" for ids that `find_datasets`
+  and `get_dataset` return.** Seen from GitHub Actions at about 20:30 UTC: `get_dataset {"id":"4611b4343153c1b9"}`
+  (NatureScot, 30 x 30 Protected Areas) answers, but `fetch_features` with the same id and a bbox near Linlithgow
+  fails with "No dataset with id 4611b4343153c1b9". Same for SEPA river flooding (ce6e59e44174bf68), Historic
+  Environment Scotland Scheduled Monuments (25ffbbeec3836e1a), Hutton land capability (bd18c4d31d168bf4) and others.
+  Earlier the same evening `fetch_features` worked for NOAA layers (9383353f552e9482). Reading `worker/src/index.js`,
+  `fetchFeatures` looks the id up in the published shards (`DATA_BASE` + `d/<first two chars>.json`) while
+  `find_datasets` and `get_dataset` read D1, so a rebuild that's in D1 but not yet in the shards (or the other way
+  round) would do this. Asks: (1) make the two agree (or have `fetch_features` fall back to D1); (2) note in
+  `docs/mcp-tools.md` that ids from `find_datasets` are always fetchable. Tobler reports these as "not checked", so
+  nothing is wrong on screen, but most screens come back mostly not checked until it's fixed.
+- **17 Nov (late evening): NASA FIRMS and other trusted global services.** Tobler now calls NASA FIRMS (VIIRS and
+  MODIS thermal hotspots, open under NASA's data policy, free MAP_KEY) through its own Worker, because the atlas holds
+  only Esri's copy (Esri Master License Agreement) and a regional Alaska service. Longer term it would be better in
+  the atlas: (1) catalogue key-gated services like FIRMS, with the key held server-side; (2) a "trusted global
+  service" tier for publishers such as NASA, ESA/Copernicus, NOAA, USGS, UNEP-WCMC, GEBCO, EMODnet, FAO, so agents
+  can ask for them first; (3) prefer a publisher's own service over an Esri Living Atlas copy (e.g. NOAA's own
+  Essential Fish Habitat services, if they exist, over Esri's copies), and record the Esri Master License Agreement
+  as its own licence class, since Tobler leaves those out unless the person holds an Esri licence.
 - **17 Nov (evening): catalogue text search that copes with world-wide searches.** Tobler is adding an open
   "find data" tool for its analyst, built on `find_datasets` with `text` (e.g. "VIIRS", "thermal", "essential fish
   habitat") and an area that can be large (an ocean, a country, sometimes the world). In a test from GitHub Actions,

@@ -30,6 +30,8 @@ const SEAS = {
   "santos basin": box("the Santos Basin", [-49, -28, -40, -22]), "campos basin": box("the Campos Basin", [-42.5, -24, -39, -20.5]),
 };
 
+const GENERIC_WORDS = /^(the|of|a|an|platform|platforms|field|fields|block|blocks|licen[cs]e|lease|mine|mines|farm|wind|solar|offshore|onshore|oil|gas|plant|power|station|project|site|terminal|port|harbour|harbor|tlp|spar|fpso|installation|facility|development|area|park|reserve)$/i;
+
 const round = (v, d = 3) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
 
 export function placeToolDefs(skills) {
@@ -246,7 +248,12 @@ export function createPlaceTools(host) {
         searchNominatim(q, { near: nearAt, country, fetchFn: host.fetchFn, headers: host.headers }),
         searchWikidata(q, { fetchFn: host.fetchFn, headers: host.headers }),
       ]);
-      const [atlas, ...byName] = await Promise.all([kind ? searchCatalogue(names, kind, area, nearAt) : null, ...names.map(perName)]);
+      // The catalogue also gets the name without words that describe the kind of thing ("Mars platform" → "Mars"),
+      // because a publisher's record rarely repeats them ("A-Mars TLP"; Mars missed on 17 Nov when the analyst
+      // didn't happen to try "Mars TLP").
+      const core = (n) => n.split(/\s+/).filter((w) => !GENERIC_WORDS.test(w)).join(" ").trim();
+      const catalogueNames = [...new Set([...names, ...names.map(core).filter((c) => c && c.length >= 3)])].slice(0, 6);
+      const [atlas, ...byName] = await Promise.all([kind ? searchCatalogue(catalogueNames, kind, area, nearAt) : null, ...names.map(perName)]);
       const anchors = [], others = [];
       byName.forEach(([an, nom, wd], i) => {
         const q = names[i];
