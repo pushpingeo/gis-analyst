@@ -335,7 +335,8 @@ await test("a named licence block is found by searching the catalogue's layers f
   assert.match(c.source, /licence blocks/);
   assert.ok(c.area_km2 > 0, "comes with its outline");
   assert.equal(r.atlas.found, 1, "1450 isn't 145; the well point is the wrong geometry");
-  assert.ok(r.atlas.layers_checked.some((x) => /wrong geometry/.test(x)));
+  assert.equal(r.atlas.layers_checked.skipped_wrong_geometry, 1);
+  assert.equal(r.atlas.layers_checked.asked, 2);
   assert.match(r.atlas.searched, /Nigeria and its waters/);
 });
 
@@ -371,6 +372,30 @@ await test("a road search skips junction-point layers and keeps going until it f
   assert.equal(asked[0], "lines", "line layer asked before junction layers");
   const atl = out.sources.find((s) => s.source === "AI Living World Atlas");
   assert.ok(atl.found >= 1);
+});
+
+await test("lookups in one step run at the same time; map changes run after them, in order", async () => {
+  const { runTurn } = await import("../js/converse.js");
+  const log = [];
+  let round = 0;
+  const callClaude = async () => (round++ === 0
+    ? { stop_reason: "tool_use", content: [
+      { type: "tool_use", id: "a", name: "find_place", input: { query: "A" } },
+      { type: "tool_use", id: "m", name: "make_place", input: {} },
+      { type: "tool_use", id: "b", name: "find_place", input: { query: "B" } }] }
+    : { stop_reason: "end_turn", content: [{ type: "text", text: "done" }] });
+  const exec = async (name, input) => {
+    log.push(`start ${name} ${input.query || ""}`.trim());
+    await new Promise((ok) => setTimeout(ok, name === "find_place" ? 50 : 1));
+    log.push(`end ${name} ${input.query || ""}`.trim());
+    return { ok: true };
+  };
+  const t0 = Date.now();
+  const r = await runTurn({ system: "s", messages: [{ role: "user", content: "x" }], tools: [], exec, callClaude });
+  assert.ok(Date.now() - t0 < 95, "two 50 ms searches overlapped");
+  assert.deepEqual(log.slice(0, 2), ["start find_place A", "start find_place B"]);
+  assert.equal(log.indexOf("start make_place") > log.indexOf("end find_place B"), true);
+  assert.deepEqual(r.history[2].content.map((x) => x.tool_use_id), ["a", "m", "b"], "results in the order asked");
 });
 
 console.log(`${passed} place tests passed`);

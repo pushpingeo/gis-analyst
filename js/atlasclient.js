@@ -4,7 +4,22 @@
 import { CONFIG } from "./config.js";
 
 let unavailable = null;
+// Answers are remembered for the session, so a follow-up ("make it 5 km") doesn't ask the same servers again.
+// Failures aren't remembered. The atlas is rebuilt now and then, but not within a session that matters.
+const memory = new Map();
+const MEMORY_MAX = 400;
+
 export async function atlasViaWorker(tool, args) {
+  const key = `${tool}|${JSON.stringify(args)}`;
+  if (memory.has(key)) return memory.get(key);
+  const p = callWorker(tool, args);
+  memory.set(key, p);
+  p.catch(() => memory.delete(key));
+  if (memory.size > MEMORY_MAX) memory.delete(memory.keys().next().value);
+  return p;
+}
+
+async function callWorker(tool, args) {
   if (unavailable) throw new Error(unavailable);
   let r;
   // One retry after a short random pause: when ten layers are asked at once, a few calls can fail at the Worker.

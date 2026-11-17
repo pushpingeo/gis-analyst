@@ -24,6 +24,7 @@ export function placeToolDefs(skills) {
         type: "object",
         properties: {
           query: { type: "string", description: "The name or reference to search for, e.g. 'Jackdaw', 'Mocuba', '30/2', 'OML 145', 'Lake Turkana'" },
+          also: { type: "array", items: { type: "string" }, maxItems: 3, description: "Optional: up to three other spellings or forms searched at the same time, e.g. ['Tasiast mine', 'Tasiast gold'] or ['Oil Mining Lease 145']. Cheaper than separate calls." },
           near: { type: "string", description: "Optional: a candidate id or place name to search near" },
           country: { type: "string", description: "Optional ISO 3166 two-letter country code to restrict OpenStreetMap results" },
           kind: { type: "string", enum: Object.keys(NAMED_KINDS), description: "Optional: what kind of thing it is, to search the atlas catalogue for it" },
@@ -168,12 +169,12 @@ export function createPlaceTools(host) {
     return null;
   }
 
-  async function searchCatalogue(query, kind, area, nearAt) {
+  async function searchCatalogue(names, kind, area, nearAt) {
     if (!host.atlas) return { report: { not_checked: "The atlas isn't connected here." } };
     const where = await catalogueArea(area, nearAt);
     if (!where) return { report: { not_checked: `"${area}" isn't a country, candidate or place, and there's no map view: find the area first.` } };
     try {
-      const r = await atlasFindNamed(query, kind, where.bbox, { call: host.atlas });
+      const r = await atlasFindNamed(names, kind, where.bbox, { call: host.atlas });
       return { candidates: r.candidates, report: {
         searched: `${kind} layers covering ${where.label}`, found: r.candidates.length,
         layers_checked: describeChecked(r.checked), layers_found: r.layers_found,
@@ -190,30 +191,40 @@ export function createPlaceTools(host) {
       return { skill: name, method: host.skillText(name) };
     },
 
-    async find_place({ query, near, country, kind, area }) {
+    async find_place({ query, also = [], near, country, kind, area }) {
       // "near" is a hint: if it isn't a candidate or place yet, search without it rather than fail the call.
       let nearAt = null, nearNote = null;
       if (near) { try { nearAt = resolve(near).lonlat; } catch { nearNote = `"${near}" isn't a candidate id or place yet, so the search wasn't narrowed to it. Find it first if you need it.`; } }
-      const results = [];
+      const names = [...new Set([query, ...(Array.isArray(also) ? also : [])].map((x) => String(x || "").trim()).filter(Boolean))].slice(0, 4);
       const errors = [];
-      // All sources at once; results keep this order (authoritative layers first).
-      const [an, nom, wd] = await Promise.allSettled([
-        searchAnchors(host.anchors, query, { near: nearAt, fetchFn: host.fetchFn }),
-        searchNominatim(query, { near: nearAt, country, fetchFn: host.fetchFn, headers: host.headers }),
-        searchWikidata(query, { fetchFn: host.fetchFn, headers: host.headers }),
+      // Every source and every spelling at once, the catalogue too; results keep this order (authoritative first).
+      const perName = (q) => Promise.allSettled([
+        searchAnchors(host.anchors, q, { near: nearAt, fetchFn: host.fetchFn }),
+        searchNominatim(q, { near: nearAt, country, fetchFn: host.fetchFn, headers: host.headers }),
+        searchWikidata(q, { fetchFn: host.fetchFn, headers: host.headers }),
       ]);
-      if (an.status === "fulfilled") for (const a of an.value) (a.error ? errors.push(a.error) : results.push(a));
-      if (nom.status === "fulfilled") results.push(...nom.value); else errors.push(`OpenStreetMap search: ${nom.reason?.message}`);
-      if (wd.status === "fulfilled") results.push(...wd.value); else errors.push(`Wikidata search: ${wd.reason?.message}`);
-      try { results.push(...searchNaturalEarth(await host.ref.get("places"), query)); } catch { /* reference not loaded */ }
-      const atlas = kind ? await searchCatalogue(query, kind, area, nearAt) : null;
-      if (atlas?.candidates?.length) results.unshift(...atlas.candidates);
+      const [atlas, ...byName] = await Promise.all([kind ? searchCatalogue(names, kind, area, nearAt) : null, ...names.map(perName)]);
+      const anchors = [], others = [];
+      byName.forEach(([an, nom, wd], i) => {
+        const q = names[i];
+        if (an.status === "fulfilled") for (const x of an.value) (x.error ? errors.push(x.error) : anchors.push(x));
+        if (nom.status === "fulfilled") others.push(...nom.value); else errors.push(`OpenStreetMap search for "${q}": ${nom.reason?.message}`);
+        if (wd.status === "fulfilled") others.push(...wd.value); else errors.push(`Wikidata search for "${q}": ${wd.reason?.message}`);
+      });
+      try { const pl = await host.ref.get("places"); for (const q of names) others.push(...searchNaturalEarth(pl, q)); } catch { /* reference not loaded */ }
+      // The same feature found under two spellings comes once.
+      const seen = new Set();
+      const results = [...(atlas?.candidates || []), ...anchors, ...others].filter((c) => {
+        const k = `${c.source?.id}|${c.source?.url || c.source?.atlas_id || ""}|${(c.name || "").toLowerCase()}|${c.lonlat.map((v) => v.toFixed(3))}`;
+        if (seen.has(k)) return false; seen.add(k); return true;
+      });
       const list = results.map((c) => {
         if (nearAt) { c.distance_km = round(turf.distance(nearAt, c.lonlat), 1); c.bearing = Math.round((turf.bearing(nearAt, c.lonlat) + 360) % 360); }
         return cands.get(keep(c));
       });
       host.onCandidates?.(list);
-      return { query, candidates: list.slice(0, 12).map(compact), ...(atlas ? { atlas: atlas.report } : {}), ...(errors.length ? { problems: errors } : {}), ...(nearNote ? { near_ignored: nearNote } : {}),
+      return { searched_for: names, candidates: list.slice(0, 12).map(compact), ...(list.length > 12 ? { more_candidates: list.length - 12 } : {}),
+        ...(atlas ? { atlas: atlas.report } : {}), ...(errors.length ? { problems: [...new Set(errors)] } : {}), ...(nearNote ? { near_ignored: nearNote } : {}),
         note: list.length ? undefined : "Nothing found. Try another spelling, a shorter name, or the nearest town and find_features_near." };
     },
 

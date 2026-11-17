@@ -18,6 +18,7 @@ for (const s of JSON.parse(process.env.SEARCHES || "[]")) {
     const r = s[0] === "named" ? await atlasFindNamed(s[1], s[2], s[3], { call: atlasCall }) : await atlasFeaturesNear(s[1], s[2], s[3], { call: atlasCall, name: s[4] });
     console.log(`\n>>> ${JSON.stringify(s)} in ${((Date.now() - t0) / 1000).toFixed(1)} s\nfound ${r.candidates.length}; layers found ${r.layers_found ?? r.datasets_found}; not checked ${r.layers_not_checked}`);
     for (const c of r.candidates.slice(0, 8)) console.log(`  * ${c.name} | ${c.type} | ${c.source.title} (${c.source.publisher}) | ${c.geometry.type} ${c.area_km2 ?? c.length_km ?? ""}`);
-    for (const l of describeChecked(r.checked)) console.log(`  - ${l}`);
+    console.log(`  summary: ${JSON.stringify(describeChecked(r.checked))}`);
+    for (const x of r.checked) console.log(`  - ${x.dataset} (${x.publisher}): ${x.error || (x.kept ?? x.returned)}`);
   } catch (e) { console.log(`\n>>> ${JSON.stringify(s)}\nERROR ${e.stack}`); }
 }

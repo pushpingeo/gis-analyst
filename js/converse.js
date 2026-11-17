@@ -16,6 +16,7 @@ export function systemPrompt({ skills, comingSoon = [], loaded = [] }) {
 How you work:
 - Each message starts with a <project> summary listing the places on the map (with how they were made and any edits). That summary is the current truth; the map may have changed since earlier messages.
 - ${FENCE_RULE}
+- When you need several searches that don't depend on each other (a name in a few spellings, the asset and the town it's described from), ask for them in the same step: they run at the same time.
 - Use skills for methods. Load the relevant skill with load_skill before doing that kind of work, then follow it.
 - Never work out coordinates, areas or distances in your head. Tools find places and build shapes; you choose the tool and the numbers and explain why.
 - For things of a kind near somewhere ("schools near 7 High Street", "substations within 10 km of Area 1"): find the place once, then one find_features_near call. Don't search for a kind of thing by name.
@@ -56,6 +57,9 @@ export function buildMessages({ recent = [], summary, userText }) {
 }
 
 // One turn. Throws on failure so the caller can roll back and leave no half exchange behind.
+// Tools that only look things up, so several can run at once.
+export const READ_ONLY = new Set(["load_skill", "find_place", "find_features_near", "get_place"]);
+
 export async function runTurn({ system, messages, tools, exec, callClaude, onEvent = () => {}, maxRounds = 10 }) {
   const history = messages.map((m) => ({ ...m }));
   const usage = { input_tokens: 0, output_tokens: 0 };
@@ -70,18 +74,23 @@ export async function runTurn({ system, messages, tools, exec, callClaude, onEve
     if (resp.stop_reason === "max_tokens") { onEvent({ type: "warning", message: "The reply hit the length limit." }); break; }
     const uses = resp.content.filter((b) => b.type === "tool_use");
     if (resp.stop_reason !== "tool_use" || !uses.length) break;
-    const results = [];
-    for (const u of uses) {
+    // Searches and lookups in one step run at once; tools that change the map run in order, after them.
+    const run1 = async (u) => {
       onEvent({ type: "tool_start", name: u.name, input: u.input });
       try {
         const out = await exec(u.name, u.input || {});
         onEvent({ type: "tool", name: u.name, input: u.input, output: out });
-        results.push({ type: "tool_result", tool_use_id: u.id, content: toolResultText(out) });
+        return { type: "tool_result", tool_use_id: u.id, content: toolResultText(out) };
       } catch (e) {
         onEvent({ type: "tool", name: u.name, input: u.input, error: e.message });
-        results.push({ type: "tool_result", tool_use_id: u.id, is_error: true, content: clean(String(e.message)) });
+        return { type: "tool_result", tool_use_id: u.id, is_error: true, content: clean(String(e.message)) };
       }
-    }
+    };
+    const byId = new Map();
+    const parallel = uses.filter((u) => READ_ONLY.has(u.name));
+    (await Promise.all(parallel.map(run1))).forEach((r, i) => byId.set(parallel[i].id, r));
+    for (const u of uses) if (!READ_ONLY.has(u.name)) byId.set(u.id, await run1(u));
+    const results = uses.map((u) => byId.get(u.id));
     history.push({ role: "user", content: results });
     if (round === maxRounds - 1) onEvent({ type: "warning", message: "Stopped after the maximum number of steps." });
   }

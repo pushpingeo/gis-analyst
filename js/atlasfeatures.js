@@ -112,7 +112,7 @@ export function geometryFits(geometry, geom) {
 
 // Ask layers in batches until there's enough or the time runs out. ask(d) → { returned, kept, wrong_geometry } or throws.
 // Returns the checked list and how many layers were left unasked.
-async function askInBatches(layers, ask, { first = 10, then = 10, max = 40, budgetMs = 30000, enough = () => false } = {}) {
+async function askInBatches(layers, ask, { first = 10, then = 10, max = 40, budgetMs = 30000, layerMs = 8000, enough = () => false } = {}) {
   const t0 = Date.now();
   const checked = [];
   let i = 0;
@@ -120,9 +120,15 @@ async function askInBatches(layers, ask, { first = 10, then = 10, max = 40, budg
     const size = i === 0 ? first : then;
     const batch = layers.slice(i, Math.min(i + size, max));
     i += batch.length;
+    // Each layer gets layerMs: a slow server is reported as too slow rather than holding up the batch.
+    // Whatever it sends later is ignored (late), so results don't change after the reply has gone.
     await Promise.all(batch.map(async (d) => {
-      try { checked.push({ dataset: d.title, publisher: d.publisher, ...(await ask(d)) }); }
-      catch (e) { checked.push({ dataset: d.title, publisher: d.publisher, error: String(e.message || e).slice(0, 120) }); }
+      let late = false;
+      const timer = new Promise((ok) => setTimeout(() => { late = true; ok("late"); }, layerMs));
+      try {
+        const r = await Promise.race([ask(d, () => late), timer]);
+        checked.push(r === "late" ? { dataset: d.title, publisher: d.publisher, error: `too slow (no answer in ${layerMs / 1000} s)`, slow: true } : { dataset: d.title, publisher: d.publisher, ...r });
+      } catch (e) { checked.push({ dataset: d.title, publisher: d.publisher, error: String(e.message || e).slice(0, 120) }); }
     }));
     if (enough() || Date.now() - t0 > budgetMs) break;
   }
@@ -138,8 +144,23 @@ function atlasCandidate(f, d, name) {
   });
 }
 
-const checkedLine = (x) => `${x.dataset} (${x.publisher})${x.error ? ": failed" : `: ${x.kept ?? x.returned}${x.wrong_geometry ? ` (${x.wrong_geometry} of the wrong geometry skipped)` : ""}`}`;
-export const describeChecked = (list) => list.map(checkedLine);
+// What the model is told about the layers asked: the ones that found something by name, the failures by name
+// (a few), the rest as counts. The full list stays in the trace for the person; the model doesn't need it.
+const label = (x) => `${x.dataset} (${x.publisher})`;
+export function describeChecked(list) {
+  const hits = list.filter((x) => !x.error && (x.kept ?? x.returned) > 0);
+  const failed = list.filter((x) => x.error && !x.slow);
+  const slow = list.filter((x) => x.slow);
+  const wrong = list.reduce((n, x) => n + (x.wrong_geometry || 0), 0);
+  return {
+    asked: list.length,
+    found_in: hits.map((x) => `${label(x)}: ${x.kept ?? x.returned}`),
+    nothing_in: list.length - hits.length - failed.length - slow.length,
+    ...(failed.length ? { failed: failed.slice(0, 5).map(label), ...(failed.length > 5 ? { more_failed: failed.length - 5 } : {}) } : {}),
+    ...(slow.length ? { too_slow: slow.length } : {}),
+    ...(wrong ? { skipped_wrong_geometry: wrong } : {}),
+  };
+}
 
 // call(tool, args) → structuredContent. Returns { candidates, total, checked: [ { dataset, publisher, returned | error } ] }.
 export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, name = null, limit = 15, maxDatasets = 20, budgetMs = 30000 } = {}) {
@@ -151,8 +172,9 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
   const { layers, unlisted } = pickLayers(finds, { geom: map.geom });
   const cands = [];
   let fitting = 0;
-  const ask = async (d) => {
+  const ask = async (d, isLate) => {
     const g = await call("fetch_features", { id: d.id, lon: lonlat[0], lat: lonlat[1], radius_km: r, limit: 100, ...(name ? { text: name } : {}) });
+    if (isLate()) return null;
     let kept = 0, wrong = 0;
     for (const f of g.features || []) {
       if (!f.geometry) continue;
@@ -231,29 +253,38 @@ const serverText = (name) => {
   return (w.filter((x) => /\d/.test(x)).sort((a, b) => b.length - a.length)[0]) || w.sort((a, b) => b.length - a.length)[0] || name;
 };
 
-// bbox: [w, s, e, n]. Returns { candidates, checked, layers_found, layers_not_checked }.
-export async function atlasFindNamed(name, kind, bbox, { call, limit = 8, max = 40, budgetMs = 30000 } = {}) {
+// names: one name or several spellings of it. bbox: [w, s, e, n]. Returns { candidates, checked, layers_found, layers_not_checked }.
+export async function atlasFindNamed(names, kind, bbox, { call, limit = 8, max = 40, budgetMs = 25000, layerMs = 8000 } = {}) {
   const k = NAMED_KINDS[kind];
   if (!k) throw new Error(`Unknown kind. Use one of: ${Object.keys(NAMED_KINDS).join(", ")}.`);
+  names = (Array.isArray(names) ? names : [names]).filter(Boolean);
   const finds = await Promise.all(k.concepts.map((concept) =>
     call("find_datasets", { bbox, concept, capability: "query", limit: 100, ...serverGeometry(k.geom) }).catch(() => ({ results: [] }))));
   const { layers, unlisted } = pickLayers(finds, { geom: k.geom, titles: k.titles });
   const cands = [];
-  const text = serverText(name);
-  const ask = async (d) => {
-    const g = await call("fetch_features", { id: d.id, bbox, limit: 50, text });
-    let kept = 0, wrong = 0;
-    for (const f of g.features || []) {
-      if (!f.geometry || !nameMatches(f.properties || {}, name)) continue;
-      if (!geometryFits(f.geometry, k.geom)) { wrong++; continue; }
-      let c;
-      try { c = atlasCandidate(f, d, pickName(f.properties || {}) || name); } catch { continue; }
-      c.extra = Object.fromEntries(Object.entries(f.properties || {}).filter(([, v]) => (typeof v === "string" && v.trim() && v.length < 80) || typeof v === "number").slice(0, 8));
-      cands.push(c); kept++;
+  // One server-side search per distinct distinctive word ("145" serves both "OML 145" and "Oil Mining Lease 145").
+  const texts = [...new Set(names.map(serverText))];
+  const ask = async (d, isLate) => {
+    const got = await Promise.all(texts.map((text) => call("fetch_features", { id: d.id, bbox, limit: 50, text })));
+    if (isLate()) return null;
+    let kept = 0, wrong = 0, returned = 0;
+    const seenHere = new Set();
+    for (const g of got) {
+      returned += g.returned || 0;
+      for (const f of g.features || []) {
+        const key = JSON.stringify(f.properties || {});
+        if (!f.geometry || seenHere.has(key) || !names.some((n) => nameMatches(f.properties || {}, n))) continue;
+        seenHere.add(key);
+        if (!geometryFits(f.geometry, k.geom)) { wrong++; continue; }
+        let c;
+        try { c = atlasCandidate(f, d, pickName(f.properties || {}) || names[0]); } catch { continue; }
+        c.extra = Object.fromEntries(Object.entries(f.properties || {}).filter(([, v]) => (typeof v === "string" && v.trim() && v.length < 80) || typeof v === "number").slice(0, 8));
+        cands.push(c); kept++;
+      }
     }
-    return { returned: g.returned, kept, ...(wrong ? { wrong_geometry: wrong } : {}) };
+    return { returned, kept, ...(wrong ? { wrong_geometry: wrong } : {}) };
   };
-  const { checked, unasked } = await askInBatches(layers, ask, { first: 10, then: 10, max, budgetMs, enough: () => cands.length > 0 });
+  const { checked, unasked } = await askInBatches(layers, ask, { first: 10, then: 10, max, budgetMs, layerMs, enough: () => cands.length > 0 });
   // Layers whose titles fit the kind come first, so a match there outranks one from an unrelated layer.
   const off = (c) => (k.titles && !k.titles.test(c.source.title) ? 1 : 0);
   cands.sort((a, b) => off(a) - off(b) || authorityRank(a.source) - authorityRank(b.source));

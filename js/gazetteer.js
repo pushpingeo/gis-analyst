@@ -104,16 +104,24 @@ export async function searchAnchors(sources, term, { near = null, fetchFn = fetc
 // ---- OpenStreetMap: Nominatim ------------------------------------------------------------
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 let lastNominatim = 0;
+let nominatimQueue = Promise.resolve();
+// Nominatim's policy is at most one request a second. Searches can run side by side, so they queue here.
+function nominatimSlot() {
+  const slot = nominatimQueue.then(async () => {
+    const wait = lastNominatim + 1100 - Date.now();
+    if (wait > 0) await new Promise((ok) => setTimeout(ok, wait));
+    lastNominatim = Date.now();
+  });
+  nominatimQueue = slot.catch(() => {});
+  return slot;
+}
 
 export async function searchNominatim(term, { near = null, country = null, fetchFn = fetch, limit = 6, headers = {} } = {}) {
   const q = new URLSearchParams({ q: term, format: "jsonv2", limit: String(limit), polygon_geojson: "1", polygon_threshold: "0.0005", addressdetails: "1" });
   if (country) q.set("countrycodes", country.toLowerCase());
   if (near) q.set("viewbox", [near[0] - 1, near[1] + 1, near[0] + 1, near[1] - 1].join(","));
   const j = await remembered(`nominatim:${q}`, async () => {
-    // Nominatim's policy is at most one request a second.
-    const wait = lastNominatim + 1100 - Date.now();
-    if (wait > 0) await new Promise((ok) => setTimeout(ok, wait));
-    lastNominatim = Date.now();
+    await nominatimSlot();
     const r = await fetchFn(`${NOMINATIM}?${q}`, { headers });
     if (!r.ok) throw new Error(`Nominatim ${r.status}`);
     return r.json();
@@ -198,9 +206,7 @@ async function nearViaNominatim(lonlat, featureType, radiusKm, { fetchFn, header
   for (const q of ph.q) {
     const params = new URLSearchParams({ q, format: "jsonv2", limit: "40", viewbox: box, bounded: "1" });
     const j = await remembered(`nominatim:${params}`, async () => {
-      const wait = lastNominatim + 1100 - Date.now();
-      if (wait > 0) await new Promise((ok) => setTimeout(ok, wait));
-      lastNominatim = Date.now();
+      await nominatimSlot();
       const r = await fetchFn(`${NOMINATIM}?${params}`, { headers });
       if (!r.ok) throw new Error(`Nominatim ${r.status}`);
       return r.json();
@@ -237,7 +243,15 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
   const atlasP = atlas && ATLAS_CONCEPTS[featureType]
     ? atlasFeaturesNear(lonlat, featureType, radiusKm, { call: atlas, name, limit })
     : Promise.resolve(null);
-  const [osm, at] = await Promise.allSettled([osmP, atlasP]);
+  // Once the atlas has found something, OpenStreetMap gets 3 more seconds, not its full 15: when Overpass is
+  // struggling, waiting it out was most of a search's time.
+  const GRACE = 3000;
+  const graceP = atlasP.then((v) => (v?.candidates?.length ? new Promise((ok) => setTimeout(() => ok("grace"), GRACE)) : new Promise(() => {})), () => new Promise(() => {}));
+  const osmOrGrace = Promise.race([osmP, graceP]).then((v) => {
+    if (v === "grace") throw new Error(`OpenStreetMap was still searching ${GRACE / 1000} s after the atlas answered, so it was skipped to save time`);
+    return v;
+  });
+  const [osm, at] = await Promise.allSettled([osmOrGrace, atlasP]);
   const sources = [];
   const cands = [];
   if (at.status === "fulfilled" && at.value) {
