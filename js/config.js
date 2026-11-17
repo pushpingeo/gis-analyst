@@ -1,7 +1,8 @@
 // Settings for the agent page.
 export const CONFIG = {
-  // Same Cloudflare Worker as demo 1: it holds the API key, pins the model and limits use per visitor.
-  proxyUrl: "https://north-sea-geo-demo.robdunfey.workers.dev",
+  // Tobler's own Cloudflare Worker (worker/): holds the keys, pins the model, limits use per visitor.
+  // To switch back to demo 1's Worker: "https://north-sea-geo-demo.robdunfey.workers.dev".
+  proxyUrl: "https://tobler-api.robdunfey.workers.dev",
   model: "claude-haiku-5-5",
   maxTokens: 8000,
   maxRounds: 10,
