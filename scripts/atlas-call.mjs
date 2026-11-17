@@ -10,3 +10,14 @@ for (const u of JSON.parse(process.env.URLS || "[]")) {
   try { const r = await fetch(u, { signal: AbortSignal.timeout(25000) }); console.log(`\n>>> GET ${u}\n${r.status} ${(await r.text()).slice(0, 3000)}`); }
   catch (e) { console.log(`\n>>> GET ${u}\nERROR ${e.message}`); }
 }
+// Run Tobler's own searches against the real atlas: SEARCHES = [["named", name, kind, bbox], ["near", [lon,lat], type, km, name]].
+const { atlasFindNamed, atlasFeaturesNear, describeChecked } = await import("../js/atlasfeatures.js");
+for (const s of JSON.parse(process.env.SEARCHES || "[]")) {
+  const t0 = Date.now();
+  try {
+    const r = s[0] === "named" ? await atlasFindNamed(s[1], s[2], s[3], { call: atlasCall }) : await atlasFeaturesNear(s[1], s[2], s[3], { call: atlasCall, name: s[4] });
+    console.log(`\n>>> ${JSON.stringify(s)} in ${((Date.now() - t0) / 1000).toFixed(1)} s\nfound ${r.candidates.length}; layers found ${r.layers_found ?? r.datasets_found}; not checked ${r.layers_not_checked}`);
+    for (const c of r.candidates.slice(0, 8)) console.log(`  * ${c.name} | ${c.type} | ${c.source.title} (${c.source.publisher}) | ${c.geometry.type} ${c.area_km2 ?? c.length_km ?? ""}`);
+    for (const l of describeChecked(r.checked)) console.log(`  - ${l}`);
+  } catch (e) { console.log(`\n>>> ${JSON.stringify(s)}\nERROR ${e.stack}`); }
+}
