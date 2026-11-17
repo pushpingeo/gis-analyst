@@ -62,16 +62,23 @@ export function edgeDistanceKm(lonlat, geometry) {
 }
 
 // call(tool, args) → structuredContent. Returns { candidates, total, checked: [ { dataset, publisher, returned | error } ] }.
-export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, name = null, limit = 15, maxDatasets = 16 } = {}) {
+export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, name = null, limit = 15, maxDatasets = 20 } = {}) {
   const map = ATLAS_CONCEPTS[featureType];
   if (!map) return null; // not a kind of thing the atlas indexes; OpenStreetMap only
   const r = Math.min(Math.max(radiusKm, 0.5), 50);
   const finds = await Promise.all([map.concept, map.also].filter(Boolean).map((concept) =>
-    call("find_datasets", { lon: lonlat[0], lat: lonlat[1], radius_km: r, concept, capability: "query", limit: 30 }).catch(() => ({ results: [] }))));
+    call("find_datasets", { lon: lonlat[0], lat: lonlat[1], radius_km: r, concept, capability: "query", limit: 100 }).catch(() => ({ results: [] }))));
   // Layers flagged with a possibly overstated extent are usually local layers claiming the world: skip them.
   const seenTitles = new Set();
   const all = finds.flatMap((f) => f.results || []).filter((d) => !d.extent_may_be_overstated)
     .filter((d) => { const k = `${d.title}|${d.publisher}`.toLowerCase(); if (seenTitles.has(k)) return false; seenTitles.add(k); return true; });
+  // National and intergovernmental bodies first (NatureScot's SSSIs before a council's copy), then curated and
+  // academic collections, then local bodies and unknown publishers, whose "global" extents are often wrong
+  // (San José traffic signals came up for the M9). Within a group, the atlas's own order (fit) stands.
+  const rank = (d) => (/central-gov|public-body|intergov|national|regulator|mapping-agency/i.test(d.publisher_type || "") ? 0
+    : /curated|academic|ngo|research/i.test(d.publisher_type || "") ? 1 : 2) + (d.coverage === "global" && /local|city|unknown/i.test(d.publisher_type || "unknown") ? 2 : 0);
+  all.forEach((d, i) => { d._i = i; });
+  all.sort((x, y) => rank(x) - rank(y) || x._i - y._i);
   const datasets = all.slice(0, maxDatasets);
   const notChecked = all.length - datasets.length + Math.max(0, finds.reduce((n, f) => n + (f.matches || 0), 0) - finds.reduce((n, f) => n + (f.results || []).length, 0));
   const checked = [];
@@ -108,12 +115,17 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
       checked.push({ dataset: d.title, publisher: d.publisher, error: String(e.message || e).slice(0, 120) });
     }
   }));
-  // The same feature often appears in more than one layer: keep one per name within 1 km.
+  // The same feature often appears in more than one layer (keep one per name within 1 km), and one site can come
+  // in pieces within a layer (the Firth of Forth Ramsar site): keep its nearest piece and count the rest.
+  const near = (c) => c.edge_km ?? c.distance_km;
+  cands.sort((a, b) => near(a) - near(b));
   const seen = [];
   const uniq = cands.filter((c) => {
-    const dup = seen.find((s) => s.name && c.name && s.name.toLowerCase() === c.name.toLowerCase() && turf.distance(s.lonlat, c.lonlat) < 1);
-    if (!dup) seen.push(c);
-    return !dup;
+    const dup = seen.find((s) => s.name && c.name && s.name.toLowerCase() === c.name.toLowerCase()
+      && (s.source.atlas_id === c.source.atlas_id || turf.distance(s.lonlat, c.lonlat) < 1));
+    if (dup) { if (dup.source.atlas_id === c.source.atlas_id) dup.extra.more_pieces = (dup.extra.more_pieces || 0) + 1; return false; }
+    seen.push(c);
+    return true;
   });
   uniq.sort((a, b) => (b.area_km2 || 0) - (a.area_km2 || 0) || a.distance_km - b.distance_km);
   return { candidates: uniq.slice(0, limit), total: uniq.length, checked, datasets_found: datasets.length, layers_not_checked: notChecked };
