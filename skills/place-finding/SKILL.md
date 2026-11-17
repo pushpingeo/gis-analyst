@@ -1,6 +1,6 @@
 ---
 name: place-finding
-version: 4.3
+version: 4.4
 description: Turn words into a place on the map. Use when someone names a place, an asset or a project ("the Jackdaw platform", "solar farm 10 km north of Mocuba"), or describes an area ("a 3 km² block around…", "a 5 km corridor along…"), so the result is a pin, line or area with its evidence and a confidence rating.
 ---
 
@@ -24,7 +24,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
    - **Once the asset itself is found, distances in the description are checks, not moves.** "Village X lies 25 km east of the mine" tells you where the village is relative to the mine; it doesn't mean the mine is 25 km from where you found it. Use offsets to *place* something only when the asset can't be found and you're working out where it is from a named reference.
    - **Large features need their outline, not a point.** A salt flat, reservoir, lake, concession or district can be tens of kilometres across, and a gazetteer point is just somewhere in it, often the middle. Use the feature's outline (`shape: "feature"`) where the source has one; if the description says which part ("the south-eastern sector of the salar"), find that part. A point for a large feature can't be better than medium confidence.
    - **Gazetteer points can be rough.** A Wikidata or OpenStreetMap point for a mine, a salt flat, a reservoir or a port is sometimes the centre of a much larger feature, or a town's position reused. Check it against the other clues (distances to named villages, rivers, "the south-eastern part of the salar"). If it disagrees with them by more than about 5 km, look for a feature that fits all the clues (`find_features_near`), prefer that, and say why; if nothing better turns up, keep the point with low confidence.
-4. **Build the shape** with `make_place`, using the anchor's id. Say how the anchor matched (`match`), and pass **every distance clue** in the request as a `check` against the feature it names (find that feature first). The tool measures them from the place it builds and works out the confidence; you don't choose it. Choose the shape from the words:
+4. **Build the shape** with `make_place`, using the anchor's id. Say how the anchor matched (`match`): when the person named the place itself and that's what you found ("5 km round Linlithgow Palace" → the palace; "block 30/2"; "Fife"), it's `named_place`, even if the source is Wikidata or OpenStreetMap, and pass **every distance clue** in the request as a `check` against the feature it names (find that feature first). The tool measures them from the place it builds and works out the confidence; you don't choose it. Choose the shape from the words:
    - "around", "centred on" with an area or size → square, circle or rectangle centred on the anchor. "Block" or "box" means a square unless the context says otherwise; "radius" or "within X km" means a circle.
    - A named area (a field, a licence block, a park) → the feature's own outline (`shape: "feature"`).
    - "X km north of" → offset from the anchor by distance and bearing.
