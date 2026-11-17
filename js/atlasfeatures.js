@@ -63,8 +63,9 @@ export function edgeDistanceKm(lonlat, geometry) {
 
 // ---- choosing layers -------------------------------------------------------------------------
 // One picker for both searches ("features near" and "find this named thing"), so a fix to which layers get
-// asked helps both. The atlas doesn't record a layer's geometry type yet, so titles stand in: a road search
-// shouldn't spend its budget on junction or camera points (the M9 on 17 Nov found only junctions).
+// asked helps both. Layers of the right recorded geometry come first, then those whose geometry isn't recorded;
+// for those, titles stand in: a road search shouldn't spend its budget on junction or camera points (the M9 on
+// 17 Nov found only junctions).
 const POINTY = /junction|node|\bpoints?\b|label|sign|camera|counter|count site|station|\bstops?\b|collision|accident|crossing|vertices|vertex|marker|milepost|annotation|centroid|gritting|lamp/i;
 
 function authorityRank(d) {
@@ -81,13 +82,19 @@ function authorityRank(d) {
 // (NatureScot, Natural Resources Wales): treat them like national bodies (Linlithgow SSSIs, 17 Nov).
 // Layers whose titles suggest the wrong kind of geometry, or (for a named search) the wrong kind of thing,
 // go after the rest; they're still asked if the budget allows. Within a group the atlas's own order (fit) stands.
+// The atlas records each layer's geometry where the service says it (ArcGIS does; most WFS don't), and filters on it.
+const serverGeometry = (geom) => (geom === "line" ? { geometry: "line" } : geom === "area" ? { geometry: "polygon" } : {});
+const WANT = { line: ["line", "polygon"], area: ["polygon"] };
+const wrongGeometry = (d, geom) => Array.isArray(d.geometry) && d.geometry.length > 0 && WANT[geom] && !d.geometry.some((g) => WANT[geom].includes(g));
+
 export function pickLayers(finds, { geom = null, titles = null } = {}) {
   const seen = new Set();
   // Layers flagged with a possibly overstated extent are usually local layers claiming the world: skip them.
   const all = finds.flatMap((f) => f.results || []).filter((d) => !d.extent_may_be_overstated)
     .filter((d) => { const k = `${d.title}|${d.publisher}`.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
   const rank = (d) => authorityRank(d)
-    + (geom && geom !== "point" && POINTY.test(d.title || "") ? 4 : 0)
+    + (geom && geom !== "point" && (wrongGeometry(d, geom) || (!d.geometry?.length && POINTY.test(d.title || ""))) ? 4 : 0)
+    + (geom && geom !== "point" && !d.geometry?.length ? 1 : 0)
     + (titles && !titles.test(`${d.title} ${d.publisher}`) ? 3 : 0);
   all.forEach((d, i) => { d._i = i; });
   all.sort((x, y) => rank(x) - rank(y) || x._i - y._i);
@@ -140,7 +147,7 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
   if (!map) return null; // not a kind of thing the atlas indexes; OpenStreetMap only
   const r = Math.min(Math.max(radiusKm, 0.5), 50);
   const finds = await Promise.all([map.concept, map.also].filter(Boolean).map((concept) =>
-    call("find_datasets", { lon: lonlat[0], lat: lonlat[1], radius_km: r, concept, capability: "query", limit: 100 }).catch(() => ({ results: [] }))));
+    call("find_datasets", { lon: lonlat[0], lat: lonlat[1], radius_km: r, concept, capability: "query", limit: 100, ...serverGeometry(map.geom) }).catch(() => ({ results: [] }))));
   const { layers, unlisted } = pickLayers(finds, { geom: map.geom });
   const cands = [];
   let fitting = 0;
@@ -229,7 +236,7 @@ export async function atlasFindNamed(name, kind, bbox, { call, limit = 8, max = 
   const k = NAMED_KINDS[kind];
   if (!k) throw new Error(`Unknown kind. Use one of: ${Object.keys(NAMED_KINDS).join(", ")}.`);
   const finds = await Promise.all(k.concepts.map((concept) =>
-    call("find_datasets", { bbox, concept, capability: "query", limit: 100 }).catch(() => ({ results: [] }))));
+    call("find_datasets", { bbox, concept, capability: "query", limit: 100, ...serverGeometry(k.geom) }).catch(() => ({ results: [] }))));
   const { layers, unlisted } = pickLayers(finds, { geom: k.geom, titles: k.titles });
   const cands = [];
   const text = serverText(name);
