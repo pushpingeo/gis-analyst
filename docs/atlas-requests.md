@@ -12,7 +12,11 @@ new from the atlas, add it here (newest first), tell Rob, and he passes it to th
   Earlier the same evening `fetch_features` worked for NOAA layers (9383353f552e9482). Reading `worker/src/index.js`,
   `fetchFeatures` looks the id up in the published shards (`DATA_BASE` + `d/<first two chars>.json`) while
   `find_datasets` and `get_dataset` read D1, so a rebuild that's in D1 but not yet in the shards (or the other way
-  round) would do this. Asks: (1) make the two agree (or have `fetch_features` fall back to D1); (2) note in
+  round) would do this. **Likely cause, found later:** atlas commit `daf3023` (20:10 UTC, "Viewer: gzipped detail
+  shards keyed by 3 characters (dz/)") changed the published detail files; `details()` in the MCP server still reads
+  `d/<2 chars>.json`. A NOAA layer that fetched fine at 19:40 (9383353f552e9482) fails the same way since. This breaks
+  the contract in `docs/mcp-tools.md` (`fetch_features`), so it blocks Tobler's feature searches, named searches and
+  screening. Asks: (1) make the two agree (or have `fetch_features` fall back to D1); (2) note in
   `docs/mcp-tools.md` that ids from `find_datasets` are always fetchable. Tobler reports these as "not checked", so
   nothing is wrong on screen, but most screens come back mostly not checked until it's fixed.
 - **17 Nov (late evening): NASA FIRMS and other trusted global services.** Tobler now calls NASA FIRMS (VIIRS and
