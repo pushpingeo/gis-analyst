@@ -15,7 +15,7 @@ const mf = new Miniflare({
     ALLOWED_ORIGINS: "https://asktobler.com,https://pushpingeo.github.io,http://localhost:8000",
     // Small limits so they can be reached in a test.
     PER_VISITOR_DAILY: "5", TOTAL_DAILY: "8", ATLAS_PER_VISITOR_DAILY: "25",
-    ANTHROPIC_API_KEY: "sk-test", ATLAS_MCP_KEY: "atlas-test",
+    ANTHROPIC_API_KEY: "sk-test", ATLAS_MCP_KEY: "atlas-test", FIRMS_MAP_KEY: "firmskey123", FIRMS_PER_VISITOR_DAILY: "3",
   },
   // Fake atlas, behind the service binding.
   serviceBindings: {
@@ -28,6 +28,12 @@ const mf = new Miniflare({
   },
   // Fake Anthropic: every outbound fetch lands here.
   outboundService: async (req) => {
+    if (req.url.includes("firms")) {
+      upstreamCalls.firms = [...(upstreamCalls.firms || []), req.url];
+      if (req.url.includes("/MODIS_NRT/")) return new Response("Invalid MAP_KEY firmskey123.", { status: 400 });
+      if (req.url.includes("/VIIRS_NOAA21_NRT/")) return new Response("latitude,longitude,bright_ti4,acq_date,acq_time,satellite,confidence,frp,daynight\n", { status: 200 });
+      return new Response("latitude,longitude,bright_ti4,acq_date,acq_time,satellite,confidence,frp,daynight\n28.17,-89.20,330.5,2026-11-16,0712,N20,n,4.2,N\n28.30,-89.10,301.2,2026-11-15,1904,N20,l,1.1,D\n", { status: 200 });
+    }
     const body = await req.json();
     upstreamCalls.claude.push({ url: req.url, key: req.headers.get("x-api-key"), body });
     return new Response(JSON.stringify({ content: [{ type: "text", text: "ok" }], model: body.model }), { headers: { "content-type": "application/json" } });
@@ -135,6 +141,32 @@ try {
     // 6.6.6.6 has used its atlas allowance but no Claude calls; the Claude total is used up though,
     // so check the reverse: 2.2.2.2 used its Claude allowance and can still use the atlas.
     assert.equal((await post("/atlas", atlas(), { ip: "2.2.2.2" })).status, 200);
+  });
+
+  await t("FIRMS: key added, CSV becomes GeoJSON, empty is empty, NASA's errors don't leak the key", async () => {
+    const r = await post("/firms", { source: "VIIRS_NOAA20_NRT", bbox: [-90, 27.5, -88.5, 29], days: 7 }, { ip: "7.7.7.7" });
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    assert.equal(j.features.length, 2);
+    assert.deepEqual(j.features[0].geometry.coordinates, [-89.2, 28.17]);
+    assert.equal(j.features[0].properties.acquired_utc, "2026-11-16 07:12 UTC");
+    assert.equal(j.features[0].properties.frp, 4.2);
+    assert.equal(j.features[0].properties.confidence, "n");
+    assert.match(upstreamCalls.firms.at(-1), /\/api\/area\/csv\/firmskey123\/VIIRS_NOAA20_NRT\/-90,27.5,-88.5,29\/7$/);
+    const empty = await (await post("/firms", { source: "VIIRS_NOAA21_NRT", bbox: [0, 0, 1, 1], days: 1 }, { ip: "7.7.7.7" })).json();
+    assert.equal(empty.features.length, 0);
+    const bad = await post("/firms", { source: "MODIS_NRT", bbox: [0, 0, 1, 1], days: 1 }, { ip: "7.7.7.7" });
+    assert.equal(bad.status, 502);
+    assert.doesNotMatch(JSON.stringify(await bad.json()), /firmskey123/);
+  });
+
+  await t("FIRMS: checks inputs, and its own daily limit (3)", async () => {
+    assert.equal((await post("/firms", { source: "EVIL", bbox: [0, 0, 1, 1] }, { ip: "8.8.8.8" })).status, 400);
+    assert.equal((await post("/firms", { source: "MODIS_NRT", bbox: [0, 0, 30, 30] }, { ip: "8.8.8.8" })).status, 400);
+    assert.equal((await post("/firms", { source: "MODIS_NRT", bbox: [0, 0, 1, 1], days: 11 }, { ip: "8.8.8.8" })).status, 400);
+    assert.equal((await post("/firms", { source: "MODIS_NRT", bbox: [0, 0, 1, 1], date: "17/11/2026" }, { ip: "8.8.8.8" })).status, 400);
+    // 7.7.7.7 has used 3 (two OK, one NASA error): the next is refused.
+    assert.equal((await post("/firms", { source: "VIIRS_NOAA20_NRT", bbox: [0, 0, 1, 1] }, { ip: "7.7.7.7" })).status, 429);
   });
 
   console.log(`\n${passed} passed`);

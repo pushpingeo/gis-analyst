@@ -5,6 +5,8 @@
 //   POST /atlas        Read-only calls to the AI Living World Atlas (find_datasets, get_dataset,
 //                      fetch_features, vocabulary), adding the atlas key, through the ATLAS service
 //                      binding (a Worker can't fetch another Worker on the account by workers.dev: 1042).
+//   POST /firms        NASA FIRMS active fire / thermal hotspot detections (VIIRS, MODIS) for a box, with the
+//                      FIRMS MAP_KEY added here. Returns GeoJSON. Open data under NASA's open data policy.
 //   GET  /health       Liveness check, no counters.
 //
 // Only allowed origins are served. Counters live in a Durable Object (one per visitor per day, one for
@@ -15,6 +17,27 @@ import { DurableObject } from "cloudflare:workers";
 
 const ATLAS_TOOLS = new Set(["find_datasets", "get_dataset", "fetch_features", "vocabulary"]);
 const MAX_BODY = 120_000;
+// FIRMS sources Tobler may ask for (near real-time; the archive "_SP" ones too, for a date).
+const FIRMS_SOURCES = new Set(["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT", "MODIS_NRT", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "MODIS_SP", "LANDSAT_NRT"]);
+const FIRMS_MAX_DEG2 = 400; // keeps one call to a few FIRMS transactions
+
+// FIRMS CSV → GeoJSON points. Numbers stay numbers; acq_date + acq_time become one ISO time.
+export function firmsCsvToGeoJSON(csv) {
+  const lines = csv.trim().split(/\r?\n/);
+  if (!lines.length || !/latitude/i.test(lines[0])) return { type: "FeatureCollection", features: [] };
+  const head = lines[0].split(",");
+  const iLat = head.indexOf("latitude"), iLon = head.indexOf("longitude");
+  const features = [];
+  for (const line of lines.slice(1)) {
+    const v = line.split(",");
+    if (v.length < head.length) continue;
+    const p = {};
+    head.forEach((h, i) => { if (i !== iLat && i !== iLon) p[h] = v[i] !== "" && !isNaN(+v[i]) && !/date|time|satellite|instrument|version|daynight|confidence/.test(h) ? +v[i] : v[i]; });
+    if (p.acq_date && p.acq_time) { const t = String(p.acq_time).padStart(4, "0"); p.acquired_utc = `${p.acq_date} ${t.slice(0, 2)}:${t.slice(2)} UTC`; }
+    features.push({ type: "Feature", geometry: { type: "Point", coordinates: [+v[iLon], +v[iLat]] }, properties: p });
+  }
+  return { type: "FeatureCollection", features };
+}
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export class Counter extends DurableObject {
@@ -70,7 +93,7 @@ export default {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") return reply(200, { ok: true, service: "tobler-api" });
 
-    const route = request.method === "POST" && (url.pathname === "/v1/messages" || url.pathname === "/atlas") ? url.pathname : null;
+    const route = request.method === "POST" && ["/v1/messages", "/atlas", "/firms"].includes(url.pathname) ? url.pathname : null;
     if (!route) return reply(404, { message: "Not found" });
     if (!okOrigin) return reply(403, { message: "This endpoint only serves Tobler." });
 
@@ -81,6 +104,33 @@ export default {
 
     const day = new Date().toISOString().slice(0, 10);
     const visitor = counter(env, `${day}:${await visitorId(request)}`);
+
+    if (route === "/firms") {
+      const { source, bbox, days = 7, date } = body || {};
+      if (!FIRMS_SOURCES.has(source)) return reply(400, { message: `Unknown FIRMS source. Use one of: ${[...FIRMS_SOURCES].join(", ")}` });
+      if (!Array.isArray(bbox) || bbox.length !== 4 || bbox.some((v) => typeof v !== "number" || !isFinite(v))) return reply(400, { message: "bbox must be [west, south, east, north]" });
+      const [w, so, e, n] = bbox;
+      if (w >= e || so >= n || w < -180 || e > 180 || so < -90 || n > 90) return reply(400, { message: "bbox out of range" });
+      if ((e - w) * (n - so) > FIRMS_MAX_DEG2) return reply(400, { message: `Area too large for one call (max ${FIRMS_MAX_DEG2} square degrees).` });
+      const d = Math.round(+days);
+      if (!(d >= 1 && d <= 10)) return reply(400, { message: "days must be 1 to 10" });
+      if (date != null && !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return reply(400, { message: "date must be YYYY-MM-DD" });
+      if (!env.FIRMS_MAP_KEY) return reply(500, { message: "FIRMS isn't set up (FIRMS_MAP_KEY missing)." });
+      const used = await visitor.hit("firms", +env.FIRMS_PER_VISITOR_DAILY || 300);
+      if (!used.ok) return reply(429, { message: "You've reached today's limit for satellite fire searches." });
+      const area = [w, so, e, n].map((v) => Math.round(v * 1e4) / 1e4).join(",");
+      const firmsUrl = `${env.FIRMS_URL || "https://firms.modaps.eosdis.nasa.gov/api/area/csv"}/${env.FIRMS_MAP_KEY}/${source}/${area}/${d}${date ? `/${date}` : ""}`;
+      let r;
+      try { r = await fetch(firmsUrl, { cf: { cacheTtl: 900 } }); }
+      catch (err) { return reply(502, { message: `NASA FIRMS didn't answer: ${String(err.message || err).slice(0, 120)}` }); }
+      const text = await r.text();
+      if (!r.ok || !/latitude/i.test(text.slice(0, 200))) {
+        // FIRMS answers errors as plain text (e.g. "Invalid MAP_KEY."); never echo the key.
+        if (r.ok && !text.trim()) return reply(200, { type: "FeatureCollection", features: [], source, days: d });
+        return reply(502, { message: `NASA FIRMS answered: ${text.replaceAll(env.FIRMS_MAP_KEY, "…").slice(0, 160)}` });
+      }
+      return reply(200, { ...firmsCsvToGeoJSON(text), source, days: d, ...(date ? { date } : {}) });
+    }
 
     if (route === "/atlas") {
       if (body?.method !== "tools/call" || !ATLAS_TOOLS.has(body?.params?.name)) return reply(403, { message: "Not allowed" });

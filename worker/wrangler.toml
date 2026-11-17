@@ -13,9 +13,11 @@ PER_VISITOR_DAILY = "200"
 TOTAL_DAILY = "5000"
 # Atlas calls (no Anthropic cost; one map search can be ~20 calls).
 ATLAS_PER_VISITOR_DAILY = "2000"
+# NASA FIRMS calls (open data; FIRMS allows 5,000 transactions per 10 minutes per key).
+FIRMS_PER_VISITOR_DAILY = "300"
 
 # Secrets (set by .github/workflows/worker-deploy.yml, never pasted):
-#   ANTHROPIC_API_KEY, ATLAS_MCP_KEY
+#   ANTHROPIC_API_KEY, ATLAS_MCP_KEY, FIRMS_MAP_KEY
 
 # Counters: one object per visitor per day, one for the daily total.
 [[durable_objects.bindings]]
