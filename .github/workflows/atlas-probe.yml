@@ -19,4 +19,4 @@ jobs:
         env: { ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}" }
       - if: inputs.calls != '' || inputs.urls != '' || inputs.searches != ''
         run: node scripts/atlas-call.mjs
-        env: { ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}", CALLS: "${{ inputs.calls }}", URLS: "${{ inputs.urls }}", SEARCHES: ${{ toJSON(inputs.searches) }} }
+        env: { ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}", CALLS: "${{ inputs.calls }}", URLS: "${{ inputs.urls }}", SEARCHES: "${{ inputs.searches }}" }
