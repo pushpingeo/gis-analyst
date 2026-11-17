@@ -2,6 +2,19 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 17 Nov 2026 (evening): scope reset, Tobler is a screening tool
+- After Rob's Mars test (the analyst wrongly said VIIRS isn't in the catalogue; the atlas holds 7 VIIRS datasets,
+  including NASA's global thermal hotspots layer), Rob set the scope: Tobler is a geospatial screening tool, NTR first,
+  area discounting after. Place finding supports screening. Speed and ease of use count as screening needs, so
+  corridor clipping stays and the atlas name index is requested again.
+- No tuning around the model; it stays one config setting. Quality comes from tools and skills.
+- Modular: the atlas stands alone; tools stay in the page; skills are written to lift out (standard SKILL.md header,
+  method in plain terms naming operations rather than Tobler functions, a short "Tools in Tobler" mapping, nothing about
+  Tobler's screens). NTR's evaluated method stays word for word, or the evaluation is rerun.
+- Next, in order: catalogue tools (find data, get data); confidence inherited from the anchor; never claim absence
+  without a way to check; skills in the portable format; NTR on places; corridor clipping and turn speed; name index
+  (atlas). Full list and the Mars test write-up in the plan doc's handover.
+
 ## 17 Nov 2026 (evening): Tobler's own Worker, tobler-api
 - Tobler's Claude and atlas calls now go through `tobler-api` (code in `worker/`, see `worker/README.md`), not demo 1's `north-sea-geo-demo`. Switched in one line (`proxyUrl` in `js/config.js`); demo 1's Worker is untouched and still serves demo 1.
 - Deployed by the **Worker deploy** Action on changes under `worker/`: tests, `wrangler deploy`, secrets loaded with `wrangler secret bulk` from the repo secrets, then a live check. Secrets used: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `ANTHROPIC_API_KEY`, `ATLAS_MCP_KEY` (checked first with the harmless **Worker secrets check** workflow).
