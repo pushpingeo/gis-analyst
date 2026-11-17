@@ -1,6 +1,7 @@
 // The conversation agent: one turn at a time, working from a compact project summary rather than the whole
 // history, so long sessions don't rot. Old tool results are never replayed; the agent asks tools for detail.
 // No DOM here, so the page and the evaluation share it.
+import { FENCE_RULE, toolResultText, clean } from "./fence.js";
 
 export function parseSkill(text) {
   const fm = text.match(/^---\n([\s\S]*?)\n---\n/);
@@ -14,6 +15,7 @@ export function systemPrompt({ skills, comingSoon = [], loaded = [] }) {
 
 How you work:
 - Each message starts with a <project> summary listing the places on the map (with how they were made and any edits). That summary is the current truth; the map may have changed since earlier messages.
+- ${FENCE_RULE}
 - Use skills for methods. Load the relevant skill with load_skill before doing that kind of work, then follow it.
 - Never work out coordinates, areas or distances in your head. Tools find places and build shapes; you choose the tool and the numbers and explain why.
 - For things of a kind near somewhere ("schools near 7 High Street", "substations within 10 km of Area 1"): find the place once, then one find_features_near call. Don't search for a kind of thing by name.
@@ -74,10 +76,10 @@ export async function runTurn({ system, messages, tools, exec, callClaude, onEve
       try {
         const out = await exec(u.name, u.input || {});
         onEvent({ type: "tool", name: u.name, input: u.input, output: out });
-        results.push({ type: "tool_result", tool_use_id: u.id, content: JSON.stringify(out) });
+        results.push({ type: "tool_result", tool_use_id: u.id, content: toolResultText(out) });
       } catch (e) {
         onEvent({ type: "tool", name: u.name, input: u.input, error: e.message });
-        results.push({ type: "tool_result", tool_use_id: u.id, is_error: true, content: String(e.message).slice(0, 500) });
+        results.push({ type: "tool_result", tool_use_id: u.id, is_error: true, content: clean(String(e.message)) });
       }
     }
     history.push({ role: "user", content: results });
