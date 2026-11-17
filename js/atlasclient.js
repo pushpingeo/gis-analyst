@@ -42,3 +42,20 @@ async function callWorker(tool, args) {
   if (j.result?.isError) throw new Error(j.result.content?.[0]?.text || "atlas error");
   return j.result.structuredContent;
 }
+
+// NASA FIRMS detections through the Worker, which holds the FIRMS key. Remembered for the session like atlas answers.
+export async function firmsViaWorker(args) {
+  const key = `firms|${JSON.stringify(args)}`;
+  if (memory.has(key)) return memory.get(key);
+  const p = (async () => {
+    const r = await fetch(CONFIG.proxyUrl.replace(/\/$/, "") + "/firms", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args), signal: AbortSignal.timeout(30000),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.message || `FIRMS answered ${r.status}`);
+    return j;
+  })();
+  memory.set(key, p);
+  p.catch(() => memory.delete(key));
+  return p;
+}

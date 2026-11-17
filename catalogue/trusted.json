@@ -1,0 +1,46 @@
+{
+  "about": "Tobler's go-to global services. Two kinds: services Tobler calls directly (because the atlas doesn't hold them, or holds only a copy with a worse licence), and trusted publishers whose own atlas records are ranked first. Edit by hand; each entry says where its licence comes from. Started 17 Nov 2026.",
+  "services": [
+    {
+      "key": "nasa-firms-viirs",
+      "title": "Active fires and thermal hotspots, VIIRS 375 m (NASA FIRMS)",
+      "publisher": "NASA (FIRMS, LANCE)",
+      "publisher_type": "intergovernmental-or-national-agency",
+      "coverage": "global",
+      "licence": "Free and open under NASA's Earth science data policy; cite NASA FIRMS",
+      "licence_class": "open",
+      "licence_source": "https://www.earthdata.nasa.gov/learn/articles/wildfire-articles/wildfires-cant-hide-from-earth-observing-satellites",
+      "attribution": "NASA FIRMS (Fire Information for Resource Management System), VIIRS 375 m active fire product (S-NPP, NOAA-20, NOAA-21)",
+      "topics": ["viirs", "thermal", "hotspot", "hot spot", "fire", "wildfire", "flare", "flaring", "gas flare", "heat", "burn", "burning", "thermal anomaly", "active fire", "firms"],
+      "geometry": "point",
+      "time_aware": true,
+      "access": { "type": "firms", "sources": ["VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT", "VIIRS_SNPP_NRT"], "default_days": 7, "max_days": 10 },
+      "note": "Satellite detections of heat, at about 375 m: fires, gas flares, industrial heat. Positions are pixel centres. Shows what was detected in the days asked (up to 10), not a long record."
+    },
+    {
+      "key": "nasa-firms-modis",
+      "title": "Active fires and thermal hotspots, MODIS 1 km (NASA FIRMS)",
+      "publisher": "NASA (FIRMS, LANCE)",
+      "publisher_type": "intergovernmental-or-national-agency",
+      "coverage": "global",
+      "licence": "Free and open under NASA's Earth science data policy; cite NASA FIRMS",
+      "licence_class": "open",
+      "licence_source": "https://www.earthdata.nasa.gov/learn/articles/wildfire-articles/wildfires-cant-hide-from-earth-observing-satellites",
+      "attribution": "NASA FIRMS (Fire Information for Resource Management System), MODIS Collection 6.1 active fire product",
+      "topics": ["modis", "thermal", "hotspot", "hot spot", "fire", "wildfire", "flare", "flaring", "heat", "burn", "thermal anomaly", "active fire", "firms"],
+      "geometry": "point",
+      "time_aware": true,
+      "access": { "type": "firms", "sources": ["MODIS_NRT"], "default_days": 7, "max_days": 10 },
+      "note": "Coarser (1 km) than VIIRS; the longer-running record. Use VIIRS first."
+    }
+  ],
+  "publishers": {
+    "about": "Atlas records whose publisher matches one of these are marked trusted and ranked first. National and intergovernmental bodies with a global or regional remit; national mapping and environment agencies are already ranked first by publisher type.",
+    "patterns": [
+      "\\bNASA\\b", "\\bESA\\b", "European Space Agency", "Copernicus", "\\bEEA\\b", "European Environment Agency", "EMODnet", "\\bNOAA\\b", "National Oceanic and Atmospheric",
+      "\\bUSGS\\b", "Geological Survey", "UNEP", "UN Environment", "\\bFAO\\b", "Food and Agriculture Organization", "World Bank", "\\bGEBCO\\b", "\\bGBIF\\b",
+      "IUCN", "UNESCO", "Ramsar", "\\bJRC\\b", "Joint Research Centre", "\\bOSPAR\\b", "\\bHELCOM\\b", "\\bICES\\b", "\\bIMO\\b", "\\bWHO\\b", "OCHA", "Humanitarian Data Exchange",
+      "Bureau of Ocean Energy Management", "\\bBOEM\\b", "Natural England", "NatureScot", "Joint Nature Conservation", "\\bJNCC\\b", "Marine Scotland", "Ordnance Survey"
+    ]
+  }
+}

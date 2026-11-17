@@ -403,6 +403,9 @@ export function createPlaceTools(host) {
 
   const data = createDataTools({
     atlas: host.atlas || null,
+    firms: host.firms || null,
+    get trusted() { return host.trusted; },
+    esriLicence: () => !!host.esriLicence?.(),
     resolve,
     area: (ref) => catalogueArea(ref, null),
     keep: (c) => keep(c),

@@ -8,7 +8,7 @@ import * as R from "./reference.js";
 import { placeToolDefs, createPlaceTools, projectSummary } from "./placetools.js";
 import { parseSkill, systemPrompt, buildMessages, runTurn, activityFor } from "./converse.js";
 import { callClaude, LimitReached } from "./claude.js";
-import { atlasViaWorker } from "./atlasclient.js";
+import { atlasViaWorker, firmsViaWorker } from "./atlasclient.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
@@ -258,11 +258,16 @@ function logEdit(p, words) {
 // ---- the host: what the analyst's tools can see and do -------------------------------------
 const skills = {};
 let anchors = [];
+let trusted = { services: [], publishers: { patterns: [] } };
 const host = {
   ref,
   get anchors() { return anchors; },
   fetchFn: (...a) => fetch(...a),
   atlas: atlasViaWorker,
+  firms: firmsViaWorker,
+  get trusted() { return trusted; },
+  // Settings (step 4 adds the gear): whether the person holds an Esri licence, so Esri-licensed layers can be used.
+  esriLicence: () => { try { return localStorage.getItem("tobler.esriLicence") === "yes"; } catch { return false; } },
   view: () => viewBounds(),
   headers: {},
   places: () => [...places.values()],
@@ -303,6 +308,7 @@ const tools = createPlaceTools(host);
 Promise.all([
   fetch(asset("skills/place-finding/SKILL.md")).then((r) => r.text()).then((t) => { const s = parseSkill(t); skills[s.name] = s; }),
   fetch(asset("catalogue/anchors.json")).then((r) => r.json()).then((j) => { anchors = j.sources; }),
+  fetch(asset("catalogue/trusted.json")).then((r) => r.json()).then((j) => { trusted = j; }),
 ]).catch((e) => note(`Something the analyst needs didn't load: ${e.message}`));
 
 // ---- cards ----------------------------------------------------------------------------

@@ -18,4 +18,5 @@ jobs:
         env:
           ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}"
           ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}"
+          FIRMS_MAP_KEY: "${{ secrets.FIRMS_MAP_KEY }}"
           REQUESTS: "${{ inputs.requests }}"

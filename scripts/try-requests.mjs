@@ -7,10 +7,12 @@ import * as R from "../js/reference.js";
 import { createPlaceTools, placeToolDefs, projectSummary } from "../js/placetools.js";
 import { parseSkill, systemPrompt, buildMessages, runTurn } from "../js/converse.js";
 import { atlasCall } from "./atlas-client.mjs";
+import { firmsCall } from "./firms-client.mjs";
 
 const UA = { "User-Agent": "tobler-try/1.0 (+https://github.com/pushpingeo/tobler)" };
 const ref = R.createReference(async (n) => JSON.parse(readFileSync(`data/ref/${n}.json`, "utf8")));
 const anchors = JSON.parse(readFileSync("catalogue/anchors.json", "utf8")).sources;
+const trusted = JSON.parse(readFileSync("catalogue/trusted.json", "utf8"));
 const skill = parseSkill(readFileSync("skills/place-finding/SKILL.md", "utf8"));
 let spend = { input: 0, output: 0 };
 
@@ -32,7 +34,9 @@ const convs = (process.env.REQUESTS || "").split("\n").map((l) => l.trim()).filt
 for (const conv of convs) {
   const list = [];
   const host = {
-    ref, anchors, headers: UA, list,
+    ref, anchors, headers: UA, list, trusted,
+    firms: process.env.FIRMS_MAP_KEY ? firmsCall : null,
+    esriLicence: () => process.env.ESRI_LICENCE === "yes",
     offerChoices(o) { console.log(`   [choices offered: ${o.question || ""} ${(o.options || []).map((x) => x.label || x).join(" / ")}]`); },
     fetchFn: (url, opts = {}) => fetch(url, { ...opts, headers: { ...UA, ...(opts.headers || {}) } }),
     atlas: process.env.ATLAS_MCP_KEY ? (tool, args) => atlasCall(tool, args) : null,
