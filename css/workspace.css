@@ -203,7 +203,7 @@ a { color: var(--sea); }
   .tools button { width: 38px; height: 38px; }
   .tools-gap { width: 1px; height: auto; margin: 6px 4px; }
   .hint { top: 94px; left: 12px; right: 12px; transform: none; max-width: none; font-size: 13px; }
-  .key { top: 94px; right: 12px; max-width: 200px; font-size: 12px; }
+  .key { top: 150px; right: 12px; max-width: 220px; font-size: 12px; }
   .panel {
     top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 52vh;
     border-radius: var(--radius-panel) var(--radius-panel) 0 0; padding-bottom: env(safe-area-inset-bottom);

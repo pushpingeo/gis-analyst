@@ -122,7 +122,8 @@ function start() {
   map.addSource("findings", { type: "geojson", data: turf.featureCollection([]) });
   map.addLayer({ id: "find-fill", type: "fill", source: "findings", filter: ["==", ["geometry-type"], "Polygon"],
     layout: { "fill-sort-key": ["-", 0, ["coalesce", ["get", "area_km2"], 0]] },
-    paint: { "fill-color": themeColour, "fill-opacity": ["case", big, 0.03, ["*", 0.14, emphasis]] } });
+    // Operating context (blocks, licences, infrastructure) is background: outlines with a whisper of fill.
+    paint: { "fill-color": themeColour, "fill-opacity": ["case", big, 0.03, ["==", ["get", "theme"], "context"], ["*", 0.05, emphasis], ["*", 0.14, emphasis]] } });
   map.addLayer({ id: "find-line", type: "line", source: "findings", filter: ["!=", ["geometry-type"], "Point"],
     paint: { "line-color": themeColour, "line-width": ["case", big, 1, 2], "line-opacity": emphasis } });
   map.addLayer({ id: "find-pt", type: "circle", source: "findings", filter: ["==", ["geometry-type"], "Point"],
