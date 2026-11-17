@@ -36,9 +36,18 @@ const NAME_KEYS = /^(name|site_?name|plant_?name|plant___project_name|project_?n
 const NAMEISH = /name|project|plant|site|mine|facility|title|^ref$|road_?num|roadnumber|route/i;
 const TYPEISH = /^(type|.*_?type|commod.*|fuel|technology|source|status|primary_fuel|dep_type)$/i;
 
+// Fields that hold who made or supplied the data, not what the feature is: never a name (Rosebank, 17 Nov: habitat
+// polygons labelled "JNCC" and "PC, JNCC" from a project/source column). Short all-capital codes are skipped too.
+const NOT_A_NAME = /source|provider|supplier|owner|origin|author|contact|licen[cs]|copyright|dataset|survey|contract|organi[sz]ation|agency|publisher|citation|metadata|surveyor|data_?set|contractor/i;
+const CODE_LIKE = /^[A-Z0-9&/,.\s-]{1,12}$/;
+const ROADISH = /road|route|^ref$|num/i; // road numbers ("M9") are names, however short
+const DESCRIPTIVE = /habitat|hab_?(type|name|desc)|feature|class|designat|category|descr|description|sitetype|eunis/i;
+const usable = (k, v) => typeof v === "string" && v.trim() && v.length < 120 && !NOT_A_NAME.test(k);
+
 export function pickName(p) {
-  const k = Object.keys(p).find((k) => NAME_KEYS.test(k) && typeof p[k] === "string" && p[k].trim())
-    || Object.keys(p).find((k) => NAMEISH.test(k) && typeof p[k] === "string" && p[k].trim() && p[k].length < 120);
+  const k = Object.keys(p).find((k) => NAME_KEYS.test(k) && usable(k, p[k]))
+    || Object.keys(p).find((k) => NAMEISH.test(k) && usable(k, p[k]) && (ROADISH.test(k) || !CODE_LIKE.test(p[k].trim())))
+    || Object.keys(p).find((k) => DESCRIPTIVE.test(k) && usable(k, p[k]) && !CODE_LIKE.test(p[k].trim()) && p[k].length < 80);
   return k ? p[k].trim() : null;
 }
 export function pickType(p) {

@@ -267,6 +267,16 @@ await test("findings: themes from the analyst, the feature type or the atlas con
   assert.deepEqual(F.ringDistances(true), [2, 10, 50]);
 });
 
+await test("names: source and project columns and short codes aren't names; descriptive fields are the fallback", async () => {
+  const { pickName } = await import("../js/atlasfeatures.js");
+  assert.equal(pickName({ PROJECT: "JNCC", SOURCE_NAME: "PC, JNCC", HAB_TYPE: "Deep-sea sponge aggregations" }), "Deep-sea sponge aggregations");
+  assert.equal(pickName({ SITE_NAME: "Faroe-Shetland Sponge Belt", PROJECT: "JNCC" }), "Faroe-Shetland Sponge Belt");
+  assert.equal(pickName({ PROJECT: "NOC" }), null);
+  assert.equal(pickName({ name: "M9" }), "M9", "a real name field may be short");
+  assert.equal(pickName({ ROUTE: "A803" }), "A803", "road numbers are names");
+  assert.equal(pickName({ SITE_CODE: "UK0030" }), null, "other short codes aren't");
+});
+
 await test("keyAttributes and geometryDistanceKm", () => {
   const k = keyAttributes({ OBJECTID: 5, Shape__Area: 3, acq_date: 1763337600000, name: "X", junk: "y" });
   assert.deepEqual(Object.keys(k), ["acq_date", "name"]);
