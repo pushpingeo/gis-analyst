@@ -1,0 +1,21 @@
+name: Try requests
+# Plays requests through the analyst with the atlas on and prints the conversations (no scoring).
+# Small Anthropic cost: a few cents per conversation.
+on:
+  workflow_dispatch:
+    inputs:
+      requests: { description: 'One conversation per line; " >> " between turns', required: true }
+jobs:
+  try:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci || npm install
+      - run: node scripts/try-requests.mjs
+        env:
+          ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}"
+          ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}"
+          REQUESTS: "${{ inputs.requests }}"
