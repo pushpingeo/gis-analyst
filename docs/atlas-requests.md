@@ -4,6 +4,16 @@ Tobler and the atlas are worked on in separate chats (decided 17 Nov). Tobler do
 What Tobler can rely on is written down in the atlas repo's `docs/mcp-tools.md`. When Tobler needs something
 new from the atlas, add it here (newest first), tell Rob, and he passes it to the atlas chat.
 
+- **17 Nov (night): EMODnet as feature services, with their licences.** All 169 EMODnet Human Activities records in
+  the atlas are WMS only (picture services) with "licence not stated" (find_datasets "EMODnet" around Shetland). EMODnet
+  publishes the same layers as WFS at `https://ows.emodnet-humanactivities.eu/wfs?`, and its GeoNetwork records give
+  the licence: e.g. "EMODnet Human Activities, Cultural Heritage, Ship wrecks"
+  (https://emodnet.ec.europa.eu/geonetwork/srv/api/records/e965088b-a265-4517-84df-c49b156af8a7): CC-BY 4.0, no
+  limitations on public access, WFS layer `emodnet:heritageshipwrecks`. Rob found it after Tobler reported wrecks
+  as unfetchable at Rosebank. Asks: (1) harvest the EMODnet WFS endpoints (Human Activities first; then the other
+  EMODnet portals) so wrecks, pipelines, installations, wind farms, military areas, dumped munitions and fishing
+  effort can be fetched; (2) take licences from the GeoNetwork (ISO) metadata where the service doesn't state one;
+  (3) more generally, when a WMS layer has a WFS sibling on the same server, prefer the WFS record.
 - **17 Nov (night): a mislabelled NSTA layer.** Atlas record `bdb5d0a70436343e`, titled "UKCS offshore infrastructure
   pipeline linear (WGS84)", points at NSTA's `UKCS_offshore_infrastructure_pipeline_linear_removed_(WGS84)` service:
   *removed* pipelines. It returns nothing at Rosebank, while `29a134d61746d7dc` (the ED50 layer) returns Rosebank's
