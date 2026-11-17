@@ -130,6 +130,7 @@ export function createPlaceTools(host) {
     lat: round(c.lonlat[1], 4), lon: round(c.lonlat[0], 4),
     ...(c.area_km2 != null ? { area_km2: c.area_km2 } : {}), ...(c.length_km != null ? { length_km: c.length_km } : {}),
     ...(c.distance_km != null ? { distance_km: c.distance_km, bearing_deg: c.bearing } : {}),
+    ...(c.edge_km != null ? { nearest_edge_km: c.edge_km } : {}), ...(c.contains_anchor ? { contains_anchor: true } : {}),
     ...(c.outline ? { has_outline: true, note: "Anchors on its centre; use shape \"feature\" for the area itself." } : {}),
     ...(Object.keys(c.extra || {}).length ? { details: c.extra } : {}),
   });

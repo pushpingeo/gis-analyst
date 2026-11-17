@@ -242,13 +242,15 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
   const cands = [];
   if (at.status === "fulfilled" && at.value) {
     cands.push(...at.value.candidates);
-    sources.push({ source: "AI Living World Atlas", found: at.value.total, layers_checked: at.value.checked });
+    sources.push({ source: "AI Living World Atlas", found: at.value.total, layers_checked: at.value.checked.map((x) => `${x.dataset} (${x.publisher})${x.error ? ": failed" : `: ${x.returned}`}`),
+      ...(at.value.layers_not_checked ? { more_layers_not_checked: at.value.layers_not_checked } : {}) });
   } else if (atlas && ATLAS_CONCEPTS[featureType]) sources.push({ source: "AI Living World Atlas", not_checked: String(at.reason?.message || at.reason || "unavailable").slice(0, 120) });
   if (osm.status === "fulfilled") { cands.push(...osm.value.candidates); sources.push({ source: "OpenStreetMap", found: osm.value.total, ...(osm.value.note ? { note: osm.value.note } : {}) }); }
   else sources.push({ source: "OpenStreetMap", not_checked: String(osm.reason?.message || osm.reason).slice(0, 160) });
   if (!cands.length && osm.status === "rejected" && !(at.status === "fulfilled" && at.value)) throw osm.reason;
   const bySize = /farm|hydro|power plant|mine|port|platform|industrial|airport/.test(featureType);
-  cands.sort(bySize ? (a, b) => (b.area_km2 || 0) - (a.area_km2 || 0) || a.distance_km - b.distance_km : (a, b) => a.distance_km - b.distance_km);
+  const near = (c) => c.edge_km ?? c.distance_km;
+  cands.sort(bySize ? (a, b) => (b.area_km2 || 0) - (a.area_km2 || 0) || near(a) - near(b) : (a, b) => near(a) - near(b));
   return {
     candidates: cands.slice(0, limit), total: cands.length, sources,
     wind_turbines: osm.status === "fulfilled" ? osm.value.wind_turbines : undefined,

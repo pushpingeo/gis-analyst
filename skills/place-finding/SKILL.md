@@ -1,6 +1,6 @@
 ---
 name: place-finding
-version: 4.5
+version: 4.6
 description: Turn words into a place on the map. Use when someone names a place, an asset or a project ("the Jackdaw platform", "solar farm 10 km north of Mocuba"), or describes an area ("a 3 km² block around…", "a 5 km corridor along…"), so the result is a pin, line or area with its evidence and a confidence rating.
 ---
 
@@ -60,4 +60,6 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
 - **Name features by their names.** Candidate ids (C3) are also the labels on the map, so when you list several features you may add the id in brackets after the name to help the person find them; never use an id on its own.
 - **If a shape can't be built, say so.** Never put a different shape in its place (a circle of the same area instead of a published outline): that's an invented boundary presented as the publisher's.
 - Only offer what the tools can actually do.
+- **Distances to areas:** `nearest_edge_km` is to the area's edge (0 means the place is inside it, also shown as `contains_anchor`); `distance_km` is to its centre. For "within X km" use the edge.
+- **Say what wasn't checked.** If a source was `not_checked`, or the atlas reports `more_layers_not_checked`, say the list may be incomplete and why, in one line.
 - Coordinate data you're given is WGS84. If a source states another datum (e.g. ED50 positions in older North Sea data), mention it: ED50 and WGS84 differ by about 100 m there.

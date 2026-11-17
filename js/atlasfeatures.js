@@ -45,20 +45,40 @@ function pickType(p) {
   return Object.entries(p).filter(([k, v]) => TYPEISH.test(k) && typeof v === "string" && v.trim() && v.length < 80).map(([, v]) => v).slice(0, 2).join(", ");
 }
 
+// Distance from a point to a feature: 0 inside an area, else to its nearest edge or line; to the point itself for points.
+export function edgeDistanceKm(lonlat, geometry) {
+  const f = { type: "Feature", properties: {}, geometry };
+  try {
+    if (/Polygon/.test(geometry.type)) {
+      if (turf.booleanPointInPolygon(lonlat, f)) return 0;
+      const lines = turf.polygonToLine(f);
+      const ls = lines.type === "FeatureCollection" ? lines.features : [lines];
+      return Math.min(...ls.map((l) => turf.pointToLineDistance(lonlat, l, { units: "kilometers" })));
+    }
+    if (geometry.type === "LineString") return turf.pointToLineDistance(lonlat, f, { units: "kilometers" });
+    if (geometry.type === "MultiLineString") return Math.min(...geometry.coordinates.map((c) => turf.pointToLineDistance(lonlat, turf.lineString(c), { units: "kilometers" })));
+  } catch { /* fall through */ }
+  return null;
+}
+
 // call(tool, args) → structuredContent. Returns { candidates, total, checked: [ { dataset, publisher, returned | error } ] }.
-export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, name = null, limit = 15, maxDatasets = 8 } = {}) {
+export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, name = null, limit = 15, maxDatasets = 16 } = {}) {
   const map = ATLAS_CONCEPTS[featureType];
   if (!map) return null; // not a kind of thing the atlas indexes; OpenStreetMap only
   const r = Math.min(Math.max(radiusKm, 0.5), 50);
   const finds = await Promise.all([map.concept, map.also].filter(Boolean).map((concept) =>
-    call("find_datasets", { lon: lonlat[0], lat: lonlat[1], radius_km: r, concept, capability: "query", limit: 12 }).catch(() => ({ results: [] }))));
+    call("find_datasets", { lon: lonlat[0], lat: lonlat[1], radius_km: r, concept, capability: "query", limit: 30 }).catch(() => ({ results: [] }))));
   // Layers flagged with a possibly overstated extent are usually local layers claiming the world: skip them.
-  const datasets = finds.flatMap((f) => f.results || []).filter((d) => !d.extent_may_be_overstated).slice(0, maxDatasets);
+  const seenTitles = new Set();
+  const all = finds.flatMap((f) => f.results || []).filter((d) => !d.extent_may_be_overstated)
+    .filter((d) => { const k = `${d.title}|${d.publisher}`.toLowerCase(); if (seenTitles.has(k)) return false; seenTitles.add(k); return true; });
+  const datasets = all.slice(0, maxDatasets);
+  const notChecked = all.length - datasets.length + Math.max(0, finds.reduce((n, f) => n + (f.matches || 0), 0) - finds.reduce((n, f) => n + (f.results || []).length, 0));
   const checked = [];
   const cands = [];
   await Promise.all(datasets.map(async (d) => {
     try {
-      const g = await call("fetch_features", { id: d.id, lon: lonlat[0], lat: lonlat[1], radius_km: r, limit: 100 });
+      const g = await call("fetch_features", { id: d.id, lon: lonlat[0], lat: lonlat[1], radius_km: r, limit: 100, ...(name ? { text: name } : {}) });
       checked.push({ dataset: d.title, publisher: d.publisher, returned: g.returned });
       for (const f of g.features || []) {
         if (!f.geometry) continue;
@@ -78,7 +98,9 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
           });
         } catch { continue; }
         c.distance_km = Math.round(turf.distance(lonlat, c.lonlat) * 100) / 100;
-        if (c.distance_km > r * 1.2) continue;
+        const edge = edgeDistanceKm(lonlat, f.geometry);
+        if (edge != null) { c.edge_km = Math.round(edge * 100) / 100; if (c.edge_km === 0) c.contains_anchor = true; }
+        if ((c.edge_km ?? c.distance_km) > r) continue;
         c.bearing = Math.round((turf.bearing(lonlat, c.lonlat) + 360) % 360);
         cands.push(c);
       }
@@ -94,5 +116,5 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
     return !dup;
   });
   uniq.sort((a, b) => (b.area_km2 || 0) - (a.area_km2 || 0) || a.distance_km - b.distance_km);
-  return { candidates: uniq.slice(0, limit), total: uniq.length, checked, datasets_found: datasets.length };
+  return { candidates: uniq.slice(0, limit), total: uniq.length, checked, datasets_found: datasets.length, layers_not_checked: notChecked };
 }
