@@ -18,6 +18,7 @@ geodesic and measured from the footprint edge.
 - **Does:** fetches one dataset's features within a distance of the site, measures each from the site's edge (0 = on
   site), and returns them nearest first with name, distance, key attributes (dates, types), publisher, licence and when
   it was checked. Time-aware sources (satellite detections) take a number of recent days. Failures are "not checked".
+  Takes the theme the evidence is for, so findings can be shown by theme.
 - **Tobler:** `get_data`.
 
 ## Everyday features near the site

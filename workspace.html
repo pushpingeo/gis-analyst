@@ -9,7 +9,7 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=411e6ed3">
+<link rel="stylesheet" href="css/workspace.css?v=a5c8be7c">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
@@ -21,17 +21,18 @@
   "./js/config.js": "./js/config.js?v=06c1aa11",
   "./js/config.js?v=m2b": "./js/config.js?v=06c1aa11",
   "./js/converse.js": "./js/converse.js?v=020c5b70",
-  "./js/datatools.js": "./js/datatools.js?v=932c20cd",
+  "./js/datatools.js": "./js/datatools.js?v=dcf65781",
   "./js/fence.js": "./js/fence.js?v=eee6e5f0",
+  "./js/findings.js": "./js/findings.js?v=b71c96c8",
   "./js/gazetteer.js": "./js/gazetteer.js?v=a08aca9c",
   "./js/geometry.js": "./js/geometry.js?v=6bc3cd92",
   "./js/licence.js": "./js/licence.js?v=33e1d941",
-  "./js/placetools.js": "./js/placetools.js?v=25408f9d",
+  "./js/placetools.js": "./js/placetools.js?v=3f6d5e75",
   "./js/reference.js": "./js/reference.js?v=6eaf57a4",
   "./js/tools.js": "./js/tools.js?v=084a3bd7",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=e6091938",
+  "./js/workspace.js": "./js/workspace.js?v=f38fdb85",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -39,15 +40,15 @@
 </script>
 <script type="application/json" id="asset-versions">
 {
- "skills/ntr-screening/SKILL.md": "skills/ntr-screening/SKILL.md?v=75316cb2",
- "skills/ntr-screening/operations.md": "skills/ntr-screening/operations.md?v=366dedd2",
+ "skills/ntr-screening/SKILL.md": "skills/ntr-screening/SKILL.md?v=8d595dd0",
+ "skills/ntr-screening/operations.md": "skills/ntr-screening/operations.md?v=04713a18",
  "skills/ntr-screening-ifc/SKILL.md": "skills/ntr-screening-ifc/SKILL.md?v=d087c0ba",
  "skills/ntr-screening-ifc/operations.md": "skills/ntr-screening-ifc/operations.md?v=2277331a",
  "skills/place-finding/SKILL.md": "skills/place-finding/SKILL.md?v=dc94103e",
  "skills/place-finding/operations.md": "skills/place-finding/operations.md?v=ade1e924",
  "catalogue/anchors.json": "catalogue/anchors.json?v=4239096c",
  "catalogue/catalogue.json": "catalogue/catalogue.json?v=1fae6aef",
- "catalogue/trusted.json": "catalogue/trusted.json?v=f8dddafb",
+ "catalogue/trusted.json": "catalogue/trusted.json?v=2aa372d7",
  "data/ref/coastline.json": "data/ref/coastline.json?v=e913d7a4",
  "data/ref/countries.json": "data/ref/countries.json?v=bd02bffd",
  "data/ref/lakes.json": "data/ref/lakes.json?v=819467cc",
@@ -78,6 +79,12 @@
 </nav>
 
 <p class="hint" id="hint" hidden></p>
+
+<details class="key" id="key" hidden open>
+  <summary>On the map</summary>
+  <ul></ul>
+  <button type="button" id="key-clear">Clear</button>
+</details>
 
 <section class="panel" id="panel" aria-label="Conversation">
   <button class="handle" id="handle" aria-expanded="true" aria-controls="conversation"><span class="sr">Show or hide the conversation</span></button>
@@ -171,6 +178,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=e6091938"></script>
+<script type="module" src="js/workspace.js?v=f38fdb85"></script>
 </body>
 </html>

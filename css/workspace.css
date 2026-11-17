@@ -56,6 +56,23 @@ a { color: var(--sea); }
   font-size: 13.5px; box-shadow: var(--shadow); max-width: calc(100vw - 140px); text-align: center;
 }
 
+/* ---- map key: themes of the findings on the map ---- */
+.key {
+  position: fixed; z-index: 3; top: 16px; right: 16px; max-width: 260px;
+  padding: 8px 12px 10px; border-radius: var(--radius-control); background: var(--panel); box-shadow: var(--shadow);
+  font-size: 12.5px; color: var(--ink);
+}
+.key summary { cursor: pointer; font-weight: 600; }
+.key ul { list-style: none; margin: 6px 0 4px; padding: 0; }
+.key li { margin: 3px 0; }
+.key label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.key .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.key .count { color: var(--ink-2); margin-left: auto; padding-left: 8px; }
+.key button { margin-top: 2px; padding: 0; border: 0; background: none; color: var(--sea); font: inherit; text-decoration: underline; cursor: pointer; }
+.finding-pop { font: 12.5px/1.4 var(--font); color: var(--ink); }
+.finding-pop b { display: block; }
+.finding-pop span { color: var(--ink-2); }
+
 /* ---- panel ---- */
 .panel {
   position: fixed; z-index: 4; top: 16px; left: 16px; bottom: 16px; width: 404px;
@@ -186,6 +203,7 @@ a { color: var(--sea); }
   .tools button { width: 38px; height: 38px; }
   .tools-gap { width: 1px; height: auto; margin: 6px 4px; }
   .hint { top: 94px; left: 12px; right: 12px; transform: none; max-width: none; font-size: 13px; }
+  .key { top: 94px; right: 12px; max-width: 200px; font-size: 12px; }
   .panel {
     top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 52vh;
     border-radius: var(--radius-panel) var(--radius-panel) 0 0; padding-bottom: env(safe-area-inset-bottom);

@@ -7,6 +7,7 @@ import * as R from "./reference.js";
 import { rateConfidence, runCheck, MATCHES } from "./confidence.js";
 import { atlasFindNamed, NAMED_KINDS, describeChecked } from "./atlasfeatures.js";
 import { DATA_TOOL_DEFS, createDataTools, geometryDistanceKm } from "./datatools.js";
+import { themeFor, THEME_IDS } from "./findings.js";
 import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES } from "./gazetteer.js";
 
 // Common names that aren't Natural Earth's own, and seas (energy basins especially) by rough box.
@@ -69,6 +70,7 @@ export function placeToolDefs(skills) {
           feature_type: { type: "string", enum: Object.keys(FEATURE_TYPES) },
           radius_km: { type: "number", description: "Search radius, 0.5 to 50 km" },
           name: { type: "string", description: "Optional: part of the feature's name" },
+          theme: { type: "string", enum: THEME_IDS, description: "Optional, when screening: which theme this search is for (sets the colour on the map)." },
         },
         required: ["anchor", "feature_type", "radius_km"],
       },
@@ -285,7 +287,7 @@ export function createPlaceTools(host) {
         note: list.length ? undefined : "Nothing found. Try another spelling, a shorter name, or the nearest town and find_features_near." };
     },
 
-    async find_features_near({ anchor, feature_type, radius_km, name }) {
+    async find_features_near({ anchor, feature_type, radius_km, name, theme }) {
       const a = resolve(anchor);
       const g = a.feature.geometry;
       const shaped = g.type !== "Point";
@@ -300,7 +302,7 @@ export function createPlaceTools(host) {
       }
       const total = shaped ? found.length : r.total;
       const list = found.slice(0, 15).map((c) => cands.get(keep(c)));
-      if (list.length) (host.addFindings ? host.addFindings(list, feature_type) : host.onCandidates?.(list));
+      if (list.length) (host.addFindings ? host.addFindings(list, { theme: themeFor({ theme, featureType: feature_type }), dataset: feature_type, place: a.feature }) : host.onCandidates?.(list));
       return {
         anchor: a.label, feature_type, radius_km, measured_from: shaped ? `the edge of ${a.label} (0 = inside or touching)` : `the point ${a.label}`,
         found: total, listed: list.length, ...(total > list.length ? { not_listed: `${total - list.length} more found but not listed (nearest ${list.length} shown). Say "${total} found", not ${list.length}.` } : {}),
@@ -439,7 +441,7 @@ export function createPlaceTools(host) {
     resolve,
     area: (ref) => catalogueArea(ref, null),
     keep: (c) => keep(c),
-    onCandidates: (list, group) => { const l = list.map((c) => cands.get(c.id)); host.addFindings ? host.addFindings(l, group) : host.onCandidates?.(l); },
+    onCandidates: (list, meta) => { const l = list.map((c) => cands.get(c.id)); host.addFindings ? host.addFindings(l, meta) : host.onCandidates?.(l); },
     now: host.now,
   });
   run.find_data = (i) => data.find_data(i);

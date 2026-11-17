@@ -222,7 +222,7 @@ await test("licence classes", async () => {
 await test("find_features_near from an area: distances from its edge, all found counted, findings kept on the map", async () => {
   const h = host();
   const added = [];
-  h.addFindings = (list, group) => added.push(...list.map((c) => [c.name, group]));
+  h.addFindings = (list, meta) => added.push(...list.map((c) => [c.name, meta.theme, meta.place]));
   h.list.push({ name: "Area 1", feature: G.squareAround(MARS, 100, 0), origin: { method: "words", confidence: "high" }, status: "proposed", edits: [] });
   const t = createPlaceTools(h);
   const r = await t.exec("find_features_near", { anchor: "Area 1", feature_type: "pipeline", radius_km: 2.2 });
@@ -233,7 +233,8 @@ await test("find_features_near from an area: distances from its edge, all found 
   assert.deepEqual(names.slice(4), ["Export 0.5", "Export 1", "Export 1.5", "Export 2"]);
   assert.equal(r.found, 8);
   assert.equal(added.length, 8);
-  assert.equal(added[0][1], "pipeline");
+  assert.equal(added[0][1], "context");
+  assert.equal(added[0][2].geometry.type, "Polygon");
   // Nothing found in a later search leaves the findings alone (no call that clears them).
   await t.exec("find_features_near", { anchor: "Area 1", feature_type: "river", radius_km: 2 });
   assert.equal(added.length, 8);
@@ -250,6 +251,20 @@ await test("show_on_map: fits to findings, or clears them", async () => {
   assert.equal((await t.exec("show_on_map", { ids: ["C2"] })).shown, 1);
   assert.equal((await t.exec("show_on_map", { clear: true })).cleared, true);
   assert.ok(cleared);
+});
+
+await test("findings: themes from the analyst, the feature type or the atlas concept; bands; labels for the nearest and the near", async () => {
+  const F = await import("../js/findings.js");
+  assert.equal(F.themeFor({ theme: "heritage", featureType: "protected area" }), "heritage");
+  assert.equal(F.themeFor({ featureType: "protected area" }), "biodiversity");
+  assert.equal(F.themeFor({ concepts: ["marine-activity", "seabed-habitat"] }), "land");
+  assert.equal(F.themeFor({ concepts: ["oil-gas"] }), "context");
+  assert.equal(F.themeFor({}), "context");
+  assert.deepEqual([0, 0.9, 3, 12, null].map(F.bandOf), ["near", "near", "close", "wider", "wider"]);
+  const feats = [7, 0.5, 2, 9, 30, 0.2].map((d, i) => ({ properties: { theme: i < 5 ? "biodiversity" : "community", distance_km: d } }));
+  F.chooseLabels(feats);
+  assert.deepEqual(feats.map((f) => f.properties.label_on), [true, true, true, false, false, true]);
+  assert.deepEqual(F.ringDistances(true), [2, 10, 50]);
 });
 
 await test("keyAttributes and geometryDistanceKm", () => {

@@ -10,12 +10,13 @@ import { parseSkill, systemPrompt, buildMessages, runTurn, activityFor } from ".
 import { callClaude, LimitReached } from "./claude.js";
 import { atlasViaWorker, firmsViaWorker } from "./atlasclient.js";
 import { CONFIG } from "./config.js";
+import { THEMES, themeFor, bandOf, BAND_OPACITY, BIG_AREA_KM2, chooseLabels, ringDistances } from "./findings.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
 const ASSETS = (() => { try { return JSON.parse($("asset-versions")?.textContent || "{}"); } catch { return {}; } })();
 const asset = (path) => ASSETS[path] || path;
-const C = { ink: "#15303c", pole: "#d1352a", white: "#ffffff", sea: "#2b6a80", find: "#b7651d" };
+const C = { ink: "#15303c", pole: "#d1352a", white: "#ffffff", sea: "#2b6a80" };
 const BASEMAP = "https://tiles.openfreemap.org/styles/positron";
 
 // ---- reference data -------------------------------------------------------------
@@ -110,15 +111,28 @@ function start() {
   map.addSource("cands", { type: "geojson", data: turf.featureCollection([]) });
   map.addLayer({ id: "cands-line", type: "line", source: "cands", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": C.sea, "line-width": 1.2, "line-dasharray": [2, 2] } });
   map.addLayer({ id: "cands-pt", type: "circle", source: "cands", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 4, "circle-color": C.white, "circle-stroke-color": C.sea, "circle-stroke-width": 2 } });
-  // Findings: features from data searches (protected areas, pipelines, settlements…). They stay on the map for the
-  // session, labelled by name, until the person clears them; a later search never wipes them (Rosebank, 17 Nov).
+  // Findings: features from data searches, drawn by screening theme (js/findings.js). They stay for the session,
+  // until the person clears them; a later search never wipes them (Rosebank, 17 Nov). Big areas sit underneath,
+  // quiet; distance from the site sets the emphasis.
+  const themeColour = ["match", ["get", "theme"], ...Object.entries(THEMES).flatMap(([k, t]) => [k, t.colour]), THEMES.context.colour];
+  const emphasis = ["match", ["get", "band"], "near", BAND_OPACITY.near, "close", BAND_OPACITY.close, BAND_OPACITY.wider];
+  const big = [">", ["coalesce", ["get", "area_km2"], 0], BIG_AREA_KM2];
+  map.addSource("rings", { type: "geojson", data: turf.featureCollection([]) });
+  map.addLayer({ id: "rings-line", type: "line", source: "rings", paint: { "line-color": C.ink, "line-width": 1, "line-opacity": 0.35, "line-dasharray": [3, 3] } });
   map.addSource("findings", { type: "geojson", data: turf.featureCollection([]) });
-  map.addLayer({ id: "find-fill", type: "fill", source: "findings", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": C.find, "fill-opacity": 0.08 } });
-  map.addLayer({ id: "find-line", type: "line", source: "findings", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": C.find, "line-width": 1.6 } });
-  map.addLayer({ id: "find-pt", type: "circle", source: "findings", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 4.5, "circle-color": C.find, "circle-stroke-color": C.white, "circle-stroke-width": 1.5 } });
+  map.addLayer({ id: "find-fill", type: "fill", source: "findings", filter: ["==", ["geometry-type"], "Polygon"],
+    layout: { "fill-sort-key": ["-", 0, ["coalesce", ["get", "area_km2"], 0]] },
+    paint: { "fill-color": themeColour, "fill-opacity": ["case", big, 0.03, ["*", 0.14, emphasis]] } });
+  map.addLayer({ id: "find-line", type: "line", source: "findings", filter: ["!=", ["geometry-type"], "Point"],
+    paint: { "line-color": themeColour, "line-width": ["case", big, 1, 2], "line-opacity": emphasis } });
+  map.addLayer({ id: "find-pt", type: "circle", source: "findings", filter: ["==", ["geometry-type"], "Point"],
+    paint: { "circle-radius": ["match", ["get", "band"], "near", 6, 5], "circle-color": themeColour, "circle-opacity": emphasis, "circle-stroke-color": C.white, "circle-stroke-width": 1.5 } });
+  // Tap a point or an outline to see what it is (not a big area's inside: that would get in the way of the site).
+  for (const id of ["find-pt", "find-line"]) map.on("click", id, (e) => findingPopup(e));
   if (map.getStyle().glyphs) {
     const text = { "text-size": 12, "text-font": ["Noto Sans Bold"], "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": true };
-    map.addLayer({ id: "find-label", type: "symbol", source: "findings", layout: { ...text, "text-field": ["get", "label"], "text-size": 11, "symbol-placement": "point" }, paint: { "text-color": C.find, "text-halo-color": C.white, "text-halo-width": 1.4 } });
+    map.addLayer({ id: "find-label", type: "symbol", source: "findings", filter: ["==", ["get", "label_on"], true], layout: { ...text, "text-field": ["get", "label"], "text-size": 11 }, paint: { "text-color": C.ink, "text-halo-color": C.white, "text-halo-width": 1.6 } });
+    map.addLayer({ id: "rings-label", type: "symbol", source: "rings", layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-size": 10, "text-font": ["Noto Sans Bold"] }, paint: { "text-color": C.ink, "text-opacity": 0.6, "text-halo-color": C.white, "text-halo-width": 1.4 } });
     map.addLayer({ id: "cands-label", type: "symbol", source: "cands", layout: { ...text, "text-field": ["get", "label"], "text-size": 11 }, paint: { "text-color": C.sea, "text-halo-color": C.white, "text-halo-width": 1.4 } });
     map.addLayer({ id: "aoi-label", type: "symbol", source: "aoi", layout: { ...text, "text-field": ["get", "label"] }, paint: { "text-color": C.ink, "text-halo-color": C.white, "text-halo-width": 1.6 } });
   }
@@ -182,20 +196,97 @@ function showCandidates(list) {
   map.getSource("cands")?.setData(turf.featureCollection(feats));
 }
 
-// Findings stay until cleared, one entry per feature id; the analyst can bring them into view with show_on_map.
+// Findings stay until cleared, one entry per feature id, drawn by theme; the analyst can bring them into view with
+// show_on_map. The legend (#key) lists the themes with counts and lets the person switch each off.
 const findings = new Map();
-function addFindings(list, group) {
-  for (const c of list) findings.set(c.id, { type: "Feature", geometry: c.geometry, properties: { label: c.name || c.type || "", group: group || "" } });
-  map.getSource("findings")?.setData(turf.featureCollection([...findings.values()]));
+const hiddenThemes = new Set();
+let ringsAround = null;
+function drawFindings() {
+  const feats = [...findings.values()].filter((f) => !hiddenThemes.has(f.properties.theme));
+  chooseLabels(feats);
+  map.getSource("findings")?.setData(turf.featureCollection(feats));
+  drawKey();
 }
-function clearFindings() { findings.clear(); map.getSource("findings")?.setData(turf.featureCollection([])); }
+function addFindings(list, meta = {}) {
+  const theme = meta.theme || themeFor({});
+  for (const c of list) {
+    findings.set(c.id, { type: "Feature", geometry: c.geometry, properties: {
+      id: c.id, label: c.name || c.type || "", theme, band: bandOf(c.distance_km), distance_km: c.distance_km ?? null,
+      area_km2: c.area_km2 ?? null, dataset: meta.dataset || "", publisher: meta.publisher || c.source?.publisher || "",
+    } });
+  }
+  if (meta.place) drawRings(meta.place);
+  drawFindings();
+}
+async function drawRings(place) {
+  const key = JSON.stringify(place.geometry).slice(0, 200);
+  if (ringsAround === key) return;
+  ringsAround = key;
+  let offshore = false;
+  try { offshore = !!(await R.describe(ref, place)).offshore; } catch { /* reference not loaded */ }
+  const rings = ringDistances(offshore).map((km) => {
+    const b = turf.buffer(place, km, { units: "kilometers", steps: 32 });
+    const line = turf.polygonToLine(b);
+    const f = line.type === "FeatureCollection" ? line.features[0] : line;
+    f.properties = { label: `${km} km` };
+    return f;
+  });
+  map.getSource("rings")?.setData(turf.featureCollection(rings));
+}
+function clearFindings() {
+  findings.clear(); hiddenThemes.clear(); ringsAround = null;
+  map.getSource("rings")?.setData(turf.featureCollection([]));
+  drawFindings();
+}
 function showFindings(ids) {
   const feats = ids?.length ? ids.map((id) => findings.get(String(id).toUpperCase())).filter(Boolean) : [...findings.values()];
   if (!feats.length) return { shown: 0 };
+  feats.forEach((f) => hiddenThemes.delete(f.properties.theme));
+  drawFindings();
   const focus = places.get(selectedId) || [...places.values()].at(-1);
   const all = turf.featureCollection([...feats, ...(focus ? [focus.feature] : [])]);
   map.fitBounds(turf.bbox(all), { padding: fitPadding(), maxZoom: 14 });
   return { shown: feats.length, on_map: findings.size };
+}
+// The map key: one row per theme on the map, with a count and a switch; doubles as the list of what's shown.
+function drawKey() {
+  const key = $("key");
+  if (!key) return;
+  const counts = new Map();
+  for (const f of findings.values()) counts.set(f.properties.theme, (counts.get(f.properties.theme) || 0) + 1);
+  key.hidden = !counts.size;
+  if (!counts.size) return;
+  const list = key.querySelector("ul");
+  list.replaceChildren(...Object.entries(THEMES).filter(([k]) => counts.has(k)).map(([k, t]) => {
+    const li = document.createElement("li");
+    const label = document.createElement("label");
+    const box = document.createElement("input");
+    box.type = "checkbox"; box.checked = !hiddenThemes.has(k);
+    box.addEventListener("change", () => { box.checked ? hiddenThemes.delete(k) : hiddenThemes.add(k); drawFindings(); });
+    const sw = document.createElement("span"); sw.className = "swatch"; sw.style.background = t.colour;
+    label.append(box, sw, document.createTextNode(` ${t.label} `), Object.assign(document.createElement("span"), { className: "count", textContent: counts.get(k) }));
+    li.append(label);
+    return li;
+  }));
+}
+
+$("key-clear")?.addEventListener("click", () => clearFindings());
+if (phone) $("key")?.removeAttribute("open");
+
+// Tap a finding: its name, theme, distance and source.
+function findingPopup(e) {
+  if (draw && draw.getMode() !== "select") return;
+  const f = e.features?.[0];
+  if (!f) return;
+  const p = f.properties;
+  const box = document.createElement("div");
+  box.className = "finding-pop";
+  const name = document.createElement("b"); name.textContent = p.label || "Unnamed feature";
+  const what = document.createElement("span");
+  const km = p.distance_km == null || p.distance_km === "null" ? "" : +p.distance_km === 0 ? "on site · " : `${p.distance_km} km from the site · `;
+  what.textContent = `${THEMES[p.theme]?.label || ""} · ${km}${p.dataset}${p.publisher ? ` (${p.publisher})` : ""}`;
+  box.append(name, what);
+  new maplibregl.Popup({ closeButton: true, maxWidth: "280px" }).setLngLat(e.lngLat).setDOMContent(box).addTo(map);
 }
 
 // ---- modes and hints ---------------------------------------------------------------

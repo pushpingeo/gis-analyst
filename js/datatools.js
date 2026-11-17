@@ -6,6 +6,7 @@ import * as turf from "./vendor/turf.js";
 import { atlasCandidate, pickName, edgeDistanceKm } from "./atlasfeatures.js";
 import { candidate } from "./gazetteer.js";
 import { classifyLicence, LICENCE_NOTE } from "./licence.js";
+import { themeFor, THEME_IDS } from "./findings.js";
 
 const round = (v, d = 2) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
 
@@ -34,6 +35,7 @@ export const DATA_TOOL_DEFS = [
         within_km: { type: "number", description: "Also count features up to this far outside the place (0 to 50 km). Default 0 for an area, 10 for a point." },
         name: { type: "string", description: "Optional: only features with this text in a name-like field" },
         days: { type: "number", description: "For time-aware datasets (satellite detections): how many recent days, 1 to 10. Default 7." },
+        theme: { type: "string", enum: THEME_IDS, description: "Which screening theme this evidence is for (it sets the colour on the map): biodiversity, land (land and livelihoods, fishing), indigenous, heritage, community (community health and safety), context (operating context: infrastructure, other industry)." },
       },
       required: ["dataset", "place"],
     },
@@ -157,7 +159,7 @@ export function createDataTools(host) {
       };
     },
 
-    async get_data({ dataset, place, within_km, name, days }) {
+    async get_data({ dataset, place, within_km, name, days, theme }) {
       const d = datasets.get(String(dataset).trim().toUpperCase());
       if (!d) throw new Error(`"${dataset}" isn't a dataset id from find_data in this conversation. Use find_data first.`);
       const lic = d.service ? { class: d.licence_class, short: d.licence } : classifyLicence(d.licence);
@@ -203,7 +205,7 @@ export function createDataTools(host) {
       found.forEach((c) => { c._fromCentre = turf.distance(centre, c.lonlat); });
       found.sort((x, y) => x.distance_km - y.distance_km || x._fromCentre - y._fromCentre);
       const kept = found.map((c) => ({ ...c, id: host.keep(c) }));
-      if (kept.length) host.onCandidates?.(kept, d.title);
+      if (kept.length) host.onCandidates?.(kept, { theme: themeFor({ theme: theme || d.service?.theme, concepts: d.concepts }), dataset: d.title, publisher: d.publisher, place: p.feature });
       const inside = kept.filter((c) => c.distance_km === 0).length;
       const returned = g.returned ?? (g.features || []).length;
       return {

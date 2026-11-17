@@ -14,6 +14,7 @@
       "topics": ["viirs", "thermal", "hotspot", "hot spot", "fire", "wildfire", "flare", "flaring", "gas flare", "heat", "burn", "burning", "thermal anomaly", "active fire", "firms"],
       "geometry": "point",
       "time_aware": true,
+      "theme": "community",
       "access": { "type": "firms", "sources": ["VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT", "VIIRS_SNPP_NRT"], "default_days": 7, "max_days": 10 },
       "note": "Satellite detections of heat, at about 375 m: fires, gas flares, industrial heat. Positions are pixel centres. Shows what was detected in the days asked (up to 10), not a long record."
     },
@@ -30,6 +31,7 @@
       "topics": ["modis", "thermal", "hotspot", "hot spot", "fire", "wildfire", "flare", "flaring", "heat", "burn", "thermal anomaly", "active fire", "firms"],
       "geometry": "point",
       "time_aware": true,
+      "theme": "community",
       "access": { "type": "firms", "sources": ["MODIS_NRT"], "default_days": 7, "max_days": 10 },
       "note": "Coarser (1 km) than VIIRS; the longer-running record. Use VIIRS first."
     }
