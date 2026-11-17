@@ -75,8 +75,11 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
   // National and intergovernmental bodies first (NatureScot's SSSIs before a council's copy), then curated and
   // academic collections, then local bodies and unknown publishers, whose "global" extents are often wrong
   // (San José traffic signals came up for the M9). Within a group, the atlas's own order (fit) stands.
-  const rank = (d) => (/central-gov|public-body|intergov|national|regulator|mapping-agency/i.test(d.publisher_type || "") ? 0
-    : /curated|academic|ngo|research/i.test(d.publisher_type || "") ? 1 : 2) + (d.coverage === "global" && /local|city|unknown/i.test(d.publisher_type || "unknown") ? 2 : 0);
+  // "regional-gov" covers devolved governments and their agencies (NatureScot, Natural Resources Wales): treat
+  // them like national bodies, or their SSSI layers sink below marine orders (Linlithgow, 17 Nov).
+  const rank = (d) => (/central-gov|regional-gov|public-body|intergov|national|regulator|mapping-agency/i.test(d.publisher_type || "") ? 0
+    : /curated|academic|ngo|research/i.test(d.publisher_type || "") ? 1 : /local-gov/i.test(d.publisher_type || "") ? 2 : 3)
+    + (d.coverage === "global" && /local|city|unknown/i.test(d.publisher_type || "unknown") ? 2 : 0);
   all.forEach((d, i) => { d._i = i; });
   all.sort((x, y) => rank(x) - rank(y) || x._i - y._i);
   const datasets = all.slice(0, maxDatasets);
