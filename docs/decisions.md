@@ -46,3 +46,4 @@ Judgement calls made while building, newest first. Bigger product decisions live
 - **Atlas answers are remembered in the page for the session** (up to 400; failures aren't kept).
 - **Shorter replies:** the layers asked are summarised (those that found something, a few failures by name, counts for the rest) instead of listed one by one.
 - Skill 4.9: spellings in one call; don't offer files or web services, which can't be loaded yet.
+- Road and river pieces from one layer are joined into one line (a corridor used one piece of 13 on the live M9 test); areas in pieces are still counted, not joined.

@@ -206,7 +206,19 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
   const uniq = cands.filter((c) => {
     const dup = seen.find((s) => s.name && c.name && s.name.toLowerCase() === c.name.toLowerCase()
       && (s.source.atlas_id === c.source.atlas_id || turf.distance(s.lonlat, c.lonlat) < 1));
-    if (dup) { if (dup.source.atlas_id === c.source.atlas_id) dup.extra.more_pieces = (dup.extra.more_pieces || 0) + 1; return false; }
+    if (dup) {
+      if (dup.source.atlas_id === c.source.atlas_id) {
+        // A road or river comes in many short pieces: join them, so a corridor follows the whole stretch found
+        // (the M9 corridor used one piece of 13, 17 Nov). Areas in pieces are counted instead.
+        if (/LineString/.test(dup.geometry.type) && /LineString/.test(c.geometry.type)) {
+          const parts = (g) => (g.type === "LineString" ? [g.coordinates] : g.coordinates);
+          dup.geometry = { type: "MultiLineString", coordinates: [...parts(dup.geometry), ...parts(c.geometry)] };
+          dup.length_km = Math.round(((dup.length_km || 0) + (c.length_km || 0)) * 100) / 100;
+          dup.extra.pieces_joined = (dup.extra.pieces_joined || 1) + 1;
+        } else dup.extra.more_pieces = (dup.extra.more_pieces || 0) + 1;
+      }
+      return false;
+    }
     seen.push(c);
     return true;
   });

@@ -398,4 +398,19 @@ await test("lookups in one step run at the same time; map changes run after them
   assert.deepEqual(r.history[2].content.map((x) => x.tool_use_id), ["a", "m", "b"], "results in the order asked");
 });
 
+await test("pieces of one road in one layer are joined, so a corridor follows the whole stretch", async () => {
+  const host = memoryHost();
+  const t = createPlaceTools(host);
+  const town = await t.exec("find_place", { query: "Jackdaw" });
+  const { lon, lat } = town.candidates[0];
+  host.atlas = async (tool) => (tool === "find_datasets"
+    ? { matches: 1, results: [{ id: "roads", title: "Open Roads", publisher: "Mapping agency", publisher_type: "mapping-agency", geometry: ["line"] }] }
+    : { returned: 3, features: [0, 1, 2].map((i) => ({ type: "Feature", properties: { road_number: "M9" }, geometry: { type: "LineString", coordinates: [[lon - 0.1 + i * 0.05, lat], [lon - 0.05 + i * 0.05, lat]] } })) });
+  const out = await t.exec("find_features_near", { anchor: town.candidates[0].id, feature_type: "main road", radius_km: 20, name: "M9" });
+  const c = out.candidates.find((x) => x.name === "M9");
+  assert.equal(c.details.pieces_joined, 3);
+  const built = await t.exec("make_place", { anchor: c.id, shape: "buffer", buffer_km: 0.5, words: "corridor", match: "named_place", reason: "x" });
+  assert.ok(built.area_km2 > 5, `corridor covers all three pieces (${built.area_km2} km²)`);
+});
+
 console.log(`${passed} place tests passed`);
