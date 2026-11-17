@@ -64,6 +64,8 @@ for (const conv of convs) {
           const brief = ev.error ? `ERROR ${ev.error}`
             : ev.name === "find_features_near" ? `${o.found} found; sources ${JSON.stringify(o.sources)}; top: ${(o.candidates || []).slice(0, 5).map((c) => `${c.name} (${c.distance_km} km, ${c.source})`).join("; ")}`
             : ev.name === "find_place" ? `${(o.candidates || []).length} found: ${(o.candidates || []).slice(0, 5).map((c) => `${c.id} ${c.name} [${c.type}] ${c.source}`).join("; ")}`
+            : ev.name === "find_data" ? `${o.matches ?? 0} matches: ${(o.datasets || []).map((d) => `${d.id} ${d.title} (${d.publisher}${d.can_fetch ? "" : ", picture only"})`).join("; ")}${o.not_checked ? ` NOT CHECKED: ${o.not_checked}` : ""}`
+            : ev.name === "get_data" ? (o.not_checked ? `NOT CHECKED: ${o.not_checked}` : `${o.dataset}: ${o.inside_or_touching} inside, ${o.within_distance} within ${o.within_km} km; nearest: ${(o.nearest || []).slice(0, 4).map((c) => `${c.name} ${c.distance_km} km ${JSON.stringify(c.details || {})}`).join("; ")}`)
             : ev.name === "make_place" ? `${o.summary} | ${o.how} | ${o.confidence}: ${(o.why || []).join("; ")}`
             : JSON.stringify(o).slice(0, 200);
           console.log(`   · ${ev.name} ${JSON.stringify(ev.input).slice(0, 160)}\n     → ${brief.slice(0, 700)}`);

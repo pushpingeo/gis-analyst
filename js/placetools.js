@@ -6,6 +6,7 @@ import * as G from "./geometry.js";
 import * as R from "./reference.js";
 import { rateConfidence, runCheck, MATCHES } from "./confidence.js";
 import { atlasFindNamed, NAMED_KINDS, describeChecked } from "./atlasfeatures.js";
+import { DATA_TOOL_DEFS, createDataTools } from "./datatools.js";
 import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES } from "./gazetteer.js";
 
 const round = (v, d = 3) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
@@ -102,6 +103,7 @@ export function placeToolDefs(skills) {
       description: "Full details of a place: size, where it is, how it was made and its edit history.",
       input_schema: { type: "object", properties: { place: { type: "string" } }, required: ["place"] },
     },
+    ...DATA_TOOL_DEFS,
   ];
 }
 
@@ -307,7 +309,10 @@ export function createPlaceTools(host) {
         try { const t = resolve(c.against); checks.push(runCheck(site, { lonlat: t.lonlat, name: t.label }, c)); }
         catch { checks.push({ against: c.against, expected_km: c.expected_km, pass: null, why: "not a candidate id, so not checked" }); }
       }
-      const rated = rateConfidence({ cand: a.cand, match: i.match, checks: checks.filter((c) => c.pass !== null), offset: !!i.offset_km, shape: i.shape });
+      // Built on a place already on the map: it starts from that place's confidence (a person's drawing counts as high),
+      // not from the anchor rules, which would read a platform point as "nothing specific" (Mars, 17 Nov).
+      const inherit = !a.cand && a.place ? { name: a.place.name, confidence: a.place.origin?.method === "words" ? a.place.origin.confidence : "high", drawn: a.place.origin?.method !== "words" } : null;
+      const rated = rateConfidence({ cand: a.cand, match: i.match, checks: checks.filter((c) => c.pass !== null), offset: !!i.offset_km, shape: i.shape, inherit });
       const origin = {
         method: "words", words: i.words, steps, confidence: rated.confidence, confidence_rules: rated.rules, match: i.match, checks, reason: i.reason,
         anchor: a.cand ? { name: a.cand.name, type: a.cand.type, source: a.cand.source, lonlat: a.cand.lonlat, extra: a.cand.extra } : { place: a.label },
@@ -355,8 +360,20 @@ export function createPlaceTools(host) {
     },
   };
 
+  const data = createDataTools({
+    atlas: host.atlas || null,
+    resolve,
+    area: (ref) => catalogueArea(ref, null),
+    keep: (c) => keep(c),
+    onCandidates: (list) => host.onCandidates?.(list.map((c) => cands.get(c.id))),
+    now: host.now,
+  });
+  run.find_data = (i) => data.find_data(i);
+  run.get_data = (i) => data.get_data(i);
+
   return {
     candidates: cands,
+    datasets: data.datasets,
     async exec(name, input) {
       if (!run[name]) throw new Error(`Unknown tool ${name}`);
       return run[name](input || {});

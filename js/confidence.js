@@ -63,10 +63,17 @@ export function runCheck(siteLonLat, target, { expected_km, direction }) {
 
 // cand: the anchor candidate (or null for an existing place); match: one of MATCHES;
 // checks: results of runCheck; offset: whether the place was moved from the anchor; shape; anchorType.
-export function rateConfidence({ cand, match = "none", checks = [], offset = false, shape }) {
+export function rateConfidence({ cand, match = "none", checks = [], offset = false, shape, inherit = null }) {
   const rules = [];
   const tier = tierOf(cand);
   let level;
+  if (inherit) {
+    // Built on a place already on the map (a circle round Point 1): the anchor rules don't apply; it starts from
+    // that place's confidence. Checks and offsets still count below.
+    level = Math.max(0, LEVELS.indexOf(inherit.confidence || "high"));
+    rules.push(inherit.drawn ? `built on ${inherit.name}, which the person drew: high` : `built on ${inherit.name}, which is ${LEVELS[level]} confidence`);
+    return finish(level, rules, { checks, offset, shape: null, cand: null, match: "inherited" });
+  }
   // An asset "found" as a town or village is the town, not the asset (Sierra Rutile in v3: a town sharing the project area's name).
   if (match === "name_and_type" && looksLikeSettlement(cand)) { match = "settlement_or_region"; rules.push("the match is a settlement, not the asset"); }
   if (match === "named_place") {
@@ -80,19 +87,23 @@ export function rateConfidence({ cand, match = "none", checks = [], offset = fal
   } else {
     level = 1; rules.push(match === "type_near_clues" ? "a feature of the right type where the clues point: medium" : "matched by name and type in Wikidata or OpenStreetMap: medium");
   }
+  return finish(level, rules, { checks, offset, shape, cand, match });
+}
+
+function finish(level, rules, { checks, offset, shape, cand, match }) {
   const passed = checks.filter((c) => c.pass).length, failed = checks.length - passed;
   // Only tight checks raise confidence, and a distance alone puts the site on a ring: a tight check with a direction
   // counts 2, without one 1. High needs 2 (3 for a type-only match). Replayed on the v4 results: high went from
   // 11 sites at 1.6 km median to 5 at 0.7 km (same 48 sites the rule was drawn from, so not a held-out result).
   const strength = checks.filter((c) => c.pass && c.tight !== false).reduce((n, c) => n + (c.direction ? 2 : 1), 0);
-  if (level === 1 && failed === 0 && strength >= (match === "type_near_clues" ? 3 : 2)) { level = 2; rules.push(`tight distance checks pin it down (strength ${strength}): high`); }
+  if (match !== "inherited" && level === 1 && failed === 0 && strength >= (match === "type_near_clues" ? 3 : 2)) { level = 2; rules.push(`tight distance checks pin it down (strength ${strength}): high`); }
   else if (level === 1 && failed === 0 && passed) rules.push(`${passed} check${passed > 1 ? "s" : ""} passed, but not tight or directional enough to pin the site: stays medium`);
   if (level === 0 && offset && failed === 0 && passed >= 1) { level = 1; rules.push("placed by offset, confirmed by a passing check: medium"); }
   if (offset && level > 1) { level = 1; rules.push("placed by an offset from a reference, not found itself: at most medium"); }
   const type = `${cand?.type || ""} ${cand?.name || ""}`;
   if (shape === "point" && LARGE.test(type) && level > 1) { level = 1; rules.push("a point for a large feature: the site could be anywhere in it, so at most medium"); }
   if (failed) { level = 0; rules.push(`${failed} check${failed > 1 ? "s" : ""} failed: low`); }
-  if (!checks.length && level === 1) rules.push("no distance checks given, so it stays medium");
+  if (!checks.length && level === 1 && match !== "inherited") rules.push("no distance checks given, so it stays medium");
   return { confidence: LEVELS[level], rules };
 }
 

@@ -36,12 +36,12 @@ const NAME_KEYS = /^(name|site_?name|plant_?name|plant___project_name|project_?n
 const NAMEISH = /name|project|plant|site|mine|facility|title|^ref$|road_?num|roadnumber|route/i;
 const TYPEISH = /^(type|.*_?type|commod.*|fuel|technology|source|status|primary_fuel|dep_type)$/i;
 
-function pickName(p) {
+export function pickName(p) {
   const k = Object.keys(p).find((k) => NAME_KEYS.test(k) && typeof p[k] === "string" && p[k].trim())
     || Object.keys(p).find((k) => NAMEISH.test(k) && typeof p[k] === "string" && p[k].trim() && p[k].length < 120);
   return k ? p[k].trim() : null;
 }
-function pickType(p) {
+export function pickType(p) {
   return Object.entries(p).filter(([k, v]) => TYPEISH.test(k) && typeof v === "string" && v.trim() && v.length < 80).map(([, v]) => v).slice(0, 2).join(", ");
 }
 
@@ -135,7 +135,7 @@ async function askInBatches(layers, ask, { first = 10, then = 10, max = 40, budg
   return { checked, unasked: layers.length - i };
 }
 
-function atlasCandidate(f, d, name) {
+export function atlasCandidate(f, d, name) {
   return candidate({
     name, type: pickType(f.properties || {}) || d.title, geometry: f.geometry,
     source: { id: "atlas", atlas_id: d.id, title: d.title, publisher: d.publisher, publisher_type: d.publisher_type,
