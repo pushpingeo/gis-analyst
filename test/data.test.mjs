@@ -277,6 +277,23 @@ await test("names: source and project columns and short codes aren't names; desc
   assert.equal(pickName({ SITE_CODE: "UK0030" }), null, "other short codes aren't");
 });
 
+await test("make_place clip: a corridor cut to within 5 km of a town, or to an outline", async () => {
+  const h = host();
+  const town = [-3.6, 55.977];
+  h.list.push({ name: "Road", feature: turf.lineString([[-3.9, 55.977], [-3.3, 55.977]]), origin: { method: "drawn" }, status: "drawn", edits: [] });
+  h.list.push({ name: "Town", feature: turf.point(town), origin: { method: "drawn" }, status: "drawn", edits: [] });
+  h.list.push({ name: "County", feature: turf.bboxPolygon([-3.7, 55.9, -3.5, 56.05]), origin: { method: "drawn" }, status: "drawn", edits: [] });
+  const t = createPlaceTools(h);
+  const full = await t.exec("make_place", { anchor: "Road", shape: "buffer", buffer_km: 0.5, words: "corridor", match: "named_place", reason: "x" });
+  const cut = await t.exec("make_place", { anchor: "Road", shape: "buffer", buffer_km: 0.5, clip: { to: "Town", within_km: 5 }, words: "within 5 km", match: "named_place", reason: "x" });
+  assert.ok(full.area_km2 > 35 && full.area_km2 < 40, `full ${full.area_km2}`);
+  assert.ok(cut.area_km2 > 9 && cut.area_km2 < 10.5, `about 10 km long × 1 km: ${cut.area_km2}`);
+  assert.match(cut.how, /clipped to within 5 km of Town/);
+  const inCounty = await t.exec("make_place", { anchor: "Road", shape: "buffer", buffer_km: 0.5, clip: { to: "County" }, words: "only in the county", match: "named_place", reason: "x" });
+  assert.ok(inCounty.area_km2 > 11 && inCounty.area_km2 < 13.5, `about 12.5 km × 1 km: ${inCounty.area_km2}`);
+  await assert.rejects(() => t.exec("make_place", { anchor: "Road", shape: "buffer", buffer_km: 0.5, clip: { to: "Town" }, words: "x", match: "named_place", reason: "x" }), /needs within_km/);
+});
+
 await test("keyAttributes and geometryDistanceKm", () => {
   const k = keyAttributes({ OBJECTID: 5, Shape__Area: 3, acq_date: 1763337600000, name: "X", junk: "y" });
   assert.deepEqual(Object.keys(k), ["acq_date", "name"]);

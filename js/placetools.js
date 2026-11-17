@@ -92,6 +92,7 @@ export function placeToolDefs(skills) {
           match: { type: "string", enum: MATCHES, description: "How the anchor relates to what the person wants. named_place: they asked for this place itself (a palace, a town, a block, a field). name_and_type: the asset itself, matched by name and of the right type (a mine for a mine). type_near_clues: a feature of the right type found where the clues point, its name not confirmed. name_only: the name matches but the type is wrong or unknown. settlement_or_region: a town, village or region stands in for the site. none: nothing specific." },
           checks: { type: "array", description: "Every distance clue in the request that the place can be checked against, e.g. 'Nok Kundi lies about 80 km south-east of the mine' → { against: <Nok Kundi's candidate id>, expected_km: 80, direction: 'SE' }. Direction is the way you travel FROM the site TO that feature. Give all you have; they are measured, not trusted.", items: { type: "object", properties: { against: { type: "string", description: "Candidate id" }, expected_km: { type: "number" }, direction: { type: "string", description: "Compass point from the site to it: N, NE, ENE… (optional)" } }, required: ["against", "expected_km"] } },
           reason: { type: "string", description: "One line: the evidence for the location" },
+          clip: { type: "object", description: "Optional: cut the shape to a limit, e.g. a corridor along the M9 'within 5 km of Linlithgow' → { to: <Linlithgow's candidate id>, within_km: 5 }. Without within_km it's cut to the outline of 'to' (a place or a candidate with an outline, e.g. 'only inside Fife').", properties: { to: { type: "string", description: "Candidate id or place name" }, within_km: { type: "number" } }, required: ["to"] },
           scale: { type: "string", enum: ["local", "regional", "global"], description: "Only when the request itself says the scale of the work (e.g. 'screen Mozambique' is global, 'the whole of the Moray Firth' regional) and it differs from the shape's size. Otherwise leave it out and the size decides." },
         },
         required: ["anchor", "shape", "words", "match", "reason"],
@@ -363,6 +364,23 @@ export function createPlaceTools(host) {
           } else steps.push(`${i.buffer_km} km buffer around ${a.label}`);
           break;
         default: throw new Error(`Unknown shape ${i.shape}.`);
+      }
+      if (i.clip?.to) {
+        // Cut to a circle (or buffer) round another feature, or to its outline: "within 5 km of Linlithgow".
+        const lim = resolve(i.clip.to);
+        const limGeom = lim.cand?.outline || lim.feature.geometry;
+        let limit;
+        if (i.clip.within_km) {
+          limit = limGeom.type === "Point" ? turf.circle(limGeom.coordinates, i.clip.within_km, { units: "kilometers", steps: 64 })
+            : turf.buffer({ type: "Feature", properties: {}, geometry: limGeom }, i.clip.within_km, { units: "kilometers", steps: 32 });
+        } else if (/Polygon/.test(limGeom.type)) limit = { type: "Feature", properties: {}, geometry: limGeom };
+        else throw new Error(`${lim.label} is a ${limGeom.type === "Point" ? "point" : "line"}, so it needs within_km to clip to.`);
+        if (!/Polygon/.test(f.geometry.type)) throw new Error("Only areas can be clipped (build the corridor or shape first, then clip it).");
+        const cut = turf.intersect(turf.featureCollection([f, limit]));
+        if (!cut) throw new Error(`The shape doesn't reach ${i.clip.within_km ? `within ${i.clip.within_km} km of ` : ""}${lim.label}, so clipping would leave nothing.`);
+        const before = turf.area(f) / 1e6;
+        f = cut;
+        steps.push(`clipped to ${i.clip.within_km ? `within ${i.clip.within_km} km of ${lim.label}` : `the outline of ${lim.label}`} (${round(before, 1)} km² → ${round(turf.area(f) / 1e6, 1)} km²)`);
       }
       {
         // The map editor can't hold holes. Fill them, and say so with the area it adds, rather than

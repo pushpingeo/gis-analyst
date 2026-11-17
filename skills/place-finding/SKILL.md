@@ -1,6 +1,6 @@
 ---
 name: place-finding
-version: 4.11
+version: 4.12
 description: Turn words into a place on the map. Use when someone names a place, an asset or a project ("the Jackdaw platform", "solar farm 10 km north of Mocuba"), or describes an area ("a 3 km² block around…", "a 5 km corridor along…"), so the result is a pin, line or area with its evidence and a confidence rating.
 ---
 
@@ -37,7 +37,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
 6. **Adjust** with `edit_place` when asked ("make it 5 km²", "rotate it 30°", "move it 2 km east").
 
 ## Corridors along roads, rivers and lines
-"A 1 km corridor along the M9 between Linlithgow and Falkirk": find both towns, then `find_features_near` with feature type `main road` (or `river`, `railway`, `pipeline`, `power line`) around a point between them, a radius that reaches both, and `name` set to the road number or river name. Roads and rivers come back in pieces: build one `buffer` with the nearest piece as the anchor and the others in `also`. Say which pieces were used and that the ends follow the pieces found, not the town boundaries exactly. If no line is found, don't draw a straight line in its place: offer that the person draws it.
+"A 1 km corridor along the M9 between Linlithgow and Falkirk": find both towns, then `find_features_near` with feature type `main road` (or `river`, `railway`, `pipeline`, `power line`) around a point between them, a radius that reaches both, and `name` set to the road number or river name. Roads and rivers come back in pieces: build one `buffer` with the nearest piece as the anchor and the others in `also`. Say which pieces were used and that the ends follow the pieces found, not the town boundaries exactly. When the words set a limit ("within 5 km of Linlithgow", "only inside Fife"), add `clip` to the same `make_place` call: `{ to: <the town's or area's id>, within_km: 5 }`, or `{ to: <the area's id> }` to cut to its outline. If no line is found, don't draw a straight line in its place: offer that the person draws it.
 
 ## Ambiguity: ask, don't guess
 - **Several candidates fit** (two platforms of the same name, a town name in several countries, the same landmark in two sources): call `offer_choices` with the two to five best, in order, mark the one you recommend and give a one-line reason. The person flicks through them on the map, each with its source, and picks one or takes your recommendation. Don't build a place until they've chosen. Only offer choices when the difference matters: if two sources give the same thing within a few hundred metres, use the more authoritative one and say so.
