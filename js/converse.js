@@ -67,7 +67,9 @@ export async function runTurn({ system, messages, tools, exec, callClaude, onEve
   const usage = { input_tokens: 0, output_tokens: 0 };
   let text = "";
   for (let round = 0; round < maxRounds; round++) {
+    const t0 = Date.now();
     const resp = await callClaude({ system, messages: compact(history), tools });
+    onEvent({ type: "round", round, ms: Date.now() - t0, input_tokens: resp.usage?.input_tokens || 0, output_tokens: resp.usage?.output_tokens || 0, tools: resp.content.filter((b) => b.type === "tool_use").length });
     usage.input_tokens += resp.usage?.input_tokens || 0;
     usage.output_tokens += resp.usage?.output_tokens || 0;
     history.push({ role: "assistant", content: resp.content });
@@ -79,12 +81,13 @@ export async function runTurn({ system, messages, tools, exec, callClaude, onEve
     // Searches and lookups in one step run at once; tools that change the map run in order, after them.
     const run1 = async (u) => {
       onEvent({ type: "tool_start", name: u.name, input: u.input });
+      const t1 = Date.now();
       try {
         const out = await exec(u.name, u.input || {});
-        onEvent({ type: "tool", name: u.name, input: u.input, output: out });
+        onEvent({ type: "tool", name: u.name, input: u.input, output: out, ms: Date.now() - t1 });
         return { type: "tool_result", tool_use_id: u.id, content: toolResultText(out) };
       } catch (e) {
-        onEvent({ type: "tool", name: u.name, input: u.input, error: e.message });
+        onEvent({ type: "tool", name: u.name, input: u.input, error: e.message, ms: Date.now() - t1 });
         return { type: "tool_result", tool_use_id: u.id, is_error: true, content: clean(String(e.message)) };
       }
     };

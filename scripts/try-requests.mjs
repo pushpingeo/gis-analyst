@@ -58,6 +58,7 @@ for (const conv of convs) {
   console.log(`\n==================== ${conv}`);
   for (const text of conv.split(" >> ")) {
     const t0 = Date.now();
+    const timing = { model: 0, rounds: 0, tools: [] };
     console.log(`\n> ${text}`);
     try {
       const res = await runTurn({
@@ -68,7 +69,9 @@ for (const conv of convs) {
         exec: (name, input) => tools.exec(name, input),
         callClaude,
         onEvent: (ev) => {
+          if (ev.type === "round") { timing.model += ev.ms; timing.rounds++; console.log(`   [model round ${ev.round + 1}: ${(ev.ms / 1000).toFixed(1)} s, ${ev.input_tokens} in / ${ev.output_tokens} out, ${ev.tools} tool calls]`); return; }
           if (ev.type !== "tool") return;
+          timing.tools.push([ev.name, ev.ms]);
           if (ev.name === "load_skill") { const k = allSkills.find((x) => x.name === ev.input?.name); if (k && !loaded.includes(k)) loaded = [...loaded, k]; }
           const o = ev.output || {};
           const brief = ev.error ? `ERROR ${ev.error}`
@@ -78,11 +81,12 @@ for (const conv of convs) {
             : ev.name === "get_data" ? (o.not_checked ? `NOT CHECKED: ${o.not_checked}` : `${o.dataset}: ${o.inside_or_touching} inside, ${o.within_distance} within ${o.within_km} km; nearest: ${(o.nearest || []).slice(0, 4).map((c) => `${c.name} ${c.distance_km} km ${JSON.stringify(c.details || {})}`).join("; ")}`)
             : ev.name === "make_place" ? `${o.summary} | ${o.how} | ${o.confidence}: ${(o.why || []).join("; ")}`
             : JSON.stringify(o).slice(0, 200);
-          console.log(`   · ${ev.name} ${JSON.stringify(ev.input).slice(0, 160)}\n     → ${brief.slice(0, 700)}`);
+          console.log(`   · ${ev.name} (${(ev.ms / 1000).toFixed(1)} s) ${JSON.stringify(ev.input).slice(0, 160)}\n     → ${brief.slice(0, 700)}`);
         },
       });
       recent.push({ role: "user", text }, { role: "assistant", text: res.text });
-      console.log(`\n${res.text}\n   (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
+      const total = (Date.now() - t0) / 1000;
+      console.log(`\n${res.text}\n   (${total.toFixed(0)} s: model ${(timing.model / 1000).toFixed(0)} s over ${timing.rounds} rounds; tools ${(total - timing.model / 1000).toFixed(0)} s wall; slowest tools ${timing.tools.sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, ms]) => `${n} ${(ms / 1000).toFixed(1)} s`).join(", ")})`);
     } catch (e) { console.log(`TURN FAILED: ${e.message}`); }
   }
 }

@@ -689,10 +689,11 @@ async function send(text) {
       exec: (name, input) => tools.exec(name, input),
       callClaude,
       onEvent: (ev) => {
+        if (ev.type === "round") turnLog.events.push({ model_round: ev.round, ms: ev.ms, tokens_in: ev.input_tokens, tokens_out: ev.output_tokens, tool_calls: ev.tools });
         if (ev.type === "tool_start") activity(`${activityFor(ev.name, ev.input)}…`, true);
         if (ev.type === "tool" && ev.name === "load_skill" && !ev.error) loadedSkills.add(ev.input?.name);
         if (ev.type === "tool") {
-          turnLog.events.push({ tool: ev.name, input: ev.input, ...(ev.error ? { error: ev.error } : { output: ev.output }) });
+          turnLog.events.push({ tool: ev.name, input: ev.input, ms: ev.ms, ...(ev.error ? { error: ev.error } : { output: ev.output }) });
           steps.append(el("li", traceLine(ev), ev.error ? "err" : ""));
           activity("Thinking…", true);
         }
