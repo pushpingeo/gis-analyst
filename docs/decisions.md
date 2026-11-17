@@ -2,6 +2,17 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 17 Nov 2026 (evening): Tobler's own Worker, tobler-api
+- Tobler's Claude and atlas calls now go through `tobler-api` (code in `worker/`, see `worker/README.md`), not demo 1's `north-sea-geo-demo`. Switched in one line (`proxyUrl` in `js/config.js`); demo 1's Worker is untouched and still serves demo 1.
+- Deployed by the **Worker deploy** Action on changes under `worker/`: tests, `wrangler deploy`, secrets loaded with `wrangler secret bulk` from the repo secrets, then a live check. Secrets used: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `ANTHROPIC_API_KEY`, `ATLAS_MCP_KEY` (checked first with the harmless **Worker secrets check** workflow).
+- The Worker's Anthropic key is `ANTHROPIC_API_KEY`, the same secret the evaluations use (it was the only Anthropic secret in the repo). One key, one spend limit in the Console; split later if page use and evaluation spend need tracking separately.
+- Counters in a Durable Object (SQLite-backed, one per visitor per day plus one daily total) instead of KV, so the caps are exact under parallel calls. Visitors are keyed by a hash of the IP. Calls are counted before going upstream (simpler and tighter than counting after; failed calls count).
+- Same limits as demo 1 (200 Claude calls per visitor a day, 5,000 in total, 2,000 atlas calls per visitor), as vars in `worker/wrangler.toml`.
+- Allowed origins: asktobler.com, www.asktobler.com, pushpingeo.github.io, localhost:8000. Not asktobler.ai/.io (they don't serve the site).
+- Only `system`, `messages`, `tools` and a capped `max_tokens` are forwarded to Claude, as before.
+- `compatibility_date` 2026-08-01, because local workerd (Miniflare 4) doesn't support later dates yet. Miniflare 4 is pinned for the tests because the Miniflare that ships with the latest wrangler is a beta with a different options format.
+- `index.html` (the earlier agent page) also reads `js/config.js`, so it moved to tobler-api too.
+
 ## 17 Nov 2026 (early hours)
 
 - **Place-finding v4 evaluation (skill 4.2, atlas on, Overpass down throughout):** 46 of 48 described sites placed (v3: 43), median 2.46 km, 70% within 5 km. On the 42 sites both placed, accuracy is unchanged (74–76% within 5 km, 86% within 10 km). What changed is confidence: low now means worse (median 5.6 km, against 1.6 for high), and 14 failed checks pulled placements to low. Two high-confidence misses remained (Nachtigal 22 km, Kinguélé Aval 11 km). The atlas supplied 8 anchors; 15 of 84 feature searches failed.
