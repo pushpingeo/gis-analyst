@@ -165,7 +165,7 @@ await test("confidence is worked out from the evidence, not chosen", async () =>
   const nsta = { name: "JACKDAW", type: "PLATFORM", source: { id: "nsta-surface", atlas_id: "x", publisher: "North Sea Transition Authority" } };
   const village = { name: "Sembehun", type: "village", source: { id: "osm-nominatim" } };
   const salar = { name: "Salar del Rincón", type: "salt flat", source: { id: "wikidata" } };
-  const ok = { pass: true }, bad = { pass: false };
+  const ok = { pass: true, tight: true, direction: "E" }, ring = { pass: true, tight: true }, far = { pass: true, tight: false, direction: "SE" }, bad = { pass: false };
   assert.equal(rateConfidence({ cand: nsta, match: "name_and_type", shape: "point" }).confidence, "high");
   assert.equal(rateConfidence({ cand: wd, match: "name_and_type", shape: "point" }).confidence, "medium", "a gazetteer point on its own");
   assert.equal(rateConfidence({ cand: wd, match: "name_and_type", checks: [ok], shape: "point" }).confidence, "high", "confirmed by a check");
@@ -174,8 +174,11 @@ await test("confidence is worked out from the evidence, not chosen", async () =>
   assert.equal(rateConfidence({ cand: village, match: "name_and_type", shape: "point" }).confidence, "low", "Sierra Rutile: a village isn't the mine");
   assert.equal(rateConfidence({ cand: salar, match: "name_and_type", checks: [ok], shape: "point" }).confidence, "medium", "a point for a salt flat");
   assert.equal(rateConfidence({ cand: salar, match: "name_and_type", checks: [ok], shape: "feature" }).confidence, "high", "its outline is fine");
+  assert.equal(rateConfidence({ cand: wd, match: "name_and_type", checks: [ring], shape: "point" }).confidence, "medium", "a distance alone is a ring");
+  assert.equal(rateConfidence({ cand: wd, match: "name_and_type", checks: [ring, ring], shape: "point" }).confidence, "high", "two rings cross");
+  assert.equal(rateConfidence({ cand: wd, match: "name_and_type", checks: [far], shape: "point" }).confidence, "medium", "Nachtigal: 250 km downstream pins nothing");
   assert.equal(rateConfidence({ cand: wd, match: "type_near_clues", checks: [ok], shape: "point" }).confidence, "medium");
-  assert.equal(rateConfidence({ cand: wd, match: "type_near_clues", checks: [ok, ok], shape: "point" }).confidence, "high");
+  assert.equal(rateConfidence({ cand: wd, match: "type_near_clues", checks: [ok, ring], shape: "point" }).confidence, "high");
   assert.equal(rateConfidence({ cand: nsta, match: "name_and_type", offset: true, shape: "circle" }).confidence, "medium", "offset caps at medium");
   assert.equal(rateConfidence({ cand: village, match: "settlement_or_region", offset: true, checks: [ok], shape: "point" }).confidence, "medium");
   assert.equal(rateConfidence({ cand: village, match: "named_place", shape: "circle" }).confidence, "high", "the person asked for the village itself");

@@ -2,6 +2,12 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 17 Nov 2026 (early hours)
+
+- **Place-finding v4 evaluation (skill 4.2, atlas on, Overpass down throughout):** 46 of 48 described sites placed (v3: 43), median 2.46 km, 70% within 5 km. On the 42 sites both placed, accuracy is unchanged (74–76% within 5 km, 86% within 10 km). What changed is confidence: low now means worse (median 5.6 km, against 1.6 for high), and 14 failed checks pulled placements to low. Two high-confidence misses remained (Nachtigal 22 km, Kinguélé Aval 11 km). The atlas supplied 8 anchors; 15 of 84 feature searches failed.
+- **Only tight checks raise confidence (skill 4.7).** A check within max(3 km, 35%) of a 250 km clue passes almost anywhere; a distance without a direction is a ring. Tight (tolerance ≤ 5 km) directional checks count 2, tight distance-only 1; high needs 2. Replayed on the v4 results: high goes from 11 sites at 1.6 km median to 5 at 0.7 km; Nachtigal drops to medium. Drawn from the same 48 sites, so it needs a held-out check.
+- **Atlas layer choice:** national and intergovernmental publishers first, local bodies and unknown publishers claiming global extents last, up to 20 of the top 100 layers; pieces of one site within a layer merged; `fetch_features` can search by name inside a layer (atlas change, same night).
+
 ## 16 Nov 2026 (night)
 
 - **The atlas is a feature source alongside OpenStreetMap** (`js/atlasfeatures.js`). `find_features_near` asks both at once: the atlas finds layers with the right concept around the point (skipping layers flagged with an overstated extent), fetches from up to five, and the results are merged. Each source is reported as found, or "not checked" with the reason; a failed source is never reported as "none". The evaluation calls the atlas with `ATLAS_MCP_KEY`; the page calls it through the Worker's `/atlas` route, which doesn't exist yet (see `docs/worker-atlas-route.md`, for Rob), so on the live site the atlas shows as "not connected" until then.

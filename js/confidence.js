@@ -42,6 +42,8 @@ const toBearing = (dir) => (dir == null ? null : typeof dir === "number" ? dir :
 export function runCheck(siteLonLat, target, { expected_km, direction }) {
   const actual = turf.distance(siteLonLat, target.lonlat);
   const tol = Math.max(3, 0.35 * expected_km);
+  // A check pins the site down only if it's tight: "250 km downstream of X" passes almost anywhere along the river.
+  const tight = tol <= 5;
   const distOk = Math.abs(actual - expected_km) <= tol;
   const want = toBearing(direction);
   const got = (turf.bearing(siteLonLat, target.lonlat) + 360) % 360;
@@ -54,7 +56,7 @@ export function runCheck(siteLonLat, target, { expected_km, direction }) {
     // Spelled out both ways, because "X is SE of the site" and "the site is SE of X" are easy to swap.
     reads: `The site is ${km} km ${pt((got + 180) % 360)} of ${who}; ${who} is ${pt(got)} of the site.`,
     ...(want != null ? { direction: String(direction), actual_bearing_deg: Math.round(got) } : {}),
-    pass: distOk && dirOk,
+    pass: distOk && dirOk, tight,
     ...(distOk && dirOk ? {} : { why: !distOk ? `${Math.round(actual * 10) / 10} km, not about ${expected_km} km` : `bearing ${Math.round(got)}°, not ${direction}` }),
   };
 }
@@ -79,7 +81,12 @@ export function rateConfidence({ cand, match = "none", checks = [], offset = fal
     level = 1; rules.push(match === "type_near_clues" ? "a feature of the right type where the clues point: medium" : "matched by name and type in Wikidata or OpenStreetMap: medium");
   }
   const passed = checks.filter((c) => c.pass).length, failed = checks.length - passed;
-  if (level === 1 && failed === 0 && passed >= (match === "type_near_clues" ? 2 : 1)) { level = 2; rules.push(`${passed} distance check${passed > 1 ? "s" : ""} passed: high`); }
+  // Only tight checks raise confidence, and a distance alone puts the site on a ring: a tight check with a direction
+  // counts 2, without one 1. High needs 2 (3 for a type-only match). Replayed on the v4 results: high went from
+  // 11 sites at 1.6 km median to 5 at 0.7 km (same 48 sites the rule was drawn from, so not a held-out result).
+  const strength = checks.filter((c) => c.pass && c.tight !== false).reduce((n, c) => n + (c.direction ? 2 : 1), 0);
+  if (level === 1 && failed === 0 && strength >= (match === "type_near_clues" ? 3 : 2)) { level = 2; rules.push(`tight distance checks pin it down (strength ${strength}): high`); }
+  else if (level === 1 && failed === 0 && passed) rules.push(`${passed} check${passed > 1 ? "s" : ""} passed, but not tight or directional enough to pin the site: stays medium`);
   if (level === 0 && offset && failed === 0 && passed >= 1) { level = 1; rules.push("placed by offset, confirmed by a passing check: medium"); }
   if (offset && level > 1) { level = 1; rules.push("placed by an offset from a reference, not found itself: at most medium"); }
   const type = `${cand?.type || ""} ${cand?.name || ""}`;

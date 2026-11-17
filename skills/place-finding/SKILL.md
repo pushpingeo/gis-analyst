@@ -1,6 +1,6 @@
 ---
 name: place-finding
-version: 4.6
+version: 4.7
 description: Turn words into a place on the map. Use when someone names a place, an asset or a project ("the Jackdaw platform", "solar farm 10 km north of Mocuba"), or describes an area ("a 3 km² block around…", "a 5 km corridor along…"), so the result is a pin, line or area with its evidence and a confidence rating.
 ---
 
@@ -47,7 +47,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
 ## Confidence (worked out by the tool)
 `make_place` rates confidence from the evidence, and returns the rating and the rules behind it. Report what it says; don't overrule it.
 - **Where it starts:** an authoritative layer matched by name, or the place the person named themselves, is high. Wikidata or OpenStreetMap matched by name and type, or a feature of the right type where the clues point, is medium. A settlement, a region, a name-only match or nothing specific is low.
-- **Checks move it:** any failed check makes it low. A name-and-type match with a passing check, or a type match with two, rises to high.
+- **Checks move it:** any failed check makes it low. Only tight checks (clues within about 14 km) raise it: a distance with a direction pins the site, a distance alone only puts it on a ring. A name-and-type match rises to high with one tight directional check or two tight ones. So pass the direction whenever the words give one.
 - **Caps:** placed by an offset from a reference, or a point for a large feature, is at most medium.
 - **When a check fails,** don't argue it away. Say which clue doesn't fit, look for a feature that fits all the clues (`find_features_near`), and rebuild if you find one. If nothing better turns up, keep the place at low confidence and say so.
 - Pass all the clues, including ones you expect to fail. A check that isn't passed can't help, and one that's hidden makes the rating dishonest.
