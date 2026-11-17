@@ -208,7 +208,8 @@ export function createDataTools(host) {
       const returned = g.returned ?? (g.features || []).length;
       return {
         ...head, ...extra,
-        inside_or_touching: inside, within_distance: kept.length,
+        returned_by_service: returned, inside_or_touching: inside, within_distance: kept.length,
+        ...(returned === 0 ? { service_note: "The service returned no features at all for this box. If you expected some (e.g. a field's own pipelines), the layer may be the wrong one (check its title and publisher) or may not cover this area; look for another." } : {}),
         nearest: kept.slice(0, 12).map((c) => ({ id: c.id, name: c.name, type: c.type, distance_km: c.distance_km, ...(Object.keys(c.extra).length ? { details: c.extra } : {}) })),
         ...(kept.length > 12 ? { more: kept.length - 12 } : {}),
         ...(!d.service && returned >= 100 ? { capped: "The service returned its 100-feature limit for this box, so there may be more." } : {}),

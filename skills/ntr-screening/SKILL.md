@@ -1,6 +1,6 @@
 ---
 name: ntr-screening
-version: 3.0-draft
+version: 3.1-draft
 description: Screen a site, onshore or offshore, for non-technical risk (NTR) from published spatial data. Flags anything that could become a risk, concern or delay (land and livelihoods, biodiversity, Indigenous Peoples, cultural heritage, community health and safety, and the operating context), with traced evidence and what wasn't checked. Use when someone asks what risks, sensitivities or constraints a site, block, field, route or area might raise.
 ---
 
@@ -33,11 +33,13 @@ State the distances used at the top of the result, and offer to change them.
 1. **Confirm the site:** location, onshore/offshore, asset type, stage, footprint and distances used.
 2. **Plan the evidence.** For each theme below, decide which kinds of evidence apply to this site (onshore, offshore or both).
 3. **Find the data.** For each kind of evidence, search for datasets with short, distinctive words (the "search words" below), two or three wordings at a time. Choose, in this order: trusted services and national or intergovernmental publishers; open licences; datasets whose features can be fetched; the most specific coverage (a national layer beats a global one where both exist). Use the everyday feature search for settlements, schools, hospitals, places of worship and cemeteries.
-4. **Fetch and measure.** Fetch each chosen dataset for the footprint out to the wider band. Record name, distance, band, source, licence and date for every feature used.
+4. **Fetch and measure.** Fetch each chosen dataset for the footprint **out to the wider band** (20 km onshore, 50 km offshore, unless the person set others), then sort what comes back into bands; don't fetch a shorter distance and call the rest clear. A protected area at 20 km offshore is still named. Record name, distance, band, source, licence and date for every feature used.
 5. **Raise flags** (below), one per distinct risk, most serious first.
 6. **State the gaps:** every kind of evidence that applies but wasn't found, failed, or was left out for licence reasons.
 
 Stop searching a kind of evidence after two or three tries with different words. Say what was searched.
+
+If a dataset returns no features at all where you'd expect some (a field's own pipelines, a coast's settlements), suspect the dataset before the site: read its title again ("removed", "proposed", "historic" layers hold something else) and try another source.
 
 ## Evidence to look for, by theme
 Search words are starting points; adapt them to the place and language (e.g. "Natura 2000", "SSSI", "parque nacional").

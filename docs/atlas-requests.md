@@ -4,6 +4,12 @@ Tobler and the atlas are worked on in separate chats (decided 17 Nov). Tobler do
 What Tobler can rely on is written down in the atlas repo's `docs/mcp-tools.md`. When Tobler needs something
 new from the atlas, add it here (newest first), tell Rob, and he passes it to the atlas chat.
 
+- **17 Nov (night): a mislabelled NSTA layer.** Atlas record `bdb5d0a70436343e`, titled "UKCS offshore infrastructure
+  pipeline linear (WGS84)", points at NSTA's `UKCS_offshore_infrastructure_pipeline_linear_removed_(WGS84)` service:
+  *removed* pipelines. It returns nothing at Rosebank, while `29a134d61746d7dc` (the ED50 layer) returns Rosebank's
+  live flowlines. Tobler's analyst chose the WGS84 one (sensibly) and reported "no pipelines". Asks: keep words like
+  "removed", "decommissioned", "proposed", "historic" in titles when they're in the service name; and check whether
+  other NSTA "(WGS84)" records point at "removed" services.
 - **17 Nov (late evening), URGENT: `fetch_features` says "No dataset with id …" for ids that `find_datasets`
   and `get_dataset` return.** Seen from GitHub Actions at about 20:30 UTC: `get_dataset {"id":"4611b4343153c1b9"}`
   (NatureScot, 30 x 30 Protected Areas) answers, but `fetch_features` with the same id and a bbox near Linlithgow
