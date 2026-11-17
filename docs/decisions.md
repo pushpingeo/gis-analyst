@@ -2,6 +2,35 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 17 Nov 2026 (late evening): NTR for the workspace, trusted services, licence rule, FIRMS
+- **NTR split (Rob):** the evaluated IFC skill is frozen as `skills/ntr-screening-ifc` (method byte-identical; only the
+  header name changed) for the lab page and the evaluation. A new `skills/ntr-screening` (3.0-draft) is the
+  workspace skill: onshore and offshore, IFC themes kept as structure but not IFC's verdicts, and it says *what
+  evidence to look for* (with search words) so the analyst finds the datasets itself with `find_data`/`get_data`.
+  Few evaluations from here: smoke tests on hand-checked cases unless one adds real value.
+- **Distances:** default bands per setting (onshore 1/5/20 km, offshore 2/10/50 km, the offshore ones a draft for Rob
+  to correct); the person can change any of them in chat and the skill keeps theirs for the conversation. A settings
+  editor comes with the run card in step 4.
+- **Licence rule (Rob):** data under Esri's Master License Agreement isn't used unless the person holds an Esri
+  licence (setting `tobler.esriLicence` = "yes" in the browser; the settings gear comes in step 4). Classes in
+  `js/licence.js`: open, esri-mla, non-commercial, unknown (not stated), stated (other). `find_data` leaves Esri copies
+  out and says how many; `get_data` refuses them. Open and trusted sources rank first.
+- **Trusted global services (`catalogue/trusted.json`):** services Tobler calls directly (NASA FIRMS VIIRS and MODIS,
+  because the atlas only has Esri's copy) and trusted publishers (NASA, ESA/Copernicus, NOAA, USGS, UNEP, FAO,
+  GEBCO, EMODnet, national nature and heritage bodies…) ranked first among atlas results. Long term the atlas should
+  carry a trusted tier (requested).
+- **FIRMS:** `tobler-api` has `POST /firms` (sources allow-listed, box ≤ 400 square degrees, 1–10 days, CSV to GeoJSON,
+  300 calls per visitor a day, NASA's error text never echoes the key). `get_data` on a FIRMS service asks all
+  three VIIRS satellites at once. The key (`FIRMS_MAP_KEY`) wasn't visible in the repo secrets at the time of writing,
+  so FIRMS is untested live; the deploy no longer loads empty secrets over ones set elsewhere.
+- **find_place:** the catalogue also searches the name without kind words ("Mars platform" → "Mars").
+- **Workspace analyst:** 14 rounds a turn (a screening asks many datasets); NTR no longer "coming soon" in the prompt.
+  The "Screen for risks · soon" chip is unchanged (public text: Rob's call).
+- **Blocked by the atlas (20:10 UTC):** `fetch_features` fails with "No dataset with id …" for nearly every dataset
+  after the atlas's shard change (commit daf3023); requested as urgent. Replays after that are mostly "not checked":
+  Linlithgow solar screen (settlements, schools and rivers found; SEPA flood, HES monuments, Hutton land capability
+  not checked) and Mars (not found, because the NOAA platform layer couldn't be fetched).
+
 ## 17 Nov 2026 (evening): catalogue tools, confidence from the place, no false absence
 - **`find_data`** (`js/datatools.js`): searches the atlas catalogue by words in dataset titles and publishers for an
   area (`find_datasets` with `text` and a bbox). One entry per title and publisher; fetchable datasets first; short
