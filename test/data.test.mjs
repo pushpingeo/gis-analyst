@@ -128,6 +128,24 @@ await test("get_data: a picture-only dataset or a failed service is 'not checked
   await assert.rejects(() => t.exec("get_data", { dataset: "D42", place: "Area 1" }), /Use find_data first/);
 });
 
+await test("catalogue areas: country aliases, the USA's main part (not the world), seas by name", async () => {
+  const t = createPlaceTools(host());
+  const boxes = [];
+  for (const area of ["United States", "USA", "Gulf of America", "the North Sea", "United Kingdom"]) {
+    await t.exec("find_data", { text: "VIIRS", area });
+    const [, args] = atlasCalls.filter(([tool]) => tool === "find_datasets").at(-1);
+    boxes.push(args.bbox);
+  }
+  const [us, usa, gom, ns, uk] = boxes;
+  assert.ok(us[2] - us[0] < 70 && us[0] < -120 && us[2] > -70, `US box ${us}`);
+  assert.deepEqual(us, usa);
+  assert.deepEqual(gom, [-98, 17.5, -80, 31]);
+  assert.ok(ns[0] < 0 && ns[2] > 5, `North Sea ${ns}`);
+  assert.ok(uk[0] < -8 && uk[2] < 5, `UK ${uk}`);
+  const r = await t.exec("find_data", { text: "VIIRS", area: "Gulf of America" });
+  assert.match(r.searched.area, /Gulf of Mexico \(Gulf of America\)/);
+});
+
 await test("keyAttributes and geometryDistanceKm", () => {
   const k = keyAttributes({ OBJECTID: 5, Shape__Area: 3, acq_date: 1763337600000, name: "X", junk: "y" });
   assert.deepEqual(Object.keys(k), ["acq_date", "name"]);

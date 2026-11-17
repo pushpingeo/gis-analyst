@@ -9,6 +9,27 @@ import { atlasFindNamed, NAMED_KINDS, describeChecked } from "./atlasfeatures.js
 import { DATA_TOOL_DEFS, createDataTools } from "./datatools.js";
 import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES } from "./gazetteer.js";
 
+// Common names that aren't Natural Earth's own, and seas (energy basins especially) by rough box.
+const COUNTRY_ALIASES = { "united states": "united states of america", us: "usa", america: "united states of america", "u.s.": "usa", "u.s.a.": "usa",
+  uk: "united kingdom", britain: "united kingdom", "great britain": "united kingdom", "russian federation": "russia",
+  "democratic republic of the congo": "dem. rep. congo", drc: "dem. rep. congo", "ivory coast": "côte d'ivoire", "south korea": "south korea", uae: "united arab emirates" };
+const box = (label, bbox) => ({ label, bbox });
+const GOM = box("the Gulf of Mexico (Gulf of America)", [-98, 17.5, -80, 31]);
+const SEAS = {
+  "gulf of mexico": GOM, "gulf of america": GOM, gom: GOM,
+  "north sea": box("the North Sea", [-4.5, 50.5, 12, 62]), "central north sea": box("the central North Sea", [-2, 55, 6, 58.5]),
+  "irish sea": box("the Irish Sea", [-7, 51.5, -2.5, 55]), "celtic sea": box("the Celtic Sea", [-11, 48, -4, 52]),
+  "norwegian sea": box("the Norwegian Sea", [-5, 62, 20, 72]), "barents sea": box("the Barents Sea", [15, 68, 60, 81]),
+  "baltic sea": box("the Baltic Sea", [9, 53, 31, 66]), "mediterranean": box("the Mediterranean", [-6, 30, 36.5, 46]), "mediterranean sea": box("the Mediterranean", [-6, 30, 36.5, 46]),
+  "gulf of guinea": box("the Gulf of Guinea", [-10, -6, 12, 7]), "persian gulf": box("the Persian Gulf", [47.5, 23, 57, 31]), "arabian gulf": box("the Persian Gulf", [47.5, 23, 57, 31]),
+  "red sea": box("the Red Sea", [32, 12, 44, 30]), "caspian sea": box("the Caspian Sea", [46, 36, 55.5, 47.5]), "black sea": box("the Black Sea", [27, 40.5, 42, 47.5]),
+  "caribbean": box("the Caribbean", [-88, 9, -59, 23]), "caribbean sea": box("the Caribbean", [-88, 9, -59, 23]),
+  "south china sea": box("the South China Sea", [99, -3, 122, 25]), "timor sea": box("the Timor Sea", [122, -15.5, 133, -8]), "bass strait": box("Bass Strait", [143, -41.5, 149, -38]),
+  "bay of bengal": box("the Bay of Bengal", [79, 5, 95, 23]), "arabian sea": box("the Arabian Sea", [51, 5, 77, 26]),
+  "gulf of thailand": box("the Gulf of Thailand", [99, 5, 105.5, 14]), "java sea": box("the Java Sea", [105, -7.5, 119, -3]),
+  "santos basin": box("the Santos Basin", [-49, -28, -40, -22]), "campos basin": box("the Campos Basin", [-42.5, -24, -39, -20.5]),
+};
+
 const round = (v, d = 3) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
 
 export function placeToolDefs(skills) {
@@ -146,16 +167,28 @@ export function createPlaceTools(host) {
     return { place: p.name, status: p.status, summary: R.summaryLine(d), scale: d.scale, area_km2: d.area_km2, length_km: d.length_km, countries: d.countries, offshore: d.offshore };
   }
 
-  // Where to search the catalogue: a country (with a margin for its waters), a candidate or place, or the map view.
+  // Where to search the catalogue: a country (with a margin for its waters), a sea, a candidate or place, any other
+  // named area via OpenStreetMap, or the map view. (Mars, 17 Nov: "United States" and "Gulf of America" weren't
+  // recognised, so the catalogue was never searched, and the USA's box spanned the date line, so it covered the world.)
   async function catalogueArea(area, nearAt) {
     if (area) {
+      const want = String(area).trim().toLowerCase().replace(/^the\s+/, "");
+      const sea = SEAS[want];
+      if (sea) return { bbox: sea.bbox, label: sea.label };
       try {
         const countries = await host.ref.get("countries");
-        const want = String(area).trim().toLowerCase();
-        const hit = countries.features.filter((f) => [f.properties.name, f.properties.iso, f.properties.sovereign].some((v) => v && v.toLowerCase() === want));
+        const name = COUNTRY_ALIASES[want] || want;
+        const hit = countries.features.filter((f) => [f.properties.name, f.properties.iso, f.properties.sovereign].some((v) => v && v.toLowerCase() === name));
         if (hit.length) {
-          const b = turf.bbox({ type: "FeatureCollection", features: hit });
-          return { bbox: [b[0] - 2.5, b[1] - 2.5, b[2] + 2.5, b[3] + 2.5].map((v, i) => round(Math.max(Math.min(v, i % 2 ? 85 : 180), i % 2 ? -85 : -180), 3)), label: `${hit[0].properties.name} and its waters` };
+          let b = turf.bbox({ type: "FeatureCollection", features: hit });
+          let note = "";
+          if (b[2] - b[0] > 180) {
+            // Crosses the date line or has far-flung parts (USA, Russia, Fiji, New Zealand): use the largest part.
+            const parts = hit.flatMap((f) => (f.geometry.type === "MultiPolygon" ? f.geometry.coordinates.map((c) => turf.polygon(c)) : [f]));
+            const big = parts.reduce((a, x) => (turf.area(x) > turf.area(a) ? x : a));
+            b = turf.bbox(big); note = " (main part only)";
+          }
+          return { bbox: [b[0] - 2.5, b[1] - 2.5, b[2] + 2.5, b[3] + 2.5].map((v, i) => round(Math.max(Math.min(v, i % 2 ? 85 : 180), i % 2 ? -85 : -180), 3)), label: `${hit[0].properties.name} and its waters${note}` };
         }
       } catch { /* reference not loaded */ }
       try {
@@ -164,10 +197,18 @@ export function createPlaceTools(host) {
         const pad = 0.5;
         return { bbox: b ? [b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad] : [a.lonlat[0] - 1, a.lonlat[1] - 1, a.lonlat[0] + 1, a.lonlat[1] + 1], label: `around ${a.label}` };
       } catch { /* not a candidate or place */ }
+      try {
+        // Any other named area (a state, a province, a bay): OpenStreetMap's outline, or its centre ± 1.5°.
+        const [g] = await searchNominatim(String(area), { fetchFn: host.fetchFn, headers: host.headers, limit: 1 });
+        if (g) {
+          const b = g.outline ? turf.bbox({ type: "Feature", properties: {}, geometry: g.outline }) : [g.lonlat[0] - 1.5, g.lonlat[1] - 1.5, g.lonlat[0] + 1.5, g.lonlat[1] + 1.5];
+          if (b[2] - b[0] < 60) return { bbox: b.map((v) => round(v, 3)), label: `${g.name} (from OpenStreetMap)` };
+        }
+      } catch { /* OpenStreetMap down */ }
     }
     if (nearAt) return { bbox: [nearAt[0] - 1, nearAt[1] - 1, nearAt[0] + 1, nearAt[1] + 1], label: "around the 'near' anchor" };
     const v = host.view?.();
-    if (v) return { bbox: v, label: "the map view" };
+    if (v) return { bbox: v, label: `the map view${area ? ` ("${area}" wasn't recognised)` : ""}` };
     return null;
   }
 
