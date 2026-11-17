@@ -2,6 +2,36 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 17 Nov 2026 (evening): catalogue tools, confidence from the place, no false absence
+- **`find_data`** (`js/datatools.js`): searches the atlas catalogue by words in dataset titles and publishers for an
+  area (`find_datasets` with `text` and a bbox). One entry per title and publisher; fetchable datasets first; short
+  ids (D1…); the Esri Master License Agreement is named and flagged for checking before commercial use. Retries once
+  when the atlas says it's overloaded. When nothing matches it says what was searched and to try other words.
+- **`get_data`**: fetches one dataset's features for a place's box plus a margin (`fetch_features` with `id`, `bbox`,
+  limit 100), measures each from the place's edge (0 inside or touching; vertex-based, fine for screening), keeps
+  those within `within_km` (default 0 for areas, 10 for points), nearest first (inside: nearest the centre), and puts
+  them on the map as candidates. Returns a few key attributes (dates as ISO, ArcGIS epoch milliseconds converted),
+  publisher, licence and the time checked. Picture-only datasets and failed services come back as "not checked",
+  never as nothing found. Time-aware layers carry a note that they show recent detections only.
+- **Confidence inherited:** a shape built on a place already on the map starts from that place's confidence (a
+  drawing counts as high); offsets cap it at medium, failed checks at low; checks don't raise it. Mars: the 20 km
+  circle was "low" because the anchor rules read the platform point as nothing specific.
+- **No false absence:** the conversation prompt says never to claim data doesn't exist unless `find_data` searched
+  for it, with the words and area; if no tool could check, say so. The "coming soon" line now offers the catalogue tools.
+- **Areas for catalogue searches:** country aliases (United States, UK…); for countries spanning the date line
+  (USA, Russia, Fiji, New Zealand) the largest part only, because the USA's box covered the world; common seas and
+  basins by name (Gulf of Mexico/America, North Sea, Gulf of Guinea…); any other named area via OpenStreetMap;
+  then the map view. This also fixes `find_place` with `kind` and `area`, which had silently searched nothing for
+  "United States" and "Gulf of America".
+- **Tested:** 8 unit tests (`test/data.test.mjs`, atlas faked); Rob's Mars conversation replayed through
+  `try-requests` (Haiku, real atlas): VIIRS and MODIS found and checked, EFH 32 species areas inside the circle,
+  failed services reported as not checked; after the area fix, Mars found in one search, 46 s and 11 s turns. Live on
+  asktobler.com (desktop-app browser): "Put a 20 km circle round the Mars platform in the Gulf of America and check it
+  for thermal anomalies" → high-confidence circle, NASA VIIRS checked, no detections, snapshot caveat given.
+- **Known rough edges:** fetched features replace the map's candidate layer (two `get_data` calls at once show only
+  the last); the analyst sometimes shows D ids to the person; NTR itself is still "coming soon", so "environmentally
+  sensitive" is answered from whichever datasets the analyst picks, not from a written method.
+
 ## 17 Nov 2026 (evening): scope reset, Tobler is a screening tool
 - After Rob's Mars test (the analyst wrongly said VIIRS isn't in the catalogue; the atlas holds 7 VIIRS datasets,
   including NASA's global thermal hotspots layer), Rob set the scope: Tobler is a geospatial screening tool, NTR first,
