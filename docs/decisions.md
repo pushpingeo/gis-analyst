@@ -2,6 +2,25 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 17 Nov 2026 (night): fixes from Rob's Rosebank test
+- **Distances from the edge:** `find_features_near` measured from an area's centre; for areas and lines it now searches a
+  circle covering the shape plus the radius and measures from the shape's edge (0 = inside), and reports `found` vs
+  `listed` (nearest 15 listed) so counts don't drift.
+- **Findings stay on the map:** features from `find_features_near` and `get_data` go to their own layer (orange,
+  labelled by name) for the session; a later search never wipes them (before, one shared layer was replaced by each
+  search, including empty ones). `show_on_map` fits the view to some or all findings, or clears them.
+- **No ids for the person:** ids (C3, D2) are tool handles only; map labels are names. Place-finding 4.11.
+- **Session log:** every turn's tool inputs and outputs are kept in the page (`window.toblerLog`) and can be saved
+  from any "How I worked this out" ("Download the log"), so Rob can attach a log instead of pasting.
+- **`get_data`** reports what the service returned for the box and hints when it returned nothing at all.
+- **NTR 3.1-draft:** fetch out to the wider band (50 km offshore) then sort into bands; suspect the dataset when an
+  expected layer comes back empty.
+- **Atlas requests:** an NSTA "(WGS84)" pipeline record that points at *removed* pipelines (why Rosebank showed none);
+  EMODnet layers held as WMS only with "licence not stated", though EMODnet offers WFS and CC-BY 4.0 (Rob's wrecks find).
+- **Tested live:** Rosebank found and screened; "protected areas within 50 km … show them on the map" found 4 NatureScot
+  features measured from the field edge (Faroe-Shetland Sponge Belt ~20 km) and fitted the map to them.
+- **Rough edge:** layers without a name field get a poor label (e.g. "JNCC", taken from a source column).
+
 ## 17 Nov 2026 (late evening): NTR for the workspace, trusted services, licence rule, FIRMS
 - **NTR split (Rob):** the evaluated IFC skill is frozen as `skills/ntr-screening-ifc` (method byte-identical; only the
   header name changed) for the lab page and the evaluation. A new `skills/ntr-screening` (3.0-draft) is the
