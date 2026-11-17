@@ -145,7 +145,9 @@ export function createPlaceTools(host) {
     },
 
     async find_place({ query, near, country }) {
-      const nearAt = near ? resolve(near).lonlat : null;
+      // "near" is a hint: if it isn't a candidate or place yet, search without it rather than fail the call.
+      let nearAt = null, nearNote = null;
+      if (near) { try { nearAt = resolve(near).lonlat; } catch { nearNote = `"${near}" isn't a candidate id or place yet, so the search wasn't narrowed to it. Find it first if you need it.`; } }
       const results = [];
       const errors = [];
       // All sources at once; results keep this order (authoritative layers first).
@@ -163,7 +165,7 @@ export function createPlaceTools(host) {
         return cands.get(keep(c));
       });
       host.onCandidates?.(list);
-      return { query, candidates: list.slice(0, 12).map(compact), ...(errors.length ? { problems: errors } : {}),
+      return { query, candidates: list.slice(0, 12).map(compact), ...(errors.length ? { problems: errors } : {}), ...(nearNote ? { near_ignored: nearNote } : {}),
         note: list.length ? undefined : "Nothing found. Try another spelling, a shorter name, or the nearest town and find_features_near." };
     },
 
