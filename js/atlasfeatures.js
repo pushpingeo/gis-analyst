@@ -250,7 +250,7 @@ export const NAMED_KINDS = {
   "oil or gas field": { concepts: ["oil-gas"], titles: /field|discover|reservoir|accumulation|extraction/i, prefer: "area", trackers: true },
   "well": { concepts: ["oil-gas"], titles: /well|borehole/i },
   "offshore installation": { concepts: ["oil-gas"], titles: /platform|installation|infrastructure|facilit|structure/i },
-  "wind farm or lease": { concepts: ["offshore-wind-site", "power-plant", "renewable-potential"], titles: /wind|lease|agreement|site|zone/i, trackers: true },
+  "wind farm or lease": { concepts: ["offshore-wind-site", "power-plant", "renewable-potential"], titles: /wind|lease|agreement|site|zone/i, prefer: "area", trackers: true },
   "power plant": { concepts: ["power-plant"], trackers: true },
   "mine or quarry": { concepts: ["mineral-extraction"], trackers: true },
   "protected area": { concepts: ["protected-area"], geom: "area" },

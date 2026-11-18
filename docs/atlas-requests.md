@@ -4,6 +4,13 @@ Tobler and the atlas are worked on in separate chats (decided 17 Nov). Tobler do
 What Tobler can rely on is written down in the atlas repo's `docs/mcp-tools.md`. When Tobler needs something
 new from the atlas, add it here (newest first), tell Rob, and he passes it to the atlas chat.
 
+- **18 Nov (evening): Global Energy Monitor oil and gas tracker fails intermittently.** `fetch_features` on "Global Oil
+  and Gas Extraction Tracker (fields: extraction areas, development and discoveries)" (GEM) answered well at 17:20
+  (3 Bonga fields near 4.5 N, 4.6 E) but failed twice at 17:35 with "geojson: tile 0_0 unreadable", in a named search
+  over Nigeria's waters (bbox [0.2, 1.8, 17.2, 16.4], text "Bonga"). Tobler now asks trackers in its first batch for
+  fields, plants, mines and wind, so this layer matters for place finding everywhere. Ask: find why the tile is
+  unreadable (size, a partial write, a cache), and include GEM layers in `mcp-check`.
+
 - **18 Nov (early): re-test of the 17 Nov fixes from Tobler, and two new faults.** Done and working from Tobler
   (atlas probe and a replayed Rosebank conversation, 03:38 UTC): `fetch_features` answers again (NatureScot
   protected areas, SEPA river flooding, NOAA EFH); UKHO worldwide wrecks through EMODnet finds 2 wrecks within 10 km
