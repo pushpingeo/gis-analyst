@@ -72,7 +72,8 @@ export function parseResult(text) {
 
 // Match each evidence item the model gave to a feature the tools actually returned in this run.
 export function traceFlags(flags, evidence, d) {
-  const feats = evidence.map((f) => ({ f, n: norm(f.properties.name), ds: norm(f.properties.dataset) }));
+  // A feature can go by more than one name: a maritime boundary by its line name or by the territories either side.
+  const feats = evidence.flatMap((f) => [f.properties.name, f.properties.details?.sides].filter(Boolean).map((nm) => ({ f, n: norm(nm), ds: norm(f.properties.dataset) })));
   return (flags || []).map((flag) => {
     const ev = (flag.evidence || []).map((e) => {
       const n = norm(e.name), ds = norm(e.dataset);

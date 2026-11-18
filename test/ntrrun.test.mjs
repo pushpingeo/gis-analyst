@@ -320,6 +320,9 @@ await test("baseline before the analyst: boundaries and the must-check layers, a
   assert.match(first, /Faeroe \(Denmark\) - United Kingdom \[Faeroe \/ United Kingdom, Treaty\] 1[12]\.\d+ km/);
   assert.match(first, /IUCN Important Marine Mammal Areas .*: none in dataset/);
   assert.match(r.disclaimer, /not evidence of absence/);
+  // The analyst may name the boundary by the territories either side; it still traces.
+  const t = traceFlags([{ risk: "Maritime boundary close", theme: "context", confidence: "medium", evidence: [{ name: "Faeroe / United Kingdom (Treaty)", distance_km: 12, dataset: "Maritime Boundaries (v12, world, 2023)" }] }], ev, d);
+  assert.equal(t[0].traced, 1);
   // The analyst's own find_data ids still start at D1.
   assert.ok(model.calls[1].messages.at(-1).content.some((b) => /"id":"D1"/.test(b.content)));
 });

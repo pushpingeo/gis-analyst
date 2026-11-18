@@ -2,6 +2,28 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (late morning): screening baseline in code, boundaries, disclaimer (Rob)
+- Rob: KBAs aren't the only biodiversity source, and a site near an international boundary is an NTR (effects spill
+  over). Split agreed: **catalogue** names the must-check layers (`catalogue/trusted.json` "baseline"), **tools** fetch
+  and measure them in code before the analyst starts, **skill** says what they mean (draft 3.4 sent to Rob first).
+- Baseline layers (each tested 18 Nov at Rosebank, Mars and Linlithgow): WDPA via EMODnet (European seas and coasts
+  only), EEA nationally designated areas (CDDA) and Natura 2000 (EU, not UK since 2021), IUCN Important Marine Mammal
+  Areas, UNEP-WCMC coral reefs (tropics), MARPOL special areas, NOAA critical habitat (US). Each applies by box and
+  setting ("sea" = offshore or coast within the wider band). Licences recorded with "check before commercial use"
+  where the terms aren't open. Baseline datasets get B ids so the analyst's D ids don't shift.
+- Boundaries (`js/boundaries.js`): other countries within the wider band from Natural Earth (Tobler's reference;
+  onshore that's the land border), maritime boundary lines from VLIZ Maritime Boundaries v12 (CC-BY 4.0 per
+  marineregions.org, though the atlas record says "contact VLIZ") with the territories either side and line type.
+  Every boundary feature carries the caveat: indicative, no legal standing; VLIZ data isn't for legal,
+  resource-exploration or navigation use. No maritime call when there's no sea within reach.
+- The first message lists what the baseline found ("Already checked by the run…"); the run record keeps
+  `baseline` and `disclaimer`. A boundary named by its territories traces to the line.
+- Disclaimer (`js/disclaimer.js`, draft wording for Rob): on the run card and first in every run download; later
+  exports and the PDF use the same text.
+- Smoke tests (real atlas, Haiku): Rosebank flags the Faroe–UK treaty line at 10.7 km and the Sponge Belt at 20 km;
+  Mars flags loggerhead critical habitat on site, no boundary in reach; Linlithgow picks up 59 nationally designated
+  areas from the EEA layer. Heritage at Linlithgow still weak (HES layers fail in the atlas; request open).
+
 ## 18 Nov 2026 (10:30): FIRMS key on the live Worker
 - Rob's live screen reported NASA FIRMS "API key missing". Cause: the Worker's last good deploy (17 Nov 18:34) came
   before `FIRMS_MAP_KEY` was a repo secret, and the two deploys after it (20:06, 20:07) failed their live FIRMS check
