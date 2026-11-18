@@ -261,7 +261,7 @@ await test("traceFlags maps PS codes to themes and leaves unknown evidence untra
 
 
 await test("a result cut off at the length cap is asked for again once, as JSON only, from the same history", async () => {
-  const cut = { stop_reason: "max_tokens", content: [{ type: "text", text: "Long summary…\n\n```json\n{\"flags\":[{\"risk\":\"x" }], usage: { input_tokens: 10, output_tokens: 8000 } };
+  const cut = { stop_reason: "max_tokens", content: [{ type: "thinking", thinking: "long", signature: "sig" }, { type: "text", text: "Long summary…\n\n```json\n{\"flags\":[{\"risk\":\"x" }], usage: { input_tokens: 10, output_tokens: 8000 } };
   const model = scriptedModel([
     toolTurn(use("a", "find_data", { text: "wreck", area: "Area 1" })),
     toolTurn(use("b", "get_data", { dataset: "D1", place: "Area 1", theme: "heritage" })),
@@ -274,6 +274,7 @@ await test("a result cut off at the length cap is asked for again once, as JSON 
   const last = model.calls[3].messages;
   assert.match(last.at(-1).content, /only the JSON block/);
   assert.equal(last.at(-2).role, "assistant");
+  assert.ok(!JSON.stringify(last).includes('"thinking"'), "signed thinking blocks are dropped");
   assert.equal(rec.tobler_run.flags.length, 3);
   assert.equal(rec.tobler_run.summary, "Long summary…");
   assert.match(rec.tobler_run.note, /cut off/);

@@ -32,7 +32,7 @@ export function systemFor(skill) {
 - Put independent searches in the same step: they run at the same time. Aim to finish within about ten steps.
 - Name features and datasets as the data names them. Ids (C3, D2) are for tool calls only.
 - Your last message is the result: the short summary, then the JSON block, exactly as the method's Output section says. Use the distances given (not the skill's table) in "distances_km".
-- Keep the result compact so it fits in one reply: summary under 300 words; at most 8 flags; at most 4 evidence items per flag (the nearest or strongest, and say in "why" how many more there are); "data_gaps" at most 12 short lines; leave "checked" as an empty list, because the run records what the tools checked itself.
+- Keep the result compact so it fits in one reply: summary under 300 words; at most 8 flags; at most 4 evidence items per flag (the nearest or strongest, and say in "why" how many more there are); "data_gaps" at most 12 short lines; leave "checked" as an empty list, because the run records what the tools checked itself. Keep your thinking before the result short: the reply limit (8,000 tokens) includes it.
 
 <method skill="${skill.name}" version="${skill.version}">
 ${skill.body}
@@ -182,11 +182,18 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   const debug = { final_chars: String(res.text || "").length, final_blocks: Array.isArray(lastMsg?.content) ? lastMsg.content.map((b) => b.type).join(",") : typeof lastMsg?.content };
   if (!parsed.json) {
     // Cut off (the reply hit the length cap) or no JSON block: ask once for the JSON alone, from the same history.
-    const history = res.history.map((m, i) => (i === res.history.length - 1 && m.role === "assistant" && Array.isArray(m.content)
-      ? { ...m, content: m.content.filter((b) => b.type === "text").length ? m.content.filter((b) => b.type === "text") : [{ type: "text", text: "…" }] } : m));
+    // Thinking blocks are signed to the request they came from, so they're dropped (as in the conversation loop);
+    // the cut-off message keeps only its text. Haiku thinks by default, and on a big screen the thinking can use
+    // most of the 8,000-token cap before the write-up ends (Rosebank, 18 Nov).
+    const last = res.history.length - 1;
+    const history = res.history.map((m, i) => {
+      if (m.role !== "assistant" || !Array.isArray(m.content)) return m;
+      const keep = m.content.filter((b) => (i === last ? b.type === "text" : b.type !== "thinking" && b.type !== "redacted_thinking"));
+      return { ...m, content: keep.length ? keep : [{ type: "text", text: "…" }] };
+    });
     if (history.at(-1)?.role === "user") history.pop();
     try {
-      const resp = await callClaude({ system: systemFor(skill), tools: defs, messages: [...history, { role: "user", content: "Your result was cut off or had no JSON block. Reply now with only the JSON block, compact: at most 8 flags, at most 4 evidence items each, data_gaps at most 12 short lines, checked as []." }] });
+      const resp = await callClaude({ system: systemFor(skill), tools: defs, messages: [...history, { role: "user", content: "Your result was cut off or had no JSON block. Reply now with only the JSON block, compact: at most 6 flags, at most 3 evidence items each (name, distance_km, dataset only), data_gaps at most 10 short lines, checked as []. Keep any thinking brief." }] });
       usage.input_tokens += resp.usage?.input_tokens || 0; usage.output_tokens += resp.usage?.output_tokens || 0;
       const t2 = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
       debug.repair_stop = resp.stop_reason; debug.repair_chars = t2.length; debug.repair_head = t2.slice(0, 300);
