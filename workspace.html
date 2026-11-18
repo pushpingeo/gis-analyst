@@ -9,7 +9,7 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=ad88fe7d">
+<link rel="stylesheet" href="css/workspace.css?v=f08e8f35">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
@@ -30,13 +30,14 @@
   "./js/gazetteer.js": "./js/gazetteer.js?v=390ac614",
   "./js/geometry.js": "./js/geometry.js?v=6bc3cd92",
   "./js/licence.js": "./js/licence.js?v=cf8fd6ef",
-  "./js/ntrrun.js": "./js/ntrrun.js?v=de42431b",
-  "./js/placetools.js": "./js/placetools.js?v=e5b1fead",
+  "./js/ntrrun.js": "./js/ntrrun.js?v=60456c46",
+  "./js/placetools.js": "./js/placetools.js?v=e366ee4b",
   "./js/reference.js": "./js/reference.js?v=6eaf57a4",
   "./js/tools.js": "./js/tools.js?v=084a3bd7",
+  "./js/units.js": "./js/units.js?v=77029a89",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=9cf55445",
+  "./js/workspace.js": "./js/workspace.js?v=bffc6da1",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -94,7 +95,9 @@
 <section class="panel" id="panel" aria-label="Conversation">
   <button class="handle" id="handle" aria-expanded="true" aria-controls="conversation"><span class="sr">Show or hide the conversation</span></button>
   <header class="brand">
-    <h1><img class="mark" src="img/tobler.svg" alt="" width="30" height="30">Hi, I'm Tobler</h1>
+    <h1><img class="mark" src="img/tobler.svg" alt="" width="30" height="30">Hi, I'm Tobler
+      <button type="button" class="gear" id="gear" title="Settings" aria-haspopup="dialog" aria-controls="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.6"/></svg><span class="sr">Settings</span></button></h1>
     <p>Your geospatial screening analyst.</p>
   </header>
 
@@ -131,6 +134,44 @@
     <p class="links"><a href="lab.html">How the risk screening was tested</a><a href="index.html">Earlier agent page</a><a href="https://github.com/pushpingeo/tobler">Code</a></p>
   </div>
 </section>
+
+<dialog class="settings" id="settings" aria-labelledby="settings-title">
+  <form method="dialog">
+    <header><h2 id="settings-title">Settings</h2><button class="close" value="close" title="Close" aria-label="Close settings">×</button></header>
+    <fieldset>
+      <legend>Data the analyst may use</legend>
+      <label class="switch"><input type="checkbox" name="esri"> <span><b>I hold an Esri licence</b>Lets the analyst use layers under Esri's Master License Agreement (Living Atlas copies). Leave off unless your organisation is licensed.</span></label>
+      <label class="switch"><input type="checkbox" name="nonCommercial"> <span><b>My use is non-commercial</b>Lets the analyst use data licensed for non-commercial use only, such as the World Database on Protected Areas. Leave off for any commercial work.</span></label>
+      <p class="hint-line">Changes apply to the next search or screen. Runs already made keep what they used.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Units</legend>
+      <div class="unit-choices" role="radiogroup" aria-label="Units">
+        <label><input type="radio" name="units" value="metric"> Kilometres</label>
+        <label><input type="radio" name="units" value="imperial"> Miles</label>
+        <label><input type="radio" name="units" value="nautical"> Nautical miles</label>
+      </div>
+      <p class="hint-line">For display. The analyst still measures in kilometres and says both.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Colour of your shapes</legend>
+      <div class="colours" role="radiogroup">
+        <button type="button" role="radio" data-colour="#d1352a" title="Red" style="--c:#d1352a"><span class="sr">Red</span></button>
+        <button type="button" role="radio" data-colour="#ef5b0c" title="Orange" style="--c:#ef5b0c"><span class="sr">Orange</span></button>
+        <button type="button" role="radio" data-colour="#00a0b0" title="Cyan" style="--c:#00a0b0"><span class="sr">Cyan</span></button>
+        <button type="button" role="radio" data-colour="#1c1c1e" title="Black" style="--c:#1c1c1e"><span class="sr">Black</span></button>
+        <label class="pick" title="Any colour"><input type="color" name="colour"><span class="sr">Any colour</span></label>
+      </div>
+      <p class="hint-line">Findings use green, ochre, violet, pink, blue and grey, so a colour away from those reads best.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Your own Anthropic key</legend>
+      <div class="keyrow"><label for="own-key" class="sr">Anthropic API key</label><input id="own-key" name="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"><button type="button" data-op="key-save">Use</button><button type="button" data-op="key-clear">Clear</button></div>
+      <p class="hint-line" id="key-status">Optional. Without one, Tobler's shared daily allowance is used. A key is kept for this tab only and sent straight to Anthropic.</p>
+    </fieldset>
+    <p class="foot">Saved in this browser only.</p>
+  </form>
+</dialog>
 
 <template id="shape-card">
   <article class="msg analyst shape">
@@ -195,6 +236,11 @@
     <p class="problem" hidden></p>
     <ol class="flags"></ol>
     <div class="reach">
+      <div class="scope" role="radiogroup" aria-label="What to look at" hidden>
+        <button type="button" role="radio" data-scope="around">Area and surroundings</button>
+        <button type="button" role="radio" data-scope="inside">Inside the area only</button>
+      </div>
+      <p class="inside-note" hidden></p>
       <label class="reach-label"><span>Show findings up to</span> <output></output></label>
       <input type="range" min="0" step="0.5" aria-label="Show findings up to this distance from the site">
       <p class="nearest"></p>
@@ -211,6 +257,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=9cf55445"></script>
+<script type="module" src="js/workspace.js?v=bffc6da1"></script>
 </body>
 </html>

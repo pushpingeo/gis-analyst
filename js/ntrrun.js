@@ -41,7 +41,10 @@ ${skill.body}
 </method>`;
 }
 
-export function firstMessage({ siteName, describe, inputs, distances, footprintNote, origin, baseline = null }) {
+export const isArea = (feature) => /Polygon/.test(feature?.geometry?.type || "");
+
+export function firstMessage({ siteName, describe, inputs, distances, footprintNote, origin, baseline = null, inside = false }) {
+  const reach = inside ? 0 : distances.wider;
   const lines = [
     `Screen ${siteName}.`,
     `Site: ${R.summaryLine(describe)}${footprintNote ? `; ${footprintNote}` : ""}.`,
@@ -50,10 +53,12 @@ export function firstMessage({ siteName, describe, inputs, distances, footprintN
     `Asset type: ${inputs.asset_label}${inputs.asset_assumed ? " (assumed: say so)" : ""}. Stage: ${inputs.stage || "greenfield (assumed: say so)"}.`,
     inputs.capacity_mw ? `Capacity: ${inputs.capacity_mw} MW.` : null,
     inputs.tip_height_m ? `Turbine tip height: ${inputs.tip_height_m} m.` : null,
-    `Distances from the footprint edge: ${distancesLine(distances)}. Why: ${distances.reasons.join("; ")}.`,
+    inside
+      ? "Scope: inside the area only, as the person asked. The tools fetch only what lies inside the area or touches its edge (distance 0, band \"on site\"); the surroundings were not screened. Assess only what is inside, and put one line in data_gaps saying the surroundings weren't screened."
+      : `Distances from the footprint edge: ${distancesLine(distances)}. Why: ${distances.reasons.join("; ")}.`,
     inputs.focus ? `The person asked especially about: ${inputs.focus}.` : null,
-    describe.offshore && describe.coast_km != null && describe.coast_km > distances.wider
-      ? `No land within the wider band (the coast is about ${Math.round(describe.coast_km)} km away): settlements, schools, clinics, roads and other onshore receptors are out of reach. Don't search for them and don't list them as gaps; coastal communities matter only as spill reach beyond the bands.` : null,
+    describe.offshore && describe.coast_km != null && describe.coast_km > reach
+      ? `No land ${inside ? "inside the area" : "within the wider band"} (the coast is about ${Math.round(describe.coast_km)} km away): settlements, schools, clinics, roads and other onshore receptors are out of reach. Don't search for them and don't list them as gaps; coastal communities matter only as spill reach beyond the bands.` : null,
     baseline ? `Already checked by the run before you started (don't fetch these again; they are evidence like anything you fetch, and failures are gaps):\n${baseline}` : null,
     `Refer to the site as "${siteName}" in tool calls.`,
   ];
@@ -119,6 +124,9 @@ function checkedFrom(tool, input, out) {
 export async function runScreening({ host, site, inputs, distances, skill, callClaude, model = "", runId = "R1", maxRounds = 14, onEvent = () => {}, now = () => new Date().toISOString() }) {
   const started = now();
   const fp = footprintOf(site.feature, distances);
+  // Inside only (areas, when the person asks): fetch only what's inside or touching; otherwise out to the wider band.
+  const inside = inputs.extent === "inside" && isArea(site.feature);
+  const reach = inside ? 0 : distances.wider;
   const screenPlace = { name: site.name, feature: fp.feature, origin: site.origin, status: "accepted", edits: [] };
   const evidence = [];
   const seen = new Map();
@@ -156,8 +164,8 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     if (!SCREEN_TOOLS.includes(name)) throw new Error(`${name} isn't available in a screening run.`);
     const i = { ...input };
     // Fetch once, out to the wider band, so the card's slider can work inside it without new queries.
-    if (name === "get_data") { i.place = site.name; i.within_km = Math.min(MAX_KM, Math.max(+i.within_km || 0, distances.wider)); }
-    if (name === "find_features_near") { i.anchor = /^C\d+$/i.test(String(i.anchor || "")) ? i.anchor : site.name; i.radius_km = Math.min(MAX_KM, Math.max(+i.radius_km || 0, distances.wider)); }
+    if (name === "get_data") { i.place = site.name; i.within_km = inside ? 0 : Math.min(MAX_KM, Math.max(+i.within_km || 0, reach)); }
+    if (name === "find_features_near") { i.anchor = /^C\d+$/i.test(String(i.anchor || "")) ? i.anchor : site.name; i.radius_km = inside ? 0 : Math.min(MAX_KM, Math.max(+i.radius_km || 0, reach)); }
     const t0 = Date.now();
     try {
       const out = await tools.exec(name, i);
@@ -176,17 +184,17 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   const offshore = !!describe.offshore;
   // Baseline, in code, before the analyst starts: boundaries (land and maritime) and the layers every screen must
   // check (catalogue/trusted.json "baseline"), so the essentials never depend on a lucky catalogue search.
-  const sea = offshore || (describe.coast_km != null && describe.coast_km <= distances.wider);
+  const sea = offshore || (describe.coast_km != null && describe.coast_km <= reach);
   const baselineLines = [];
   const summarise = (c) => {
     const near = evidence.filter((f) => f.properties.dataset === c.dataset).sort((a, b) => a.properties.distance_km - b.properties.distance_km).slice(0, 3)
       .map((f) => `${f.properties.name}${f.properties.details?.sides ? ` [${f.properties.details.sides}${f.properties.details.line_type ? `, ${f.properties.details.line_type}` : ""}]` : ""} ${f.properties.distance_km} km`);
-    return `- ${c.dataset} (${c.publisher || "?"}): ${c.result === "features" ? `${c.count} within ${distances.wider} km; nearest ${near.join("; ")}` : c.result}${c.why ? ` (${c.why})` : ""}`;
+    return `- ${c.dataset} (${c.publisher || "?"}): ${c.result === "features" ? `${c.count} ${inside ? "inside or touching the area" : `within ${reach} km`}; nearest ${near.join("; ")}` : c.result}${c.why ? ` (${c.why})` : ""}`;
   };
   try {
     const tb = Date.now();
-    const nb = await nearestBoundaries({ ref: host.ref, site: fp.feature, withinKm: distances.wider, atlas: host.atlas || null, sea, now });
-    onEvent({ type: "tool", name: "nearest_boundaries", input: { within_km: distances.wider, sea }, ms: Date.now() - tb, baseline: true,
+    const nb = await nearestBoundaries({ ref: host.ref, site: fp.feature, withinKm: reach, atlas: host.atlas || null, sea, now });
+    onEvent({ type: "tool", name: "nearest_boundaries", input: { within_km: reach, sea }, ms: Date.now() - tb, baseline: true,
       output: { found: nb.evidence.map((e) => `${e.name} (${e.type}) ${e.distance_km} km`), checked: nb.checked.map((c) => `${c.dataset}: ${c.result}${c.why ? ` (${c.why})` : ""}`) } });
     capture(nb.evidence, { theme: "context" });
     for (const c of nb.checked) { checked.push(c); baselineLines.push(summarise(c)); }
@@ -209,7 +217,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     : "drawn on the map by the person";
   const res = await runTurn({
     system: systemFor(skill),
-    messages: [{ role: "user", content: firstMessage({ siteName: site.name, describe, inputs, distances, footprintNote: fp.note, origin, baseline: baselineLines.join("\n") || null }) }],
+    messages: [{ role: "user", content: firstMessage({ siteName: site.name, describe, inputs, distances, footprintNote: fp.note, origin, baseline: baselineLines.join("\n") || null, inside }) }],
     tools: defs, exec, callClaude, maxRounds,
     onEvent: (ev) => { if (ev.type === "tool_start") onEvent({ type: "tool_start", name: ev.name, input: ev.input }); if (ev.type === "tool" || ev.type === "round" || ev.type === "warning") onEvent(ev); },
   });
@@ -250,13 +258,15 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       site: {
         name: site.name, how_found: origin, confidence: site.origin?.method === "words" ? site.origin.confidence : "drawn",
         anchor_source: site.origin?.anchor?.source ? { title: site.origin.anchor.source.title, publisher: site.origin.anchor.source.publisher, licence: site.origin.anchor.source.licence } : null,
-        footprint: fp.note || `screened on the ${/Line/.test(site.feature.geometry.type) ? "line" : "area"} itself`,
+        footprint: inside ? "inside the area only (the surroundings weren't screened)" : fp.note || `screened on the ${/Line/.test(site.feature.geometry.type) ? "line" : "area"} itself`,
         setting: offshore ? "offshore" : "onshore", summary: R.summaryLine(describe),
         asset_type: inputs.asset_type, asset_label: inputs.asset_label, asset_assumed: !!inputs.asset_assumed,
         stage: inputs.stage || "greenfield (assumed)", capacity_mw: inputs.capacity_mw ?? null, tip_height_m: inputs.tip_height_m ?? null,
       },
-      distances, fetched_to_km: distances.wider, assessed_within_km: distances.wider,
-      method: "Distances geodesic on WGS84, measured from the footprint edge (0 = on site); features fetched once out to the wider band. Coordinates WGS84 (EPSG:4326).",
+      extent: inside ? "inside" : "around", distances, fetched_to_km: reach, assessed_within_km: reach,
+      method: inside
+        ? "Inside the area only, at the person's request: features inside the area or touching its edge (distance 0), geodesic on WGS84; the surroundings weren't fetched. Coordinates WGS84 (EPSG:4326)."
+        : "Distances geodesic on WGS84, measured from the footprint edge (0 = on site); features fetched once out to the wider band. Coordinates WGS84 (EPSG:4326).",
       flags, checked, data_gaps: Array.isArray(parsed.json?.data_gaps) ? parsed.json.data_gaps.map(String) : [],
       model_checked: Array.isArray(parsed.json?.checked) ? parsed.json.checked : [],
       summary: parsed.summary, ...(parsed.json ? {} : { parse_error: "The analyst's result had no readable JSON block, so there are no structured flags. The summary is kept as written." }),
@@ -297,14 +307,18 @@ export async function reassess({ record, km, skill, callClaude, now = () => new 
     const p = f.properties;
     return { name: p.name, type: p.type, theme: THEME_CODE[p.theme] || p.theme, distance_km: p.distance_km, band: bandFor(p.distance_km, d), dataset: p.dataset, publisher: p.publisher, licence: p.licence, checked: p.checked_at, ...(p.details ? { details: p.details } : {}) };
   });
+  const insideOnly = km === 0 && isArea(record.features.find((f) => f.properties.role === "site"));
+  const where = insideOnly ? "inside the area (inside it or touching its edge)" : `within ${km} km of the footprint edge`;
   const message = [
-    `Re-assess the screen of ${run.site.name} for findings within ${km} km of the footprint edge. No tools: use only the evidence below, which was fetched in the original run.`,
+    `Re-assess the screen of ${run.site.name} for findings ${where}.${insideOnly ? " The person chose to look inside the area only." : ""} No tools: use only the evidence below, which was fetched in the original run.`,
     `Site: ${run.site.summary}; ${run.site.footprint}. Setting: ${run.site.setting}. Asset type: ${run.site.asset_label}. Stage: ${run.site.stage}.`,
     `Distances now: ${distancesLine(d)}.`,
-    `Evidence within ${km} km (${ev.length} features):\n${JSON.stringify(ev)}`,
+    `Evidence ${insideOnly ? "inside the area" : `within ${km} km`} (${ev.length} features):\n${JSON.stringify(ev)}`,
     `What the original run checked:\n${JSON.stringify(run.checked.map((c) => ({ dataset: c.dataset, publisher: c.publisher, result: c.result, ...(c.why ? { why: c.why } : {}) })))}`,
     `Gaps from the original run:\n${JSON.stringify(run.data_gaps)}`,
-    "Write the short summary and the JSON block as the method says. Features beyond the new distance are out of scope; gaps still stand.",
+    insideOnly
+      ? "Write the short summary and the JSON block as the method says. Features outside the area are out of scope for this view (they were found and stay in the run); gaps still stand."
+      : "Write the short summary and the JSON block as the method says. Features beyond the new distance are out of scope; gaps still stand.",
   ].join("\n\n");
   const resp = await callClaude({ system: systemFor(skill), messages: [{ role: "user", content: message }] });
   const text = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
@@ -328,7 +342,7 @@ export function headline(record) {
   r.flags.forEach((f) => { byConf[f.confidence]++; });
   const notChecked = r.checked.filter((c) => c.result === "not checked");
   return {
-    run: r.id, site: r.site.name, distances: distancesLine(r.distances), asset: `${r.site.asset_label}${r.site.asset_assumed ? " (assumed)" : ""}`, stage: r.site.stage,
+    run: r.id, site: r.site.name, scope: r.extent === "inside" ? "inside the area only" : "the site and its surroundings", distances: r.extent === "inside" ? "none (inside the area only)" : distancesLine(r.distances), asset: `${r.site.asset_label}${r.site.asset_assumed ? " (assumed)" : ""}`, stage: r.site.stage,
     flags: r.flags.length, by_confidence: byConf,
     top_flags: r.flags.slice(0, 5).map((f) => ({ risk: f.risk, confidence: f.confidence, theme: f.theme, nearest_km: f.nearest_km })),
     evidence_features: evidenceOf(record).length, sources_checked: r.checked.length, not_checked: notChecked.map((c) => c.dataset).slice(0, 6), gaps: r.data_gaps.length,
@@ -357,8 +371,9 @@ export function createScreening({ host, table, skill, callClaude, model = "", on
       const record = await runScreening({
         host, site: { name: place.name, feature: place.feature, origin: place.origin }, distances, skill: sk, callClaude, model, runId: id, onEvent, ...(now ? { now } : {}),
         inputs: { asset_type: asset || "other", asset_label: asset ? tb.assets[asset].label : "site of unknown type", asset_assumed: !asset || !!i.assumed,
-          stage: i.stage || "", capacity_mw: site.capacity_mw, tip_height_m: site.tip_height_m, focus: i.focus || "" },
+          stage: i.stage || "", capacity_mw: site.capacity_mw, tip_height_m: site.tip_height_m, focus: i.focus || "", extent: i.extent === "inside" ? "inside" : "around" },
       });
+      if (i.extent === "inside" && !isArea(place.feature)) record.tobler_run.note_scope = "Inside only applies to areas, so this point or line was screened with its surroundings.";
       record.tobler_run.place_id = place.id ?? null;
       record.tobler_run.place_geometry_at_run = JSON.stringify(place.feature.geometry);
       runs.set(id, record);
@@ -370,7 +385,7 @@ export function createScreening({ host, table, skill, callClaude, model = "", on
       if (!rec) throw new Error("No screening runs yet in this conversation.");
       const r = rec.tobler_run;
       return {
-        run: r.id, site: r.site.name, asset: r.site.asset_label, stage: r.site.stage, distances: distancesLine(r.distances), assessed_within_km: r.assessed_within_km,
+        run: r.id, site: r.site.name, scope: r.extent === "inside" ? "inside the area only" : "the site and its surroundings", asset: r.site.asset_label, stage: r.site.stage, distances: distancesLine(r.distances), assessed_within_km: r.assessed_within_km,
         flags: r.flags.map((f) => ({ risk: f.risk, theme: THEME_CODE[f.theme] || f.theme, confidence: f.confidence, why: f.why,
           evidence: f.evidence.map((e) => ({ name: e.name, distance_km: e.distance_km, band: e.band, dataset: e.dataset, publisher: e.publisher, traced: e.traced })) })),
         checked: r.checked.map((c) => ({ dataset: c.dataset, publisher: c.publisher, result: c.result, ...(c.count ? { count: c.count } : {}), ...(c.why ? { why: c.why.slice(0, 160) } : {}) })),

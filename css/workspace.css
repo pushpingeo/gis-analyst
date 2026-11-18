@@ -14,6 +14,7 @@
   --sea: #2b6a80;      /* links, secondary actions */
   --pole: #d1352a;     /* ranging-pole red: your shapes, the active tool */
   --pole-wash: #fbe9e7;
+  --alert: #b8321f;    /* errors: fixed, so they don't follow the shape colour setting */
   --radius-panel: 18px;
   --radius-control: 10px;
   --shadow: 0 1px 2px rgba(21, 48, 60, .08), 0 8px 28px rgba(21, 48, 60, .14);
@@ -163,7 +164,7 @@ a { color: var(--sea); }
 /* the analyst's replies */
 .msg.analyst ul { margin: 4px 0 6px; padding-left: 20px; }
 .msg.analyst li { margin: 2px 0; }
-.msg.error { color: var(--pole); }
+.msg.error { color: var(--alert); }
 .examples { list-style: none; padding: 0 !important; margin: 4px 0 10px !important; display: grid; gap: 6px; }
 .examples button { text-align: left; border: 1px solid var(--rule); background: var(--paper); border-radius: 10px; padding: 6px 11px; font-size: 13.5px; width: 100%; }
 .examples button:hover { border-color: var(--sea); color: var(--sea); }
@@ -173,7 +174,7 @@ a { color: var(--sea); }
 .trace summary { cursor: pointer; color: var(--sea); }
 .trace ol { margin: 6px 0 0; padding-left: 20px; }
 .trace li { margin: 2px 0; }
-.trace li.err { color: var(--pole); }
+.trace li.err { color: var(--alert); }
 .trace .log-link { margin: 6px 0 0 20px; padding: 0; border: 0; background: none; color: var(--sea); font: inherit; text-decoration: underline; cursor: pointer; }
 .ask.busy .send { opacity: .4; pointer-events: none; }
 
@@ -271,3 +272,45 @@ a { color: var(--sea); }
 .shape.gone .card-delete { display: none; }
 .shape h2 { white-space: nowrap; }
 .run .disclaimer { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--rule); font-size: 11.5px; line-height: 1.4; color: var(--ink-2); }
+
+/* ---- settings: the gear and its dialog ---- */
+.brand h1 .gear { margin-left: auto; width: 34px; height: 34px; padding: 6px; border: 1px solid transparent; border-radius: var(--radius-control); background: none; color: var(--ink-2); cursor: pointer; flex: none; }
+.brand h1 .gear:hover { color: var(--ink); border-color: var(--rule); background: var(--paper); }
+.brand h1 .gear svg { width: 100%; height: 100%; display: block; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.settings { width: min(420px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); padding: 0; border: 0; border-radius: var(--radius-panel); box-shadow: var(--shadow); color: var(--ink); font: 14px/1.45 var(--font); }
+.settings::backdrop { background: rgba(21, 48, 60, .28); }
+.settings form { padding: 14px 18px 12px; }
+.settings header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.settings h2 { margin: 0; font-size: 17px; font-weight: 700; }
+.settings .close { width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; font-size: 22px; line-height: 1; color: var(--ink-2); cursor: pointer; }
+.settings .close:hover { background: var(--paper); color: var(--ink); }
+.settings fieldset { border: 0; border-top: 1px solid var(--rule); margin: 0; padding: 10px 0 8px; }
+.settings legend { padding: 0; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); float: left; width: 100%; margin-bottom: 6px; }
+.settings legend + * { clear: both; }
+.settings .switch { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; margin: 0 0 8px; cursor: pointer; }
+.settings .switch input { margin: 3px 0 0; width: 16px; height: 16px; accent-color: var(--ink); }
+.settings .switch b { display: block; font-weight: 650; }
+.settings .switch span { font-size: 13px; color: var(--ink-2); }
+.settings .switch span b { color: var(--ink); font-size: 14px; }
+.settings .hint-line { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.settings .unit-choices { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.settings .unit-choices label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.settings .unit-choices input { accent-color: var(--ink); }
+.settings .colours { display: flex; gap: 10px; align-items: center; }
+.settings .colours button, .settings .colours .pick { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--rule); background: var(--c); cursor: pointer; padding: 0; position: relative; }
+.settings .colours [aria-checked="true"], .settings .colours .pick.on { box-shadow: 0 0 0 2px var(--ink); }
+.settings .colours .pick { background: conic-gradient(#d1352a, #ef5b0c, #e0b000, #2a9d3a, #00a0b0, #2a5bd6, #8a3ad6, #d1352a); overflow: hidden; }
+.settings .colours .pick input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.settings .keyrow { display: flex; gap: 6px; }
+.settings .keyrow input { flex: 1; min-width: 0; padding: 6px 9px; border: 1px solid var(--rule); border-radius: 8px; font: inherit; font-size: 13.5px; }
+.settings .keyrow button { padding: 6px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--panel); font: inherit; font-size: 13px; cursor: pointer; }
+.settings .keyrow button:hover { border-color: var(--ink-2); }
+.settings .foot { margin: 6px 0 0; padding-top: 8px; border-top: 1px solid var(--rule); font-size: 12px; color: var(--ink-2); }
+
+/* ---- run card: area and surroundings, or inside the area only ---- */
+.run .scope { display: flex; gap: 0; margin: 0 0 6px; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.run .scope button { flex: 1; padding: 5px 8px; border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+.run .scope button + button { border-left: 1px solid var(--rule); }
+.run .scope button[aria-checked="true"] { background: var(--ink); color: #fff; font-weight: 600; }
+.run .inside-note { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+.run .reach [hidden] { display: none; }

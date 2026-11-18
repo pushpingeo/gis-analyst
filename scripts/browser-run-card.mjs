@@ -1,6 +1,8 @@
 // Headless browser check of a screening run in the workspace: the conversation calls screen_site, the sealed run
 // fetches (atlas and model scripted, no network, no cost), the run card appears with flags first, the slider filters
-// the map, re-assess replaces the flags, and a flag picks out its evidence. Screenshots at desktop and phone sizes.
+// the map, re-assess replaces the flags, a flag picks out its evidence, the card switches to inside the area only and
+// back, an inside-only screen, and the settings gear (units, shape colour, licence switches). Screenshots at desktop
+// and phone sizes.
 // Run: python3 -m http.server 8000 (in the repo), then node scripts/browser-run-card.mjs [chrome path].
 import { chromium } from "playwright-core";
 import * as turf from "@turf/turf";
@@ -48,7 +50,8 @@ function model(body) {
   }
   const last = body.messages.at(-1);
   if (Array.isArray(last.content) && last.content.some((b) => b.type === "tool_result")) return text("Screened Area 1: live pipelines on and next to the field are the main flag, then a wreck 2 km east. Key Biodiversity Areas and fishing effort weren't checked.");
-  return toolUse(["screen_site", { place: "Area 1", asset_type: "oil-gas-field", assumed: true }]);
+  const asked = JSON.stringify(body.messages);
+  return toolUse(["screen_site", { place: "Area 1", asset_type: "oil-gas-field", assumed: true, ...(/only inside/.test(asked) ? { extent: "inside" } : {}) }]);
 }
 
 const browser = await chromium.launch({ executablePath: CHROME, args: ["--no-sandbox", "--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
@@ -80,6 +83,12 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     hl: window.__ws.map.getSource("hl")._data.features?.length ?? 0,
     checked: document.querySelector(".run .checked summary").textContent,
     dists: document.querySelector(".run .dists").textContent,
+    scopeShown: !document.querySelector(".run .scope").hidden,
+    insideChecked: document.querySelector('.run [data-scope="inside"]').getAttribute("aria-checked") === "true",
+    sliderShown: !document.querySelector(".run input[type=range]").hidden,
+    mask: window.__ws.map.getSource("mask")._data.features?.length ?? 0,
+    rings: window.__ws.map.getSource("rings")._data.features?.length ?? 0,
+    staleText: document.querySelector(".run .stale button").textContent,
     reply: [...document.querySelectorAll(".msg.analyst")].at(-1).textContent.slice(0, 120),
   }));
   let s = await st();
@@ -106,7 +115,68 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   s = await st();
   check(s.hl === 1, `${label}: opening a flag picks out its evidence on the map (${s.hl})`);
   await page.screenshot({ path: `/tmp/run-card-${label}-3.png` });
+  // Inside the area only, from the same evidence, and back.
+  check(s.scopeShown && !s.insideChecked && s.rings > 0 && s.mask === 0, `${label}: area run offers the inside switch; rings on, no mask`);
+  await page.click('.run [data-scope="inside"]');
+  await page.waitForTimeout(300);
+  s = await st();
+  check(s.insideChecked && s.onMap === 1 && s.mask === 1 && s.rings === 0 && !s.sliderShown, `${label}: inside only: 1 finding, outside dimmed, no rings, slider hidden (${s.onMap}, mask ${s.mask}, rings ${s.rings})`);
+  check(/inside the area or touching its edge/.test(s.nearest) && s.stale && s.staleText === "Re-assess inside the area", `${label}: inside wording and re-assess offer (${s.staleText})`);
+  await page.screenshot({ path: `/tmp/run-card-${label}-4-inside.png` });
+  await page.click('.run [data-scope="around"]');
+  await page.waitForTimeout(300);
+  s = await st();
+  check(!s.insideChecked && s.onMap === 5 && s.mask === 0 && s.rings > 0 && s.out === "50 km", `${label}: back to area and surroundings at 50 km (${s.onMap}, ${s.out})`);
+  // Settings: units, colour, licence switches.
+  if (label === "phone") await page.evaluate(() => document.getElementById("panel").classList.remove("collapsed"));
+  await page.click("#gear");
+  await page.waitForSelector("#settings[open]");
+  await page.screenshot({ path: `/tmp/settings-${label}.png` });
+  await page.check('#settings input[name="units"][value="imperial"]');
+  await page.click('#settings [data-colour="#00a0b0"]');
+  await page.check('#settings input[name="esri"]');
+  const set = await page.evaluate(() => ({
+    out: document.querySelector(".run .reach output").textContent, dists: document.querySelector(".run .dists").textContent,
+    unit: document.querySelector(".shape .unit").textContent, facts: document.querySelector(".shape .facts").textContent,
+    line: window.__ws.map.getPaintProperty("aoi-red", "line-color"), css: document.documentElement.style.getPropertyValue("--pole"),
+    esri: localStorage.getItem("tobler.esriLicence"), host: window.__ws.host.esriLicence(), units: localStorage.getItem("tobler.units"),
+    rings: window.__ws.map.getSource("rings")._data.features.map((f) => f.properties.label).join(","),
+  }));
+  check(set.out === "31.1 mi" && /near 0.62 mi/.test(set.dists) && !/ km/.test(set.dists) && set.unit === "sq mi" && /sq mi/.test(set.facts) && /mi/.test(set.rings), `${label}: miles on the card, shape card and rings (${set.out}; ${set.unit}; ${set.rings})`);
+  check(set.line === "#00a0b0" && set.css === "#00a0b0", `${label}: shape colour applied to the map and the page`);
+  check(set.esri === "yes" && set.host === true && set.units === "imperial", `${label}: Esri switch and units saved`);
+  await page.click("#settings .close");
+  check(await page.evaluate(() => !document.getElementById("settings").open), `${label}: settings close`);
+  await page.evaluate(() => localStorage.clear());
   check(errors.length === 0, `${label}: no page errors${errors.length ? `: ${errors.slice(0, 3).join(" | ")}` : ""}`);
+  await page.close();
+}
+// An inside-only screen, asked for in words.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.route(/openfreemap|nominatim|wikidata|overpass/, (r) => r.abort());
+  await page.route(/tobler-api.*\/v1\/messages/, async (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(model(JSON.parse(r.request().postData()))) }));
+  await page.route(/tobler-api.*\/atlas/, async (r) => { const b = JSON.parse(r.request().postData()); r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: { structuredContent: atlas(b.params.name, b.params.arguments) } }) }); });
+  await page.goto("http://localhost:8000/workspace.html");
+  await page.waitForFunction(() => window.__ws?.draw, null, { timeout: 40000 });
+  await page.evaluate((f) => window.__ws.host.addPlace({ feature: f, origin: { method: "drawn", at: new Date().toISOString() } }), SQUARE);
+  await page.fill("#say", "Screen Area 1, only inside the area");
+  await page.click("#ask button[type=submit]");
+  await page.waitForSelector(".run .flag", { timeout: 30000 });
+  await page.waitForTimeout(500);
+  const s = await page.evaluate(() => ({
+    note: document.querySelector(".run .inside-note").hidden ? "" : document.querySelector(".run .inside-note").textContent,
+    scope: !document.querySelector(".run .scope").hidden, dists: document.querySelector(".run .dists").textContent,
+    onMap: window.__ws.map.getSource("findings")._data.features.length, mask: window.__ws.map.getSource("mask")._data.features.length,
+    rings: window.__ws.map.getSource("rings")._data.features.length,
+  }));
+  check(/inside the area only/.test(s.note) && !s.scope && /^Inside the area only/.test(s.dists), `inside screen: card says so, no switch (${s.note.slice(0, 50)})`);
+  check(s.onMap === 1 && s.mask === 1 && s.rings === 0, `inside screen: only the on-site finding, outside dimmed, no rings (${s.onMap}, ${s.mask}, ${s.rings})`);
+  await page.$eval(".run", (e) => e.scrollIntoView({ block: "start" }));
+  await page.screenshot({ path: "/tmp/run-card-inside-screen.png" });
+  check(errors.length === 0, `inside screen: no page errors${errors.length ? `: ${errors.slice(0, 3).join(" | ")}` : ""}`);
   await page.close();
 }
 await browser.close();

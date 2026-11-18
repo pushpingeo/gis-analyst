@@ -147,6 +147,7 @@ export function placeToolDefs(skills) {
           tip_height_m: { type: "number", description: "Wind turbine tip height, only if the person gave it" },
           distances: { type: "object", description: "Only if the person gave distances: near, close and/or wider in km (wider up to 50).", properties: { near: { type: "number" }, close: { type: "number" }, wider: { type: "number" } } },
           focus: { type: "string", description: "Optional: what the person is most concerned about, in their words" },
+          extent: { type: "string", enum: ["around", "inside"], description: "Areas only. around (default): the area and its surroundings out to the wider band. inside: only what lies inside the area or touches its edge; use it only when the person asks to keep the screen within the area (\"only inside the block\", \"just within the boundary\"). An around screen of an area can also be switched to inside-only on the run card, with no new fetching." },
         },
         required: ["place", "asset_type"],
       },

@@ -2,6 +2,29 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (20:00): inside-the-area option for area screens; the settings gear (Rob)
+- **Area screens default to the area and its surroundings** (unchanged: fetched out to the wider band). Rob asked
+  for the option to keep a screen within the polygon. Two ways in, one idea:
+  - **On the run card (any area screen):** a switch, "Area and surroundings | Inside the area only". Inside uses
+    the evidence already fetched (distance 0 = inside or touching the edge), so it's instant and free; the map dims
+    everything outside the area, the rings go, the slider hides, and "Re-assess inside the area" rewrites the flags
+    for the inside only (one model call, as the slider's re-assess). Switching back returns to the last distance.
+    Chosen over asking up front: the default stays fast to start, and the person can compare both views of one run.
+  - **Asked for in words** ("only inside the block"): `screen_site` takes `extent: "inside"` (areas only; a point
+    or line is screened with its surroundings and the run says so). The run fetches only inside (within 0 km), so
+    it's quicker on big areas; the analyst is told the surroundings weren't screened and to put that in the gaps;
+    the card says so and has no switch (nothing outside was fetched). The record carries `extent`.
+- **Settings gear** (panel header; a dialog; saved in the browser): the Esri licence and non-commercial switches
+  (the existing `tobler.esriLicence` / `tobler.nonCommercial`, read live, so they apply to the next search);
+  units (kilometres, miles, nautical miles: display only via `js/units.js`; cards, slider, rings, scale bar and
+  shape cards convert; the analyst is told the person's units and still measures in km, giving both); shape
+  colour (four presets chosen away from the findings' theme colours, plus any colour; map, drawing tool and
+  page follow; errors now have their own fixed red); your own Anthropic key (kept for the tab only, as before;
+  this is its first UI in the workspace). Basemap choice and web search left for later.
+- Tested: 4 new unit tests (inside-only run, inside ignored for a point, re-assess inside, units); headless
+  Chrome `scripts/browser-run-card.mjs` now 39 checks at 1280×820 and 390×844 (scope switch and back, mask and
+  rings, an inside-only screen, settings: miles, colour, Esri switch).
+
 ## 18 Nov 2026 (19:00): NTR skill 3.4-draft live (Rob approved)
 - Changes: start from the baseline; named biodiversity sources (national protected areas, EEA/Natura 2000, WDPA
   only when switched on, IMMAs, coral, MARPOL, national critical habitat; search for IBAs and EBSAs); KBAs "not

@@ -402,4 +402,74 @@ await test("named field search: a national outline and a tracker's points both c
   assert.equal(p.candidates.length, 1);
 });
 
+await test("inside the area only (asked for): fetches only inside, measures nothing outside, records the scope", async () => {
+  atlasCalls.length = 0;
+  const model = standardScript();
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const rec = await runScreening({ host: host(), site, distances: d, skill, callClaude: model, runId: "R2",
+    inputs: { asset_type: "oil-gas-field", asset_label: "offshore oil or gas field", extent: "inside" }, now: () => "2026-11-18T20:00:00Z" });
+  // Every data fetch is the site's own box (about 10 km across), not the 50 km band. (The boundary lookup pads its
+  // box by 5 km on purpose, then keeps only lines within 0 km.)
+  for (const [, a] of atlasCalls.filter(([t, x]) => t === "fetch_features" && x.bbox && x.id !== "9760b5061ea298eb")) {
+    const [w, , e] = a.bbox;
+    assert.ok(turf.distance([w, FIELD[1]], [e, FIELD[1]]) < 12, `inside-only bbox: ${a.bbox}`);
+  }
+  const r = rec.tobler_run;
+  assert.equal(r.extent, "inside");
+  assert.equal(r.fetched_to_km, 0);
+  assert.equal(r.assessed_within_km, 0);
+  assert.match(r.site.footprint, /inside the area only/);
+  const ev = rec.features.filter((f) => f.properties.role === "evidence");
+  assert.ok(ev.length >= 1 && ev.every((f) => f.properties.distance_km === 0), ev.map((f) => `${f.properties.name} ${f.properties.distance_km}`).join("; "));
+  assert.ok(ev.some((f) => /flowline/.test(f.properties.name)));
+  const first = model.calls[0].messages[0].content;
+  assert.match(first, /inside the area only/);
+  assert.doesNotMatch(first, /wider 50 km/);
+  assert.equal(headline(rec).scope, "inside the area only");
+});
+
+await test("inside only is ignored for a point (screened with its surroundings, and said)", async () => {
+  const h = host();
+  const list = [{ name: "Point 1", feature: turf.point(FIELD), origin: { method: "drawn" }, status: "accepted", edits: [] }];
+  h.places = () => list; h.findPlace = () => list[0];
+  let rec;
+  h.screening = createScreening({ host: h, table, skill, callClaude: standardScript(), onRun: (x) => { rec = x; } });
+  await createPlaceTools(h).exec("screen_site", { place: "Point 1", asset_type: "platform", extent: "inside" });
+  assert.equal(rec.tobler_run.extent, "around");
+  assert.match(rec.tobler_run.note_scope, /only applies to areas/);
+});
+
+await test("re-assess inside the area (the card's switch): only inside evidence, worded as inside", async () => {
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const rec = await runScreening({ host: host(), site, distances: d, skill, callClaude: standardScript(), runId: "R3",
+    inputs: { asset_type: "oil-gas-field", asset_label: "offshore oil or gas field" } });
+  const model = scriptedModel([final(`Inside the field, the flowline.\n\n\`\`\`json\n{"flags":[{"risk":"Flowline on site","theme":"PS4","confidence":"high","evidence":[{"name":"Rosebank 9 inch Production flowline 1","distance_km":0,"dataset":"UKCS pipelines (WGS84)"}]}],"data_gaps":[]}\n\`\`\``)]);
+  await reassess({ record: rec, km: 0, skill, callClaude: model });
+  const sent = model.calls[0].messages[0].content;
+  assert.match(sent, /inside the area/);
+  assert.doesNotMatch(sent, /West of Shetland Pipeline|TROLDFOS/);
+  assert.equal(rec.tobler_run.assessed_within_km, 0);
+  assert.equal(rec.tobler_run.fetched_to_km, 50, "can switch back out");
+  assert.equal(rec.tobler_run.flags[0].traced, 1);
+});
+
+await test("display units: conversions, text in km shown in miles or nautical miles, metric untouched", async () => {
+  const U = await import("../js/units.js");
+  U.setUnits("metric");
+  assert.equal(U.dist(12.4), "12.4 km");
+  assert.equal(U.localise("10 km² block, 3.5 km from the coast"), "10 km² block, 3.5 km from the coast");
+  U.setUnits("imperial");
+  assert.equal(U.dist(16.09344), "10 mi");
+  assert.equal(U.area(1), "247 acres");
+  assert.equal(U.area(25.9), "10 sq mi");
+  assert.equal(U.localise("near 2 km · wider 50 km"), "near 1.24 mi · wider 31.1 mi");
+  assert.ok(Math.abs(U.fromDist(U.toDist(7)) - 7) < 1e-9);
+  U.setUnits("nautical");
+  assert.equal(U.dist(18.52), "10 nm");
+  assert.match(U.unitsNote(), /nautical miles/);
+  U.setUnits("bogus");
+  assert.equal(U.getUnits(), "metric");
+  assert.equal(U.unitsNote(), "");
+});
+
 console.log(`${passed} ntrrun tests passed`);

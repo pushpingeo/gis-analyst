@@ -11,7 +11,9 @@ import { callClaude, LimitReached } from "./claude.js";
 import { atlasViaWorker, firmsViaWorker } from "./atlasclient.js";
 import { CONFIG } from "./config.js";
 import { THEMES, themeFor, bandOf, BAND_OPACITY, BIG_AREA_KM2, chooseLabels, ringDistances } from "./findings.js";
-import { createScreening, evidenceOf, evidenceWithin, nearestByTheme, flagBeyond, reassess, THEME_CODE } from "./ntrrun.js";
+import { createScreening, evidenceOf, evidenceWithin, nearestByTheme, flagBeyond, reassess, isArea, THEME_CODE } from "./ntrrun.js";
+import * as U from "./units.js";
+import { getUserKey, setUserKey } from "./claude.js";
 import { distancesLine, bandFor } from "./distances.js";
 import { DISCLAIMER } from "./disclaimer.js";
 
@@ -20,6 +22,22 @@ const $ = (id) => document.getElementById(id);
 const ASSETS = (() => { try { return JSON.parse($("asset-versions")?.textContent || "{}"); } catch { return {}; } })();
 const asset = (path) => ASSETS[path] || path;
 const C = { ink: "#15303c", pole: "#d1352a", white: "#ffffff", sea: "#2b6a80" };
+
+// ---- settings (the gear): saved in this browser; the key for this tab only (js/claude.js) --------------------
+const store = {
+  get(k, d = null) { try { return localStorage.getItem(`tobler.${k}`) ?? d; } catch { return d; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(`tobler.${k}`) : localStorage.setItem(`tobler.${k}`, v); } catch { /* storage blocked */ } },
+};
+U.setUnits(store.get("units", "metric"));
+const savedColour = store.get("shapeColour");
+if (/^#[0-9a-f]{6}$/i.test(savedColour || "")) C.pole = savedColour;
+applyColourCss();
+function applyColourCss() {
+  document.documentElement.style.setProperty("--pole", C.pole);
+  // A pale wash of the same colour for the selected card's ring.
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(C.pole.slice(i, i + 2), 16));
+  document.documentElement.style.setProperty("--pole-wash", `rgb(${[r, g, b].map((v) => Math.round(v + (255 - v) * 0.88)).join(",")})`);
+}
 const BASEMAP = "https://tiles.openfreemap.org/styles/positron";
 
 // ---- reference data -------------------------------------------------------------
@@ -39,7 +57,8 @@ const map = new maplibregl.Map({
 const phone = innerWidth <= 720;
 map.addControl(new maplibregl.AttributionControl({ compact: true }), phone ? "top-right" : "bottom-right");
 if (!phone) map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
-map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
+const scaleCtl = new maplibregl.ScaleControl({ unit: U.UNIT_SETS[U.getUnits()].scale });
+map.addControl(scaleCtl, "bottom-right");
 
 // If the basemap can't be reached, fall back to the reference countries on a plain background so the tools still work.
 // Start on "style.load", not "load": a hidden tab doesn't render, so "load" may never come (lesson from demo 1).
@@ -145,6 +164,9 @@ function start() {
     paint: { "line-color": themeColour, "line-width": ["case", big, 1, 2], "line-opacity": emphasis } });
   map.addLayer({ id: "find-pt", type: "circle", source: "findings", filter: ["==", ["geometry-type"], "Point"],
     paint: { "circle-radius": ["match", ["get", "band"], "near", 6, 5], "circle-color": themeColour, "circle-opacity": emphasis, "circle-stroke-color": C.white, "circle-stroke-width": 1.5 } });
+  // Inside the area only (a run card's switch): everything outside the site is dimmed.
+  map.addSource("mask", { type: "geojson", data: turf.featureCollection([]) });
+  map.addLayer({ id: "mask-fill", type: "fill", source: "mask", paint: { "fill-color": C.ink, "fill-opacity": 0.22 } });
   // The evidence behind one flag, picked out on the map when the flag is opened on the run card.
   map.addSource("hl", { type: "geojson", data: turf.featureCollection([]) });
   map.addLayer({ id: "hl-line", type: "line", source: "hl", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": C.ink, "line-width": 5, "line-opacity": 0.55 } }, "find-line");
@@ -159,8 +181,7 @@ function start() {
     map.addLayer({ id: "aoi-label", type: "symbol", source: "aoi", layout: { ...text, "text-field": ["get", "label"] }, paint: { "text-color": C.ink, "text-halo-color": C.white, "text-halo-width": 1.6 } });
   }
 
-  const thin = { outlineWidth: 1, outlineColor: C.ink, fillOpacity: 0, fillColor: C.pole };
-  const handle = { closingPointColor: C.white, closingPointOutlineColor: C.pole, closingPointOutlineWidth: 2, closingPointWidth: 6 };
+  const st = drawStyles();
   draw = new TerraDraw({
     adapter: new TerraDrawMapLibreGLAdapter({ map }),
     modes: [
@@ -174,19 +195,13 @@ function start() {
           },
         }])),
         keyEvents: { deselect: "Escape", delete: "Delete", rotate: ["Shift"], scale: null },
-        styles: {
-          selectedPolygonColor: C.pole, selectedPolygonFillOpacity: 0.12, selectedPolygonOutlineColor: C.ink, selectedPolygonOutlineWidth: 1.5,
-          selectedLineStringColor: C.ink, selectedLineStringWidth: 1.5,
-          selectedPointColor: C.pole, selectedPointOutlineColor: C.ink, selectedPointWidth: 9, selectedPointOutlineWidth: 2,
-          selectionPointColor: C.white, selectionPointOutlineColor: C.ink, selectionPointWidth: 5, selectionPointOutlineWidth: 2,
-          midPointColor: C.pole, midPointOutlineColor: C.white, midPointWidth: 4, midPointOutlineWidth: 1.5,
-        },
+        styles: st.select,
       }),
-      new TerraDrawPointMode({ styles: { pointColor: C.pole, pointOutlineColor: C.white, pointWidth: 8, pointOutlineWidth: 2.5 } }),
-      new TerraDrawLineStringMode({ styles: { lineStringColor: C.ink, lineStringWidth: 1.5, closingPointColor: C.white, closingPointOutlineColor: C.pole, closingPointOutlineWidth: 2 } }),
-      new TerraDrawPolygonMode({ styles: { ...thin, ...handle } }),
-      new TerraDrawRectangleMode({ styles: thin }),
-      new TerraDrawCircleMode({ styles: thin }),
+      new TerraDrawPointMode({ styles: st.point }),
+      new TerraDrawLineStringMode({ styles: st.linestring }),
+      new TerraDrawPolygonMode({ styles: st.polygon }),
+      new TerraDrawRectangleMode({ styles: st.rectangle }),
+      new TerraDrawCircleMode({ styles: st.circle }),
     ],
   });
   draw.start();
@@ -196,6 +211,32 @@ function start() {
   draw.on("deselect", () => onSelect(null));
   setMode("select");
   window.__ws = { map, draw, places, ref, host }; // for testing in the browser console
+}
+
+// Terra Draw's styles, in the shape colour (rebuilt when the colour changes in settings).
+function drawStyles() {
+  const thin = { outlineWidth: 1, outlineColor: C.ink, fillOpacity: 0, fillColor: C.pole };
+  const handle = { closingPointColor: C.white, closingPointOutlineColor: C.pole, closingPointOutlineWidth: 2, closingPointWidth: 6 };
+  return {
+    select: {
+      selectedPolygonColor: C.pole, selectedPolygonFillOpacity: 0.12, selectedPolygonOutlineColor: C.ink, selectedPolygonOutlineWidth: 1.5,
+      selectedLineStringColor: C.ink, selectedLineStringWidth: 1.5,
+      selectedPointColor: C.pole, selectedPointOutlineColor: C.ink, selectedPointWidth: 9, selectedPointOutlineWidth: 2,
+      selectionPointColor: C.white, selectionPointOutlineColor: C.ink, selectionPointWidth: 5, selectionPointOutlineWidth: 2,
+      midPointColor: C.pole, midPointOutlineColor: C.white, midPointWidth: 4, midPointOutlineWidth: 1.5,
+    },
+    point: { pointColor: C.pole, pointOutlineColor: C.white, pointWidth: 8, pointOutlineWidth: 2.5 },
+    linestring: { lineStringColor: C.ink, lineStringWidth: 1.5, closingPointColor: C.white, closingPointOutlineColor: C.pole, closingPointOutlineWidth: 2 },
+    polygon: { ...thin, ...handle }, rectangle: thin, circle: thin,
+  };
+}
+function setShapeColour(colour) {
+  C.pole = colour;
+  store.set("shapeColour", colour);
+  applyColourCss();
+  if (!started) return;
+  for (const [layer, prop] of [["aoi-fill", "fill-color"], ["aoi-red", "line-color"]]) if (map.getLayer(layer)) map.setPaintProperty(layer, prop, colour);
+  if (draw) for (const [mode, styles] of Object.entries(drawStyles())) { try { draw.updateModeOptions(mode, { styles }); } catch { /* mode not present */ } }
 }
 
 let refreshQueued = false;
@@ -242,8 +283,10 @@ function addFindings(list, meta = {}) {
   if (meta.place) drawRings(meta.place);
   drawFindings();
 }
+let ringsArgs = null; // to redraw the rings when the units change
 async function drawRings(place, kms = null) {
-  const key = JSON.stringify(place.geometry).slice(0, 200) + (kms || []).join(",");
+  ringsArgs = [place, kms];
+  const key = JSON.stringify(place.geometry).slice(0, 200) + (kms || []).join(",") + U.getUnits();
   if (ringsAround === key) return;
   ringsAround = key;
   let offshore = false;
@@ -252,13 +295,14 @@ async function drawRings(place, kms = null) {
     const b = turf.buffer(place, km, { units: "kilometers", steps: 32 });
     const line = turf.polygonToLine(b);
     const f = line.type === "FeatureCollection" ? line.features[0] : line;
-    f.properties = { label: `${km} km` };
+    f.properties = { label: U.dist(km) };
     return f;
   });
   map.getSource("rings")?.setData(turf.featureCollection(rings));
 }
 function clearFindings() {
   findings.clear(); hiddenThemes.clear(); ringsAround = null; findingLimit = Infinity;
+  shownRun = null; paintMask();
   map.getSource("hl")?.setData(turf.featureCollection([]));
   map.getSource("rings")?.setData(turf.featureCollection([]));
   drawFindings();
@@ -308,7 +352,7 @@ function findingPopup(e) {
   box.className = "finding-pop";
   const name = document.createElement("b"); name.textContent = p.label || "Unnamed feature";
   const what = document.createElement("span");
-  const km = p.distance_km == null || p.distance_km === "null" ? "" : +p.distance_km === 0 ? "on site · " : `${p.distance_km} km from the site · `;
+  const km = p.distance_km == null || p.distance_km === "null" ? "" : +p.distance_km === 0 ? "on site · " : `${U.dist(+p.distance_km)} from the site · `;
   what.textContent = `${THEMES[p.theme]?.label || ""} · ${km}${p.dataset}${p.publisher ? ` (${p.publisher})` : ""}`;
   box.append(name, what);
   new maplibregl.Popup({ closeButton: true, maxWidth: "280px" }).setLngLat(e.lngLat).setDOMContent(box).addTo(map);
@@ -409,10 +453,10 @@ const host = {
   atlas: atlasViaWorker,
   firms: firmsViaWorker,
   get trusted() { return trusted; },
-  // Settings (step 4 adds the gear): whether the person holds an Esri licence, so Esri-licensed layers can be used.
-  esriLicence: () => { try { return localStorage.getItem("tobler.esriLicence") === "yes"; } catch { return false; } },
+  // Settings (the gear): whether the person holds an Esri licence, so Esri-licensed layers can be used.
+  esriLicence: () => store.get("esriLicence") === "yes",
   // Non-commercial data (e.g. WDPA): off by default; on only for people whose use allows it (Rob, 18 Nov).
-  nonCommercial: () => { try { return localStorage.getItem("tobler.nonCommercial") === "yes"; } catch { return false; } },
+  nonCommercial: () => store.get("nonCommercial") === "yes",
   view: () => viewBounds(),
   headers: {},
   places: () => [...places.values()],
@@ -494,7 +538,7 @@ function makeCard(p) {
   const nm = el("span", p.name, "name");
   card.querySelector("h2").append(sw, nm);
   if (p.kind === "Point") card.querySelectorAll('[data-op="rotate"], .resize').forEach((e) => e.remove());
-  else card.querySelector(".unit").textContent = p.kind === "Area" ? "km²" : "km";
+  else card.querySelector(".unit").textContent = p.kind === "Area" ? U.areaUnit() : U.distUnit();
   paintOrigin(p, card);
   paintStatus(p, card);
 
@@ -507,8 +551,10 @@ function makeCard(p) {
   }));
   card.querySelector(".resize")?.addEventListener("submit", (e) => {
     e.preventDefault();
-    const v = parseFloat(e.target.querySelector("input").value);
-    if (!(v > 0)) return;
+    const shown = parseFloat(e.target.querySelector("input").value);
+    if (!(shown > 0)) return;
+    // The box is in the person's units; the geometry tools work in km and km².
+    const v = p.kind === "Area" ? U.fromArea(shown) : U.fromDist(shown);
     const before = p.kind === "Area" ? turf.area(p.feature) / 1e6 : turf.length(p.feature);
     applyGeometry(p, G.resizeTo(p.feature, v), `resized from ${R.fmtNum(before)} to ${R.fmtNum(v)} ${p.kind === "Area" ? "km²" : "km"}`);
   });
@@ -552,7 +598,7 @@ function makeChoiceCard({ choices, recommended, reason, question }) {
     card.querySelector(".kind").textContent = c.type || "";
     const src = card.querySelector(".src");
     src.replaceChildren(document.createTextNode("Source: "), Object.assign(el("a", `${c.source.publisher}, ${c.source.title}`), { href: c.source.url, target: "_blank", rel: "noopener" }), document.createTextNode(` (${c.source.licence})`));
-    const bits = [c.extra?.place || c.extra?.description, c.extra?.country, c.area_km2 != null ? R.fmtArea(c.area_km2) : null, c.distance_km != null ? `${R.fmtNum(c.distance_km)} km from the reference` : null].filter(Boolean);
+    const bits = [c.extra?.place || c.extra?.description, c.extra?.country, c.area_km2 != null ? U.area(c.area_km2) : null, c.distance_km != null ? `${U.dist(c.distance_km)} from the reference` : null].filter(Boolean);
     card.querySelector(".detail").textContent = bits.join(" · ");
     const isRec = c === recommended;
     card.querySelector(".rec").hidden = !isRec;
@@ -582,7 +628,7 @@ function makeChoiceCard({ choices, recommended, reason, question }) {
 }
 
 // ---- run cards: a screening run, flags first --------------------------------------------------
-const fmtKm = (km) => (km == null ? "" : km === 0 ? "on site" : `${R.fmtNum(km)} km`);
+const fmtKm = (km) => (km == null ? "" : km === 0 ? "on site" : U.dist(km));
 const runs = new Map(); // run id → { record, card }
 let shownRun = null;
 
@@ -601,10 +647,33 @@ function showRunOnMap(record, { fit = true } = {}) {
   const site = record.features.find((f) => f.properties.role === "site");
   findingLimit = runs.get(r.id)?.km ?? r.assessed_within_km;
   ringsAround = null;
-  drawRings(site, [r.distances.near, r.distances.close, r.fetched_to_km].filter((v, i, a) => v > 0 && a.indexOf(v) === i));
   map.getSource("hl")?.setData(turf.featureCollection([]));
   drawFindings();
-  if (fit) map.fitBounds(turf.bbox(turf.buffer(site, Math.max(r.distances.close, 1), { units: "kilometers", steps: 16 })), { padding: fitPadding(), maxZoom: 13 });
+  paintMask();
+  const inside = r.extent === "inside" || findingLimit === 0;
+  if (fit) map.fitBounds(turf.bbox(inside ? site : turf.buffer(site, Math.max(r.distances.close, 1), { units: "kilometers", steps: 16 })), { padding: fitPadding(), maxZoom: 13 });
+}
+
+// Distance rings for a run: none when it's looking inside the area only.
+const ringsFor = (r) => (r.extent === "inside" ? [] : [r.distances.near, r.distances.close, r.fetched_to_km].filter((v, i, a) => v > 0 && a.indexOf(v) === i));
+
+// Inside the area only: dim the world outside the site and drop the rings; otherwise the rings come back.
+function paintMask() {
+  const e = shownRun ? runs.get(shownRun) : null;
+  const site = e?.record.features.find((f) => f.properties.role === "site");
+  const on = !!(e && site && isArea(site) && e.km === 0);
+  map.getSource("mask")?.setData(on ? maskOutside(site) : turf.featureCollection([]));
+  if (!e || !site) return;
+  if (on || e.record.tobler_run.extent === "inside") { ringsAround = null; ringsArgs = null; map.getSource("rings")?.setData(turf.featureCollection([])); }
+  else drawRings(site, ringsFor(e.record.tobler_run));
+}
+// The world with the site cut out. MapLibre tells holes from outer rings by winding, so holes go clockwise.
+function maskOutside(site) {
+  const signed = (ring) => ring.reduce((a, [x1, y1], i) => { const [x2, y2] = ring[(i + 1) % ring.length]; return a + (x1 * y2 - x2 * y1); }, 0);
+  const g = site.geometry;
+  const outers = g.type === "Polygon" ? [g.coordinates[0]] : g.coordinates.map((poly) => poly[0]);
+  const holes = outers.map((ring) => (signed(ring) > 0 ? [...ring].reverse() : ring));
+  return turf.featureCollection([{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]], ...holes] } }]);
 }
 
 function highlight(record, fids) {
@@ -619,7 +688,8 @@ function highlight(record, fids) {
 function showRun(record) {
   const card = $("run-card").content.firstElementChild.cloneNode(true);
   const r = record.tobler_run;
-  const entry = { record, card, km: r.assessed_within_km };
+  const siteF = record.features.find((f) => f.properties.role === "site");
+  const entry = { record, card, km: r.assessed_within_km, area: isArea(siteF), aroundKm: r.assessed_within_km || r.fetched_to_km };
   runs.set(r.id, entry);
   card.dataset.run = r.id;
   card.querySelector(".site").textContent = r.site.name;
@@ -633,14 +703,36 @@ function showRun(record) {
   slider.max = String(r.fetched_to_km);
   slider.step = r.fetched_to_km <= 10 ? "0.1" : "0.5";
   slider.value = String(r.assessed_within_km);
-  slider.addEventListener("input", () => { entry.km = +slider.value; paintReach(entry); if (shownRun === r.id) { findingLimit = entry.km; drawFindings(); } });
+  const setKm = (km) => {
+    entry.km = km;
+    if (km > 0) entry.aroundKm = km;
+    slider.value = String(km);
+    paintReach(entry);
+    if (shownRun === r.id) { findingLimit = km; drawFindings(); paintMask(); }
+  };
+  slider.addEventListener("input", () => setKm(+slider.value));
+  // An area screened with its surroundings can be looked at inside the area only, from the same evidence.
+  const scope = card.querySelector(".scope");
+  if (r.extent === "inside") {
+    const note = card.querySelector(".inside-note");
+    note.hidden = false;
+    note.textContent = "Screened inside the area only, as you asked. The surroundings weren't checked; ask me to screen around it to see them.";
+  } else if (entry.area) {
+    scope.hidden = false;
+    scope.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      if (b.dataset.scope === "inside") setKm(0);
+      else setKm(entry.aroundKm > 0 ? entry.aroundKm : r.fetched_to_km);
+      if (shownRun !== r.id) showRunOnMap(record);
+      else if (b.dataset.scope === "inside") map.fitBounds(turf.bbox(siteF), { padding: fitPadding(), maxZoom: 13 });
+    }));
+  }
   card.querySelector('[data-op="reassess"]').addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     if (btn.disabled) return;
     btn.disabled = true;
     const was = btn.textContent;
     btn.textContent = "Re-assessing…";
-    activity(`Re-assessing ${r.site.name} within ${R.fmtNum(entry.km)} km…`, true);
+    activity(`Re-assessing ${r.site.name} ${entry.km === 0 && entry.area ? "inside the area" : `within ${U.dist(entry.km)}`}…`, true);
     const t0 = Date.now();
     try {
       await reassess({ record, km: entry.km, skill: skills["ntr-screening"], callClaude });
@@ -699,7 +791,9 @@ function paintRun(entry) {
     return li;
   }));
   if (!r.flags.length && !r.parse_error) list.replaceChildren(el("li", "No flags raised. See what was checked and the gaps below.", "flag note"));
-  card.querySelector(".dists").textContent = `Distances from the site's edge: ${distancesLine(r.distances)}. ${r.distances.reasons[0] ? `Why: ${r.distances.reasons.slice(0, 2).join("; ")}.` : ""}`;
+  card.querySelector(".dists").textContent = r.extent === "inside"
+    ? "Inside the area only: findings inside it or touching its edge."
+    : U.localise(`Distances from the site's edge: ${distancesLine(r.distances)}. ${r.distances.reasons[0] ? `Why: ${r.distances.reasons.slice(0, 2).join("; ")}.` : ""}`);
   const checked = card.querySelector(".checked");
   const nc = r.checked.filter((c) => c.result === "not checked");
   checked.querySelector("summary").textContent = `What was checked: ${r.checked.length} source${r.checked.length === 1 ? "" : "s"}${nc.length ? `, ${nc.length} not checked` : ""}`;
@@ -721,25 +815,33 @@ function paintRun(entry) {
 function paintReach(entry) {
   const { record, card, km } = entry;
   const r = record.tobler_run;
-  card.querySelector(".reach output").textContent = `${R.fmtNum(km)} km`;
+  // Inside the area only: either the run was screened that way, or the card is switched to it (0 km for an area).
+  const inside = entry.area && km === 0;
+  const scope = card.querySelector(".scope");
+  scope.querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", String((b.dataset.scope === "inside") === inside)));
+  card.querySelector(".reach-label").hidden = inside;
+  card.querySelector('.reach input[type="range"]').hidden = inside;
+  card.querySelector(".reach output").textContent = km === 0 ? "on site" : U.dist(km);
   const near = nearestByTheme(record, km);
   const n = evidenceWithin(record, km).length;
+  const where = inside ? "inside the area or touching its edge" : `within ${U.dist(km)}`;
   card.querySelector(".nearest").textContent = n
-    ? `${n} finding${n === 1 ? "" : "s"} within ${R.fmtNum(km)} km. Nearest: ${near.map((x) => `${(THEMES[x.theme]?.label || x.theme).toLowerCase()}, ${x.name} (${fmtKm(x.distance_km)})`).join("; ")}.`
-    : `Nothing found within ${R.fmtNum(km)} km in the sources checked.`;
+    ? `${n} finding${n === 1 ? "" : "s"} ${where}. ${inside ? "Found" : "Nearest"}: ${near.map((x) => `${(THEMES[x.theme]?.label || x.theme).toLowerCase()}, ${x.name}${inside ? "" : ` (${fmtKm(x.distance_km)})`}`).join("; ")}.`
+    : `Nothing found ${where} in the sources checked.`;
   card.querySelectorAll(".flag").forEach((li, i) => {
     const f = r.flags[i];
     if (!f) return;
     const beyond = flagBeyond(f, km);
     li.classList.toggle("beyond", beyond);
-    li.title = beyond ? `All of this flag's evidence is beyond ${R.fmtNum(km)} km` : "";
+    li.title = beyond ? (inside ? "All of this flag's evidence is outside the area" : `All of this flag's evidence is beyond ${U.dist(km)}`) : "";
   });
   const stale = card.querySelector(".stale");
   const differs = Math.abs(km - r.assessed_within_km) > 1e-9;
   stale.hidden = !differs;
   if (differs) {
-    stale.querySelector("span").textContent = `The flags were written for findings up to ${R.fmtNum(r.assessed_within_km)} km.`;
-    stale.querySelector("button").textContent = `Re-assess at ${R.fmtNum(km)} km`;
+    const was = r.assessed_within_km === 0 && entry.area ? "inside the area only" : `findings up to ${U.dist(r.assessed_within_km)}`;
+    stale.querySelector("span").textContent = `The flags were written for ${was}.`;
+    stale.querySelector("button").textContent = inside ? "Re-assess inside the area" : `Re-assess at ${U.dist(km)}`;
   }
 }
 
@@ -791,23 +893,24 @@ async function refreshCard(p) {
     p.described = d;
     if (p.scaleFrom === "size") p.scale = d.scale;
     paintScale(p);
-    sum.textContent = R.summaryLine(d);
+    sum.textContent = U.localise(R.summaryLine(d));
     sum.classList.remove("loading");
     const [lon, lat] = d.centroid;
     const rows = [
       [p.kind === "Point" ? "Location" : "Centre", `${lat.toFixed(4)}, ${lon.toFixed(4)}`],
-      d.area_km2 != null && ["Area", R.fmtArea(d.area_km2)],
-      d.length_km != null && ["Length", `${R.fmtNum(d.length_km)} km`],
-      d.extent_km != null && ["Across", `${R.fmtNum(d.extent_km)} km`],
+      d.area_km2 != null && ["Area", U.area(d.area_km2)],
+      d.length_km != null && ["Length", U.dist(d.length_km)],
+      d.extent_km != null && ["Across", U.dist(d.extent_km)],
       ["Country", d.offshore ? "None (offshore)" : d.countries.join(", ")],
-      d.coast_km != null && ["Coast", `${R.fmtNum(d.coast_km)} km`],
-      d.nearest_places.length && ["Towns", d.nearest_places.map((x) => `${x.name} ${R.fmtNum(x.km)} km`).join(", ")],
+      d.coast_km != null && ["Coast", U.dist(d.coast_km)],
+      d.nearest_places.length && ["Towns", d.nearest_places.map((x) => `${x.name} ${U.dist(x.km)}`).join(", ")],
       d.places_inside && ["Cities", d.places_inside.count ? `${d.places_inside.largest.map((x) => x.name).join(", ")}${d.places_inside.count > 3 ? ` and ${d.places_inside.count - 3} more` : ""}` : "None mapped at this scale"],
     ].filter(Boolean);
     p.card.querySelector(".facts").replaceChildren(...rows.flatMap(([k, v]) => [el("dt", k), el("dd", v)]), el("dd", "Places, coast and borders from Natural Earth (1:10m), good to about a kilometre.", "src"));
     const input = p.card.querySelector(".resize input");
-    if (input && document.activeElement !== input) input.value = p.kind === "Area" ? +d.area_km2.toPrecision(4) : +d.length_km.toPrecision(4);
-    if (!busy) activity(`${p.name}: ${R.summaryLine(d)}`);
+    if (input && document.activeElement !== input) input.value = p.kind === "Area" ? +U.toArea(d.area_km2).toPrecision(4) : +U.toDist(d.length_km).toPrecision(4);
+    p.card.querySelector(".unit") && (p.card.querySelector(".unit").textContent = p.kind === "Area" ? U.areaUnit() : U.distUnit());
+    if (!busy) activity(`${p.name}: ${U.localise(R.summaryLine(d))}`);
   } catch (e) {
     sum.textContent = `Couldn't place this shape: ${e.message}`;
   }
@@ -899,7 +1002,7 @@ async function send(text) {
   const turnLog = { at: new Date().toISOString(), user: text, events: [] };
   sessionLog.push(turnLog);
   try {
-    const summary = await projectSummary(ref, host.places(), focusName, viewBounds());
+    const summary = [await projectSummary(ref, host.places(), focusName, viewBounds()), U.unitsNote()].filter(Boolean).join("\n");
     const skillList = conversationSkills();
     runLog = turnLog; runSteps = steps;
     const res = await runTurn({
@@ -1011,3 +1114,46 @@ if (innerWidth <= 720) setSheet(false);
 document.querySelectorAll(".tools [data-mode]").forEach((b) => b.addEventListener("click", () => {
   if (innerWidth <= 720 && b.dataset.mode !== "select") setSheet(false);
 }));
+
+// ---- settings: the gear on the panel ----------------------------------------------------------
+const dlg = $("settings");
+const form = dlg.querySelector("form");
+function paintSettings() {
+  form.esri.checked = host.esriLicence();
+  form.nonCommercial.checked = host.nonCommercial();
+  form.querySelectorAll('input[name="units"]').forEach((r) => { r.checked = r.value === U.getUnits(); });
+  const preset = [...form.querySelectorAll("[data-colour]")].find((b) => b.dataset.colour.toLowerCase() === C.pole.toLowerCase());
+  form.querySelectorAll("[data-colour]").forEach((b) => b.setAttribute("aria-checked", String(b === preset)));
+  form.colour.value = C.pole;
+  form.querySelector(".pick").classList.toggle("on", !preset);
+  const key = getUserKey();
+  form.key.value = "";
+  form.key.placeholder = key ? `Using your key (…${key.slice(-4)})` : "sk-ant-…";
+  $("key-status").textContent = key
+    ? "Your key is in use for this tab: calls go straight to Anthropic and are billed to you. Clear it to go back to Tobler's shared allowance."
+    : "Optional. Without one, Tobler's shared daily allowance is used. A key is kept for this tab only and sent straight to Anthropic.";
+}
+$("gear").addEventListener("click", () => { paintSettings(); dlg.showModal(); });
+// Click outside the box closes it.
+dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+form.esri.addEventListener("change", () => store.set("esriLicence", form.esri.checked ? "yes" : null));
+form.nonCommercial.addEventListener("change", () => store.set("nonCommercial", form.nonCommercial.checked ? "yes" : null));
+form.querySelectorAll('input[name="units"]').forEach((r) => r.addEventListener("change", () => {
+  if (!r.checked) return;
+  store.set("units", U.setUnits(r.value));
+  scaleCtl.setUnit(U.UNIT_SETS[U.getUnits()].scale);
+  // Everything on screen that shows a distance or an area is redrawn; nothing is re-measured.
+  places.forEach((p) => refreshCard(p));
+  runs.forEach((e) => paintRun(e));
+  if (ringsArgs) { ringsAround = null; drawRings(...ringsArgs); }
+}));
+form.querySelectorAll("[data-colour]").forEach((b) => b.addEventListener("click", () => { setShapeColour(b.dataset.colour); paintSettings(); }));
+form.colour.addEventListener("input", () => { setShapeColour(form.colour.value); paintSettings(); });
+form.querySelector('[data-op="key-save"]').addEventListener("click", () => {
+  const k = form.key.value.trim();
+  if (!k) return;
+  if (!/^sk-ant-/.test(k)) { $("key-status").textContent = "That doesn't look like an Anthropic key (they start sk-ant-). Nothing was changed."; return; }
+  setUserKey(k); paintSettings();
+});
+form.querySelector('[data-op="key-clear"]').addEventListener("click", () => { setUserKey(""); paintSettings(); });
+form.key.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); form.querySelector('[data-op="key-save"]').click(); } });
