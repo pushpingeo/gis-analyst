@@ -2,6 +2,13 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (05:10): chip, tagline, delete on the card (Rob)
+- "Screen for risks" chip live: it fills "Screen <place in focus> for risks" (or "Screen " with no place) and waits
+  for Send. Tagline: "Your geospatial screening analyst." Shape cards get a small trash button (deletes the shape
+  and greys the card, as the map's delete does), so shapes the analyst made can go without the map tools.
+- Tested headless at desktop and phone sizes: chip text with and without a place, delete removes the shape and the
+  place, no page errors.
+
 ## 18 Nov 2026 (early): step 4 core — sealed NTR runs and the run card
 - **Rob's calls (asked first):** the slider re-sorts evidence instantly and flags are re-assessed on tap (one model
   call on the stored evidence, no new fetching); one "show findings up to" slider, not three band handles (bands
