@@ -113,6 +113,20 @@ await test("a shape across a border names both countries", async () => {
   assert.ok(d.countries.includes("Switzerland") && d.countries.includes("Germany"), d.countries.join());
 });
 
+await test("a country only clipped at an area's edge is 'touching', not 'across' (Miri Division, 18 Nov)", async () => {
+  const countries = await ref.get("countries");
+  const brunei = countries.features.find((f) => f.properties.name === "Brunei");
+  const [w, s, e] = turf.bbox(brunei);
+  const edge = turf.bboxPolygon([w - 0.3, s - 0.6, e - 0.2, s + 0.03]); // Sarawak, poking 3 km into Brunei's southern tip
+  const d = await R.describe(ref, edge);
+  assert.deepEqual(d.countries, ["Malaysia"], d.countries.join());
+  assert.ok(d.touches_at_edge?.includes("Brunei"), JSON.stringify(d.touches_at_edge));
+  assert.match(R.summaryLine(d), /in Malaysia, touching Brunei at its edge/);
+  const across = turf.bboxPolygon([w - 0.3, s - 0.3, e + 0.3, s + 0.6]); // a real share of both
+  const d2 = await R.describe(ref, across);
+  assert.ok(d2.countries.includes("Brunei") && d2.countries.includes("Malaysia") && !d2.touches_at_edge?.includes("Brunei"), d2.countries.join());
+});
+
 await test("welcome examples: one of each kind, rotating, none about oil and gas", async () => {
   const { EXAMPLES, pickExamples } = await import("../js/examples.js");
   const first = pickExamples(EXAMPLES, () => 0), last = pickExamples(EXAMPLES, () => 0.999);

@@ -426,6 +426,8 @@ await test("places are named after what they were built from, not 'Area 1'", () 
   assert.equal(placeName({ shape: "square", name: "the Jackdaw box" }, cand("JACKDAW"), sq), "the Jackdaw box");
   assert.equal(placeName({ shape: "square", name: "Tabernas solar site (placeholder)" }, cand("Tabernas"), sq), "Tabernas solar site (placeholder)", "the analyst's own name isn't rewritten");
   assert.equal(placeName({ shape: "point" }, { cand: { name: "" }, label: "C4" }, sq), null, "no name, no made-up one");
+  assert.equal(placeName({ shape: "point", name: "Miri city (OpenStreetMap C29)" }, cand("Miri"), sq), "Miri city", "no candidate ids in names (Miri log, 18 Nov)");
+  assert.equal(placeName({ shape: "point", name: "C29: Miri" }, cand("Miri"), sq), "Miri");
 });
 
 console.log(`${passed} place tests passed`);

@@ -100,6 +100,30 @@ export function countriesTouched(countries, feature) {
   return countries.features.filter((f) => boxesMeet(b, f.bbox) && turf.booleanIntersects(f, feature)).map((f) => f.properties);
 }
 
+// Each touched country's share of an area, from a grid of sample points (Rob's Miri log, 18 Nov: Miri Division
+// came out "across Indonesia, Malaysia and Brunei" because 1:10m borders clip its edge). Countries holding less
+// than `minShare` are only touched at the edge, which at this resolution (about a kilometre) may not be real.
+export function countrySplit(countries, feature, { minShare = 0.02, grid = 30 } = {}) {
+  const touched = countries.features.filter((f) => feature.geometry.type !== "Point" && boxesMeet(turf.bbox(feature), f.bbox) && turf.booleanIntersects(f, feature));
+  if (feature.geometry.type === "Point" || !/Polygon/.test(feature.geometry.type) || touched.length < 2) {
+    return { main: countriesTouched(countries, feature).map((c) => c.name), edge: [] };
+  }
+  const [w, s, e, n] = turf.bbox(feature);
+  const count = new Map(touched.map((f) => [f.properties.name, 0]));
+  let inside = 0;
+  for (let i = 0; i < grid; i++) for (let j = 0; j < grid; j++) {
+    const pt = [w + (e - w) * (i + 0.5) / grid, s + (n - s) * (j + 0.5) / grid];
+    if (!turf.booleanPointInPolygon(pt, feature)) continue;
+    inside++;
+    const c = touched.find((f) => inBox(pt, f.bbox) && turf.booleanPointInPolygon(pt, f));
+    if (c) count.set(c.properties.name, count.get(c.properties.name) + 1);
+  }
+  if (inside < 20) return { main: touched.map((f) => f.properties.name), edge: [] }; // too thin to sample: say all
+  const main = [...count].filter(([, k]) => k / inside >= minShare).sort((a, b) => b[1] - a[1]).map(([name]) => name);
+  const edge = [...count].filter(([, k]) => k / inside < minShare).map(([name]) => name);
+  return main.length ? { main, edge } : { main: touched.map((f) => f.properties.name), edge: [] };
+}
+
 // Distance in km from a point to the nearest coastline. Searches lines whose boxes are close enough first.
 export function coastDistanceKm(coastline, lonlat) {
   const kmPerDegLat = 111.32;
@@ -147,15 +171,16 @@ export async function describe(ref, feature) {
   const scale = deduceScale(feature);
   const [countries, coastline, places] = await Promise.all(["countries", "coastline", "places"].map((n) => ref.get(n)));
   const anchor = feature.geometry.type === "Point" ? feature.geometry.coordinates : m.centroid;
-  const touched = countriesTouched(countries, feature);
+  const split = countrySplit(countries, feature);
   const at = countryAt(countries, anchor);
   // For a wide area, distances from its middle mean little: list the biggest places inside it instead.
   const wide = scale !== "local" && /Polygon/.test(feature.geometry.type);
   return {
     ...m,
     scale,
-    countries: touched.map((c) => c.name),
-    offshore: !at && touched.length === 0,
+    countries: split.main,
+    ...(split.edge.length ? { touches_at_edge: split.edge } : {}),
+    offshore: !at && split.main.length === 0,
     coast_km: wide ? null : coastDistanceKm(coastline, anchor),
     nearest_places: wide ? [] : nearestPlaces(places, anchor, { n: 3, minPop: scale === "local" ? 0 : 100000 }),
     places_inside: wide ? placesInside(places, feature, 3) : undefined,
@@ -171,11 +196,12 @@ export function summaryLine(d) {
     ? `offshore${d.coast_km != null ? `, ${fmtNum(d.coast_km)} km from the coast` : ""}`
     : d.countries.length > 3 ? `across ${d.countries.length} countries`
     : d.countries.length > 1 ? `across ${listOf(d.countries)}` : `in ${d.countries[0] || "an unnamed area"}${coast}`;
+  const edge = d.touches_at_edge?.length ? `touching ${listOf(d.touches_at_edge)} at its edge` : "";
   const p = d.nearest_places[0];
   const big = d.places_inside?.largest[0];
   const near = p ? `nearest town ${p.name}${p.country && (d.offshore || d.countries.length !== 1 || p.country !== d.countries[0]) ? ` (${p.country})` : ""}, ${fmtNum(p.km)} km`
     : big ? `largest city ${big.name}` : "";
-  return [size, where, near].filter(Boolean).join(", ");
+  return [size, where, edge, near].filter(Boolean).join(", ");
 }
 
 export function fmtArea(km2) {

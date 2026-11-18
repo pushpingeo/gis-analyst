@@ -90,7 +90,7 @@ export function placeToolDefs(skills) {
           buffer_km: { type: "number" }, rotation_deg: { type: "number" },
           offset_km: { type: "number" }, bearing_deg: { type: "number", description: "Degrees clockwise from north for the offset" },
           words: { type: "string", description: "The person's own words that this place answers" },
-          name: { type: "string", description: "Optional short name for the place, as the person would say it (e.g. 'Jackdaw', 'Linlithgow Palace 4 km²', 'M9 corridor'). Leave out to name it after the anchor and the shape. Refer to the place by the name the tool returns." },
+          name: { type: "string", description: "Optional short name for the place, as the person would say it (e.g. 'Jackdaw', 'Linlithgow Palace 4 km²', 'M9 corridor'). Leave out to name it after the anchor and the shape. No candidate ids (C1) or source names in it. Refer to the place by the name the tool returns." },
           match: { type: "string", enum: MATCHES, description: "How the anchor relates to what the person wants. named_place: they asked for this place itself (a palace, a town, a block, a field). name_and_type: the asset itself, matched by name and of the right type (a mine for a mine). type_near_clues: a feature of the right type found where the clues point, its name not confirmed. name_only: the name matches but the type is wrong or unknown. settlement_or_region: a town, village or region stands in for the site. none: nothing specific." },
           checks: { type: "array", description: "Every distance clue in the request that the place can be checked against, e.g. 'Nok Kundi lies about 80 km south-east of the mine' → { against: <Nok Kundi's candidate id>, expected_km: 80, direction: 'SE' }. Direction is the way you travel FROM the site TO that feature. Give all you have; they are measured, not trusted.", items: { type: "object", properties: { against: { type: "string", description: "Candidate id" }, expected_km: { type: "number" }, direction: { type: "string", description: "Compass point from the site to it: N, NE, ENE… (optional)" } }, required: ["against", "expected_km"] } },
           reason: { type: "string", description: "One line: the evidence for the location" },
@@ -438,7 +438,7 @@ export function createPlaceTools(host) {
         anchor: a.cand ? { name: a.cand.name, type: a.cand.type, source: a.cand.source, lonlat: a.cand.lonlat, extra: a.cand.extra } : { place: a.label },
         at: new Date().toISOString(),
       };
-      const p = host.addPlace({ feature: f, origin, scale: i.scale, name: placeName(i, a, f) });
+      const p = host.addPlace({ feature: f, origin, scale: i.scale, name: placeName(i, a, f), given: i.name ? String(i.name).replace(/\s+/g, " ").trim() : null });
       return { ...(await placeSummary(p)), how: steps.join(", then "), confidence: rated.confidence, why: rated.rules,
         ...(checks.length ? { checks } : {}),
         next: rated.confidence === "low" && checks.some((c) => c.pass === false)
@@ -533,7 +533,12 @@ export function cleanName(raw) {
 }
 export function placeName(i, a, f) {
   // A name the analyst gives is used as given (trimmed), so the name it then uses in tool calls matches.
-  if (i.name && String(i.name).trim()) return String(i.name).replace(/\s+/g, " ").trim().slice(0, 60);
+  // Candidate ids (C29) are handles for the tools, never part of a name the person sees: "Miri city (OpenStreetMap
+  // C29)" → "Miri city". The place still answers to the analyst's own wording (passed to the host as `given`).
+  if (i.name && String(i.name).trim()) {
+    const n = String(i.name).replace(/\s*\([^()]*\bC\d+\b[^()]*\)/gi, "").replace(/\bC\d+\b:?/gi, "").replace(/\s+/g, " ").trim().slice(0, 60);
+    if (n) return n;
+  }
   const base = cleanName(a.cand ? a.cand.name || a.cand.type : a.place?.name || a.label);
   if (!base || /^C\d+$/i.test(base)) return null;
   const km2 = turf.area(f) / 1e6;
@@ -545,7 +550,7 @@ export function placeName(i, a, f) {
   }
 }
 
-const pickD = (d) => ({ scale: d.scale, area_km2: d.area_km2, length_km: d.length_km, extent_km: d.extent_km, countries: d.countries, offshore: d.offshore, coast_km: d.coast_km, centre: { lat: round(d.centroid[1], 4), lon: round(d.centroid[0], 4) } });
+const pickD = (d) => ({ scale: d.scale, area_km2: d.area_km2, length_km: d.length_km, extent_km: d.extent_km, countries: d.countries, ...(d.touches_at_edge ? { touches_at_edge: d.touches_at_edge } : {}), offshore: d.offshore, coast_km: d.coast_km, centre: { lat: round(d.centroid[1], 4), lon: round(d.centroid[0], 4) } });
 
 // One line per place for the conversation agent's project summary. Coordinates stay out.
 export async function projectSummary(ref, places, focus, view = null) {

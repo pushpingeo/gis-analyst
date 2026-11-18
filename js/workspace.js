@@ -57,9 +57,10 @@ const map = new maplibregl.Map({
 // On a phone the sheet covers the bottom of the map, so the attribution moves to the top.
 const phone = innerWidth <= 720;
 map.addControl(new maplibregl.AttributionControl({ compact: true }), phone ? "top-right" : "bottom-right");
-if (!phone) map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+// MapLibre stacks bottom-corner controls upwards, so the scale bar goes in first to sit below the zoom buttons.
 const scaleCtl = new maplibregl.ScaleControl({ unit: U.UNIT_SETS[U.getUnits()].scale });
 map.addControl(scaleCtl, "bottom-right");
+if (!phone) map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 
 // If the basemap can't be reached, fall back to the reference countries on a plain background so the tools still work.
 // Start on "style.load", not "load": a hidden tab doesn't render, so "load" may never come (lesson from demo 1).
@@ -103,7 +104,7 @@ const kindOf = (geom) => (geom.type === "Point" ? "Point" : /LineString/.test(ge
 // A place answers to its name and to the "Area 1" it was counted as, so either works in tool calls.
 const placeByName = (name) => {
   const n = String(name).trim().toLowerCase();
-  return [...places.values()].find((p) => p.name.toLowerCase() === n) || [...places.values()].find((p) => p.alias?.toLowerCase() === n);
+  return [...places.values()].find((p) => p.name.toLowerCase() === n) || [...places.values()].find((p) => p.alias?.toLowerCase() === n || p.given?.toLowerCase() === n);
 };
 // Names stay unique: a second "Jackdaw 3 km²" becomes "Jackdaw 3 km² (2)".
 function uniqueName(name) {
@@ -129,10 +130,10 @@ const withExtras = (p, geometry) => (p?.extraParts?.length && geometry.type === 
 
 // Scale is worked out, never asked: from the request if it says, else the shape's size; a point has no size,
 // so a drawn point takes its scale from the zoom level when it was dropped. The person can change it on the card.
-function newPlace(id, feature, { status = "drawn", origin = { method: "drawn", at: new Date().toISOString() }, scale = null, extraParts = [], name = null } = {}) {
+function newPlace(id, feature, { status = "drawn", origin = { method: "drawn", at: new Date().toISOString() }, scale = null, extraParts = [], name = null, given = null } = {}) {
   const kind = kindOf(feature.geometry);
   const alias = `${kind} ${++counts[kind]}`;
-  const p = { id, kind, name: name ? uniqueName(name) : alias, alias, feature, status, origin, edits: [], scaleFrom: "size", extraParts };
+  const p = { id, kind, name: name ? uniqueName(name) : alias, alias, feature, status, origin, edits: [], scaleFrom: "size", extraParts, ...(given && given !== name ? { given } : {}) };
   if (scale && R.SCALES[scale]) { p.scale = scale; p.scaleFrom = "request"; }
   else if (kind === "Point" && origin.method === "drawn") { p.scale = R.scaleForKm(R.viewKm(viewBounds())); p.scaleFrom = "zoom"; }
   places.set(id, p);
@@ -543,13 +544,13 @@ const host = {
   showFindings,
   clearFindings,
   offerChoices: (o) => makeChoiceCard(o),
-  addPlace({ feature, origin, scale, name }) {
+  addPlace({ feature, origin, scale, name, given }) {
     const id = crypto.randomUUID();
     const mode = feature.geometry.type === "Point" ? "point" : /LineString/.test(feature.geometry.type) ? "linestring" : "polygon";
     const { main, extra } = splitParts(feature.geometry);
     const bad = draw.addFeatures([{ id, type: "Feature", geometry: main, properties: { mode } }]).find((v) => !v.valid);
     if (bad) throw new Error(`The shape couldn't be drawn: ${bad.reason}`);
-    const p = newPlace(id, feature, { status: "proposed", origin, scale, extraParts: extra, name });
+    const p = newPlace(id, feature, { status: "proposed", origin, scale, extraParts: extra, name, given });
     if (extra.length) logEdit(p, `Published in ${extra.length + 1} parts; the map's edit handles move the largest part only.`);
     zoomTo(p);
     return p;
@@ -700,7 +701,8 @@ function makeChoiceCard({ choices, recommended, reason, question }) {
   const pick = (c) => {
     if (busy) return;
     card.classList.add("done");
-    send(`Use ${c.id}: ${c.name || "that one"} (${c.source.publisher}).`);
+    const said = `Use ${c.name || "that one"} (${c.source.publisher}).`;
+    send(said, `${said}\n[Picked from the choices you offered: candidate ${c.id}, still available. Build it with make_place, anchor ${c.id}, match named_place (the person chose it); no need to search again. Don't mention the id.]`);
   };
   card.querySelector('[data-op="use"]').addEventListener("click", () => pick(choices[i]));
   card.querySelector('[data-op="lucky"]').addEventListener("click", () => pick(recommended));
@@ -1150,7 +1152,8 @@ function downloadLog() {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
-async function send(text) {
+// `forModel` is what the analyst reads when it needs more than the person sees (a picked candidate's id).
+async function send(text, forModel = text) {
   if (!text || busy || !draw) return;
   busy = true;
   $("ask").classList.add("busy");
@@ -1168,7 +1171,7 @@ async function send(text) {
   save.type = "button";
   save.addEventListener("click", downloadLog);
   trace.append(save);
-  const turnLog = { at: new Date().toISOString(), user: text, events: [] };
+  const turnLog = { at: new Date().toISOString(), user: text, ...(forModel !== text ? { sent: forModel } : {}), events: [] };
   sessionLog.push(turnLog);
   try {
     const summary = [await projectSummary(ref, host.places(), focusName, viewBounds()), U.unitsNote()].filter(Boolean).join("\n");
@@ -1176,7 +1179,7 @@ async function send(text) {
     runLog = turnLog; runSteps = steps;
     const res = await runTurn({
       system: systemPrompt({ skills: skillList, loaded: skillList.filter((s) => loadedSkills.has(s.name)), comingSoon: ["net developable area and constraints-and-access analysis"] }),
-      messages: buildMessages({ recent, summary, userText: text }),
+      messages: buildMessages({ recent, summary, userText: forModel }),
       tools: placeToolDefs(skillList),
       maxRounds: CONFIG.workspaceRounds || 10,
       exec: (name, input) => tools.exec(name, input),
@@ -1197,7 +1200,7 @@ async function send(text) {
     turnLog.usage = res.usage;
     reply.replaceChildren(renderText(res.text || "Done."));
     if (steps.children.length) reply.append(trace);
-    remember("user", text);
+    remember("user", forModel);
     remember("assistant", res.text);
     activity("");
   } catch (err) {
