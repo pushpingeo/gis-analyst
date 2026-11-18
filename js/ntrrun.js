@@ -7,6 +7,8 @@ import { FENCE_RULE } from "./fence.js";
 import { runTurn } from "./converse.js";
 import { createPlaceTools, placeToolDefs } from "./placetools.js";
 import { bandFor, distancesLine, chooseDistances, ASSET_TYPES, MAX_KM } from "./distances.js";
+import { nearestBoundaries } from "./boundaries.js";
+import { DISCLAIMER } from "./disclaimer.js";
 
 export const RUN_SCHEMA = "tobler-run/1";
 export const SCREEN_TOOLS = ["get_place", "find_data", "get_data", "find_features_near"];
@@ -39,7 +41,7 @@ ${skill.body}
 </method>`;
 }
 
-export function firstMessage({ siteName, describe, inputs, distances, footprintNote, origin }) {
+export function firstMessage({ siteName, describe, inputs, distances, footprintNote, origin, baseline = null }) {
   const lines = [
     `Screen ${siteName}.`,
     `Site: ${R.summaryLine(describe)}${footprintNote ? `; ${footprintNote}` : ""}.`,
@@ -50,6 +52,7 @@ export function firstMessage({ siteName, describe, inputs, distances, footprintN
     inputs.tip_height_m ? `Turbine tip height: ${inputs.tip_height_m} m.` : null,
     `Distances from the footprint edge: ${distancesLine(distances)}. Why: ${distances.reasons.join("; ")}.`,
     inputs.focus ? `The person asked especially about: ${inputs.focus}.` : null,
+    baseline ? `Already checked by the run before you started (don't fetch these again; they are evidence like anything you fetch, and failures are gaps):\n${baseline}` : null,
     `Refer to the site as "${siteName}" in tool calls.`,
   ];
   return lines.filter(Boolean).join("\n");
@@ -166,12 +169,35 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   };
   const describe = await R.describe(host.ref, fp.feature);
   const offshore = !!describe.offshore;
+  // Baseline, in code, before the analyst starts: boundaries (land and maritime) and the layers every screen must
+  // check (catalogue/trusted.json "baseline"), so the essentials never depend on a lucky catalogue search.
+  const sea = offshore || (describe.coast_km != null && describe.coast_km <= distances.wider);
+  const baselineLines = [];
+  const summarise = (c) => {
+    const near = evidence.filter((f) => f.properties.dataset === c.dataset).sort((a, b) => a.properties.distance_km - b.properties.distance_km).slice(0, 3)
+      .map((f) => `${f.properties.name}${f.properties.details?.sides ? ` [${f.properties.details.sides}${f.properties.details.line_type ? `, ${f.properties.details.line_type}` : ""}]` : ""} ${f.properties.distance_km} km`);
+    return `- ${c.dataset} (${c.publisher || "?"}): ${c.result === "features" ? `${c.count} within ${distances.wider} km; nearest ${near.join("; ")}` : c.result}${c.why ? ` (${c.why})` : ""}`;
+  };
+  try {
+    const nb = await nearestBoundaries({ ref: host.ref, site: fp.feature, withinKm: distances.wider, atlas: host.atlas || null, sea, now });
+    capture(nb.evidence, { theme: "context" });
+    for (const c of nb.checked) { checked.push(c); baselineLines.push(summarise(c)); }
+  } catch (e) { checked.push({ evidence: "transboundary", dataset: "boundaries", result: "not checked", why: String(e.message || e).slice(0, 160) }); }
+  const sb = turf.bbox(fp.feature);
+  const layers = (host.trusted?.baseline || []).filter((b) => (b.setting !== "sea" || sea) && !(sb[2] < b.where[0] || sb[0] > b.where[2] || sb[3] < b.where[1] || sb[1] > b.where[3]));
+  const before = checked.length;
+  await Promise.allSettled(layers.map((b) => {
+    const id = tools.useDataset({ id: b.atlas_id, title: b.title, publisher: b.publisher, licence: b.licence, capabilities: ["query"], concepts: [] }, "B");
+    return exec("get_data", { dataset: id, place: site.name, theme: b.theme }).catch(() => null);
+  }));
+  for (const c of checked.slice(before)) baselineLines.push(summarise(c));
+  const baselineCalls = calls.length;
   const origin = site.origin?.method === "words"
     ? `from the words "${site.origin.words}", anchored on ${site.origin.anchor?.name || site.origin.anchor?.place || "a found feature"}${site.origin.anchor?.source?.publisher ? ` (${site.origin.anchor.source.publisher})` : ""}, ${site.origin.confidence} confidence`
     : "drawn on the map by the person";
   const res = await runTurn({
     system: systemFor(skill),
-    messages: [{ role: "user", content: firstMessage({ siteName: site.name, describe, inputs, distances, footprintNote: fp.note, origin }) }],
+    messages: [{ role: "user", content: firstMessage({ siteName: site.name, describe, inputs, distances, footprintNote: fp.note, origin, baseline: baselineLines.join("\n") || null }) }],
     tools: defs, exec, callClaude, maxRounds,
     onEvent: (ev) => { if (ev.type === "tool_start") onEvent({ type: "tool_start", name: ev.name, input: ev.input }); if (ev.type === "tool" || ev.type === "round" || ev.type === "warning") onEvent(ev); },
   });
@@ -222,6 +248,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       flags, checked, data_gaps: Array.isArray(parsed.json?.data_gaps) ? parsed.json.data_gaps.map(String) : [],
       model_checked: Array.isArray(parsed.json?.checked) ? parsed.json.checked : [],
       summary: parsed.summary, ...(parsed.json ? {} : { parse_error: "The analyst's result had no readable JSON block, so there are no structured flags. The summary is kept as written." }),
+      baseline: { layers: layers.map((b) => b.title), calls: baselineCalls }, disclaimer: DISCLAIMER,
       calls, usage, ...(parsed.json && !repaired ? {} : { debug }), ...(repaired ? { note: "The first result was cut off; the structured result was asked for again from the same evidence." } : {}), assessments: [],
     },
     features: [siteFeature, ...evidence],

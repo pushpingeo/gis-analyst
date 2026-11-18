@@ -15,6 +15,7 @@ const test = async (name, fn) => { await fn(); passed++; console.log("ok", name)
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 const table = JSON.parse(read("../catalogue/distances.json"));
 const trusted = JSON.parse(read("../catalogue/trusted.json"));
+const BASELINE_IDS = new Set(trusted.baseline.map((b) => b.atlas_id));
 const skill = parseSkill(read("../skills/ntr-screening/SKILL.md"));
 const ref = R.createReference(async (n) => JSON.parse(read(`../data/ref/${n}.json`)));
 
@@ -44,6 +45,15 @@ async function atlas(tool, args) {
     { type: "Feature", geometry: { type: "Point", coordinates: east(45) }, properties: { name: "FAR WRECK" } },
   ] };
   if (tool === "fetch_features" && args.id === "broken") throw new Error("atlas: fetch failed");
+  // Boundaries: a Faroe–UK treaty line 12 km west of the field, and one far away (an antimeridian line the box query
+  // also returns). Baseline layers: one protected area 20 km north; the others answer empty.
+  if (tool === "fetch_features" && args.id === "9760b5061ea298eb") return { returned: 2, features: [
+    { type: "Feature", geometry: { type: "LineString", coordinates: [turf.destination(FIELD, 17, -90).geometry.coordinates, turf.destination(turf.destination(FIELD, 17, -90), 30, 0).geometry.coordinates] },
+      properties: { line_name: "Faeroe (Denmark) - United Kingdom", line_type: "Treaty", territory1: "Faeroe", sovereign1: "Denmark", territory2: "United Kingdom", sovereign2: "United Kingdom" } },
+    { type: "Feature", geometry: { type: "LineString", coordinates: [[179, 65], [-179, 66]] }, properties: { line_name: "Russia - Alaska (United States)", line_type: "Treaty" } }] };
+  if (tool === "fetch_features" && args.id === "154dfce48e32f9ee") return { returned: 1, features: [
+    { type: "Feature", geometry: turf.circle(turf.destination(FIELD, 28, 0).geometry.coordinates, 3).geometry, properties: { name: "Faroe-Shetland Sponge Belt", desig_eng: "Nature Conservation Marine Protected Area" } }] };
+  if (tool === "fetch_features" && BASELINE_IDS.has(args.id)) return { returned: 0, features: [] };
   throw new Error(`unexpected ${tool} ${JSON.stringify(args)}`);
 }
 const host = () => ({ ref, anchors: [], headers: {}, atlas, firms: null, trusted, esriLicence: () => false, fetchFn: async () => ({ ok: true, json: async () => [] }), places: () => [], findPlace: () => null, skillText: () => "" });
@@ -149,9 +159,10 @@ await test("sealed run: fetches out to the wider band, records evidence with pro
   assert.equal(r.site.confidence, "high");
   assert.equal(r.site.anchor_source.publisher, "North Sea Transition Authority");
   assert.equal(r.fetched_to_km, 50);
-  // Evidence: 3 pipelines (inside, 1.5, 30 km) + 2 wrecks (2, 45 km). The 30 km and 45 km ones are kept for the slider.
+  // Evidence: 3 pipelines (inside, 1.5, 30 km) + 2 wrecks (2, 45 km), kept to 50 km for the slider, plus the baseline:
+  // the Faroe–UK boundary (12 km) and a protected area (20 km).
   const ev = record.features.filter((f) => f.properties.role === "evidence");
-  assert.equal(ev.length, 5, ev.map((f) => `${f.properties.name} ${f.properties.distance_km}`).join("; "));
+  assert.equal(ev.length, 7, ev.map((f) => `${f.properties.name} ${f.properties.distance_km}`).join("; "));
   for (const f of ev) for (const k of ["fid", "dataset", "publisher", "licence", "checked_at", "theme", "band", "distance_km"]) assert.ok(f.properties[k] != null && f.properties[k] !== "", `${k} on ${f.properties.name}`);
   assert.equal(ev.find((f) => /TROLDFOS/.test(f.properties.name)).properties.theme, "heritage");
   assert.equal(ev.find((f) => /flowline/.test(f.properties.name)).properties.band, "on site");
@@ -178,8 +189,8 @@ await test("sealed run: fetches out to the wider band, records evidence with pro
 });
 
 await test("slider helpers: findings within a distance, nearest per theme, flags beyond the distance", () => {
-  assert.equal(evidenceWithin(record, 50).length, 5);
-  assert.equal(evidenceWithin(record, 40).length, 4);
+  assert.equal(evidenceWithin(record, 50).length, 7);
+  assert.equal(evidenceWithin(record, 40).length, 6);
   assert.equal(evidenceWithin(record, 10).length, 3);
   assert.deepEqual(nearestByTheme(record, 10).map((x) => `${x.theme} ${x.name} ${x.distance_km}`), ["community Rosebank 9 inch Production flowline 1 0", "heritage TROLDFOS (POSSIBLY) 2"]);
   const [pipes, wreck, birds] = record.tobler_run.flags;
@@ -279,6 +290,52 @@ await test("a result cut off at the length cap is asked for again once, as JSON 
   assert.equal(rec.tobler_run.summary, "Long summary…");
   assert.match(rec.tobler_run.note, /cut off/);
   assert.equal(rec.tobler_run.parse_error, undefined);
+});
+
+
+await test("baseline before the analyst: boundaries and the must-check layers, as evidence, in the first message", async () => {
+  atlasCalls.length = 0;
+  const model = standardScript();
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const rec = await runScreening({ host: host(), site, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
+  const r = rec.tobler_run;
+  const ev = rec.features.filter((f) => f.properties.role === "evidence");
+  const line = ev.find((f) => /Faeroe/.test(f.properties.name));
+  assert.ok(line, "maritime boundary kept as evidence");
+  assert.ok(Math.abs(line.properties.distance_km - 12) < 0.5, `boundary 12 km from the edge (${line.properties.distance_km})`);
+  assert.equal(line.properties.theme, "context");
+  assert.equal(line.properties.details.sides, "Faeroe / United Kingdom");
+  assert.match(line.properties.details.caveat, /no legal standing/);
+  assert.ok(!ev.some((f) => /Alaska/.test(f.properties.name)), "far-away lines dropped");
+  assert.ok(ev.some((f) => f.properties.name === "Faroe-Shetland Sponge Belt" && f.properties.theme === "biodiversity"));
+  // Offshore west of Shetland: European, so WDPA, CDDA, Natura 2000 apply; sea layers apply; tropical corals and US habitat don't.
+  assert.ok(r.baseline.layers.includes("IUCN Important Marine Mammal Areas"));
+  assert.ok(r.baseline.layers.some((t) => /World Database on Protected Areas/.test(t)));
+  assert.ok(!r.baseline.layers.some((t) => /Coral Reefs|NMFS/.test(t)));
+  const imma = r.checked.find((c) => c.dataset === "IUCN Important Marine Mammal Areas");
+  assert.equal(imma.result, "none in dataset");
+  assert.equal(r.checked.find((c) => /Maritime Boundaries/.test(c.dataset)).result, "features");
+  const first = model.calls[0].messages[0].content;
+  assert.match(first, /Already checked by the run/);
+  assert.match(first, /Faeroe \(Denmark\) - United Kingdom \[Faeroe \/ United Kingdom, Treaty\] 1[12]\.\d+ km/);
+  assert.match(first, /IUCN Important Marine Mammal Areas .*: none in dataset/);
+  assert.match(r.disclaimer, /not evidence of absence/);
+  // The analyst's own find_data ids still start at D1.
+  assert.ok(model.calls[1].messages.at(-1).content.some((b) => /"id":"D1"/.test(b.content)));
+});
+
+await test("onshore far from the sea: no maritime call, a neighbouring country is measured from the reference", async () => {
+  atlasCalls.length = 0;
+  const { nearestBoundaries } = await import("../js/boundaries.js");
+  // A 2 km square on the Netherlands side, about 5 km from the Belgian border near Baarle (51.44 N, 4.93 E).
+  const sq = G.squareAround([4.93, 51.49], 4, 0);
+  const out = await nearestBoundaries({ ref, site: sq, withinKm: 20, atlas, sea: false });
+  assert.ok(!atlasCalls.length, "no atlas call without sea in reach");
+  const be = out.evidence.find((e) => e.name === "Belgium");
+  assert.ok(be && be.distance_km < 15, `Belgium within reach (${be?.distance_km})`);
+  assert.match(be.type, /neighbouring country/);
+  assert.ok(!out.evidence.some((e) => e.name === "Netherlands"), "own country isn't evidence");
+  assert.match(out.checked.find((c) => /Maritime/.test(c.dataset)).why, /no sea within 20 km/);
 });
 
 console.log(`${passed} ntrrun tests passed`);

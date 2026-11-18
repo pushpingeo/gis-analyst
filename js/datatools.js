@@ -77,9 +77,12 @@ export function geometryDistanceKm(a, b) {
 export function createDataTools(host) {
   const datasets = new Map();
   let n = 0;
-  const keepDataset = (d) => {
+  let nb = 0;
+  // Datasets found by find_data are D1, D2…; baseline layers the run checks itself are B1, B2… (their own count, so
+  // the ids the analyst sees from find_data don't shift).
+  const keepDataset = (d, prefix = "D") => {
     for (const [id, x] of datasets) if (x.id === d.id) return id;
-    const id = `D${++n}`; datasets.set(id, d); return id;
+    const id = prefix === "B" ? `B${++nb}` : `D${++n}`; datasets.set(id, d); return id;
   };
 
   async function callWithRetry(tool, args) {
@@ -129,6 +132,8 @@ export function createDataTools(host) {
 
   return {
     datasets,
+    // A known catalogue record (e.g. a baseline layer from trusted.json) gets a D id like any found dataset.
+    keepDataset,
     async find_data({ text, area, concept }) {
       const where = await host.area(area);
       if (!where) return { not_checked: `"${area}" isn't a place, candidate or country I can find, and there's no map view.` };

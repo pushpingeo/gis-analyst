@@ -13,6 +13,7 @@ import { CONFIG } from "./config.js";
 import { THEMES, themeFor, bandOf, BAND_OPACITY, BIG_AREA_KM2, chooseLabels, ringDistances } from "./findings.js";
 import { createScreening, evidenceOf, evidenceWithin, nearestByTheme, flagBeyond, reassess, THEME_CODE } from "./ntrrun.js";
 import { distancesLine, bandFor } from "./distances.js";
+import { DISCLAIMER } from "./disclaimer.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
@@ -599,6 +600,7 @@ function showRun(record) {
   card.querySelector(".setup").textContent = [
     `${r.site.asset_label[0].toUpperCase()}${r.site.asset_label.slice(1)}${r.site.asset_assumed ? " (assumed)" : ""}`, r.site.stage, r.site.setting, r.site.footprint,
   ].filter(Boolean).join(" · ");
+  card.querySelector(".disclaimer").textContent = DISCLAIMER;
   if (r.parse_error) { const pr = card.querySelector(".problem"); pr.hidden = false; pr.textContent = r.parse_error; }
   const slider = card.querySelector('input[type="range"]');
   slider.max = String(r.fetched_to_km);
@@ -626,7 +628,8 @@ function showRun(record) {
   });
   card.querySelector('[data-op="show"]').addEventListener("click", () => { slider.value = String(entry.km); showRunOnMap(record); });
   card.querySelector('[data-op="download"]').addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(record, null, 1)], { type: "application/geo+json" });
+    // The disclaimer travels with the data: first in the file, as well as in the run's record.
+    const blob = new Blob([JSON.stringify({ type: record.type, disclaimer: DISCLAIMER, ...record }, null, 1)], { type: "application/geo+json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `tobler-${r.id}-${r.site.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.geojson`;

@@ -507,6 +507,7 @@ export function createPlaceTools(host) {
   return {
     candidates: cands,
     datasets: data.datasets,
+    useDataset: data.keepDataset,
     async exec(name, input) {
       if (!run[name]) throw new Error(`Unknown tool ${name}`);
       return run[name](input || {});
