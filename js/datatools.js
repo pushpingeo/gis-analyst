@@ -34,7 +34,7 @@ export const DATA_TOOL_DEFS = [
         place: { type: "string", description: "Place name (e.g. Area 1) or candidate id" },
         within_km: { type: "number", description: "Also count features up to this far outside the place (0 to 50 km). Default 0 for an area, 10 for a point." },
         name: { type: "string", description: "Optional: only features with this text in a name-like field" },
-        days: { type: "number", description: "For time-aware datasets (satellite detections): how many recent days, 1 to 10. Default 7." },
+        days: { type: "number", description: "For time-aware datasets (satellite detections): how many recent days, 1 to 5 (NASA FIRMS allows no more). Default 5." },
         theme: { type: "string", enum: THEME_IDS, description: "Which screening theme this evidence is for (it sets the colour on the map): biodiversity, land (land and livelihoods, fishing), indigenous, heritage, community (community health and safety), context (operating context: infrastructure, other industry)." },
       },
       required: ["dataset", "place"],
@@ -119,7 +119,7 @@ export function createDataTools(host) {
   async function fetchFirms(d, p, within, days) {
     if (!host.firms) return { not_checked: "NASA FIRMS isn't connected here." };
     const b = turf.bbox(turf.buffer(p.feature, Math.max(within, 0.5), { units: "kilometers", steps: 8 })).map((v) => round(v, 4));
-    const n = Math.max(1, Math.min(d.service.access.max_days || 10, Math.round(days ?? d.service.access.default_days ?? 7)));
+    const n = Math.max(1, Math.min(d.service.access.max_days || 5, Math.round(days ?? d.service.access.default_days ?? 5)));
     const got = await Promise.allSettled(d.service.access.sources.map((source) => host.firms({ source, bbox: b, days: n })));
     const features = [], failed = [];
     got.forEach((g, i) => (g.status === "fulfilled" ? features.push(...(g.value.features || []).map((f) => ({ ...f, properties: { ...f.properties, source: d.service.access.sources[i] } }))) : failed.push(`${d.service.access.sources[i]}: ${String(g.reason?.message || g.reason).slice(0, 100)}`)));
@@ -133,9 +133,14 @@ export function createDataTools(host) {
       const where = await host.area(area);
       if (!where) return { not_checked: `"${area}" isn't a place, candidate or country I can find, and there's no map view.` };
       const fromTrusted = trustedMatches(text).map((x) => ({ id: `trusted:${x.key}`, title: x.title, publisher: x.publisher, coverage: x.coverage, licence: x.licence, licence_class: x.licence_class, service: x }));
-      let r = null, failure = null;
+      let r = null, failure = null, conceptDropped = false;
       if (host.atlas) {
-        try { r = await callWithRetry("find_datasets", { text: String(text).trim(), bbox: where.bbox, limit: 25, ...(concept ? { concept } : {}) }); }
+        try {
+          r = await callWithRetry("find_datasets", { text: String(text).trim(), bbox: where.bbox, limit: 25, ...(concept ? { concept } : {}) });
+          // A concept narrows by the atlas's own tags, which can be missing or odd (wrecks are tagged seabed habitat):
+          // when it finds nothing, search the words alone (Rosebank, 18 Nov: "wreck" + concept found nothing).
+          if (concept && !(r?.results || []).length) { r = await callWithRetry("find_datasets", { text: String(text).trim(), bbox: where.bbox, limit: 25 }); conceptDropped = true; }
+        }
         catch (e) { failure = String(e.message || e).slice(0, 160); }
       }
       // One entry per title and publisher (the same layer is often listed by several portals).
@@ -150,7 +155,7 @@ export function createDataTools(host) {
       list = list.map((d, i) => ({ d, i })).sort((a, b) => score(a.d) - score(b.d) || a.i - b.i).map((x) => x.d);
       const shown = [...fromTrusted, ...list].slice(0, 8).map(describe);
       return {
-        searched: { text, area: where.label, ...(concept ? { concept } : {}), trusted_services: fromTrusted.length, catalogue: host.atlas ? (failure ? "failed" : "searched") : "not connected" },
+        searched: { text, area: where.label, ...(concept ? { concept: conceptDropped ? `${concept} (found nothing, so searched the words alone)` : concept } : {}), trusted_services: fromTrusted.length, catalogue: host.atlas ? (failure ? "failed" : "searched") : "not connected" },
         matches: (r?.matches ?? list.length) + fromTrusted.length, datasets: shown,
         ...(fromTrusted.length + list.length > shown.length ? { more: fromTrusted.length + list.length - shown.length } : {}),
         ...(esri.length && !esriOk() ? { left_out: `${esri.length} dataset${esri.length > 1 ? "s" : ""} under Esri's Master License Agreement (${esri.slice(0, 3).map((d) => d.title).join("; ")}). Tobler doesn't use those unless the person holds an Esri licence; mention it if it matters.` } : {}),

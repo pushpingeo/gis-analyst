@@ -32,6 +32,7 @@ export function systemFor(skill) {
 - Put independent searches in the same step: they run at the same time. Aim to finish within about ten steps.
 - Name features and datasets as the data names them. Ids (C3, D2) are for tool calls only.
 - Your last message is the result: the short summary, then the JSON block, exactly as the method's Output section says. Use the distances given (not the skill's table) in "distances_km".
+- Keep the result compact so it fits in one reply: summary under 300 words; at most 8 flags; at most 4 evidence items per flag (the nearest or strongest, and say in "why" how many more there are); "data_gaps" at most 12 short lines; leave "checked" as an empty list, because the run records what the tools checked itself.
 
 <method skill="${skill.name}" version="${skill.version}">
 ${skill.body}
@@ -174,7 +175,21 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     tools: defs, exec, callClaude, maxRounds,
     onEvent: (ev) => { if (ev.type === "tool_start") onEvent({ type: "tool_start", name: ev.name, input: ev.input }); if (ev.type === "tool" || ev.type === "round" || ev.type === "warning") onEvent(ev); },
   });
-  const parsed = parseResult(res.text);
+  let parsed = parseResult(res.text);
+  const usage = { ...res.usage };
+  let repaired = false;
+  if (!parsed.json) {
+    // Cut off (the reply hit the length cap) or no JSON block: ask once for the JSON alone, from the same history.
+    const history = res.history.map((m, i) => (i === res.history.length - 1 && m.role === "assistant" && Array.isArray(m.content)
+      ? { ...m, content: m.content.filter((b) => b.type === "text").length ? m.content.filter((b) => b.type === "text") : [{ type: "text", text: "…" }] } : m));
+    if (history.at(-1)?.role === "user") history.pop();
+    try {
+      const resp = await callClaude({ system: systemFor(skill), tools: defs, messages: [...history, { role: "user", content: "Your result was cut off or had no JSON block. Reply now with only the JSON block, compact: at most 8 flags, at most 4 evidence items each, data_gaps at most 12 short lines, checked as []." }] });
+      usage.input_tokens += resp.usage?.input_tokens || 0; usage.output_tokens += resp.usage?.output_tokens || 0;
+      const again = parseResult((resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join(""));
+      if (again.json) { parsed = { json: again.json, summary: String(res.text || "").split("```")[0].trim() }; repaired = true; }
+    } catch { /* keep the unparsed result and say so */ }
+  }
   const flags = traceFlags(parsed.json?.flags, evidence, distances);
   const siteFeature = { type: "Feature", geometry: fp.feature.geometry, properties: { role: "site", name: site.name, run: runId } };
   return {
@@ -195,7 +210,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       flags, checked, data_gaps: Array.isArray(parsed.json?.data_gaps) ? parsed.json.data_gaps.map(String) : [],
       model_checked: Array.isArray(parsed.json?.checked) ? parsed.json.checked : [],
       summary: parsed.summary, ...(parsed.json ? {} : { parse_error: "The analyst's result had no readable JSON block, so there are no structured flags. The summary is kept as written." }),
-      calls, usage: res.usage, assessments: [],
+      calls, usage, ...(repaired ? { note: "The first result was cut off; the structured result was asked for again from the same evidence." } : {}), assessments: [],
     },
     features: [siteFeature, ...evidence],
   };

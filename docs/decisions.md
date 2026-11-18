@@ -2,6 +2,42 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (early): step 4 core — sealed NTR runs and the run card
+- **Rob's calls (asked first):** the slider re-sorts evidence instantly and flags are re-assessed on tap (one model
+  call on the stored evidence, no new fetching); one "show findings up to" slider, not three band handles (bands
+  change in chat); smoke tests only, no IFC rerun; core first (out-of-date marking, tray and settings next).
+- **Sealed runs (`js/ntrrun.js`).** `screen_site` (conversation tool) starts a run: its own `runTurn` loop with the NTR
+  skill in the system prompt, the fence rule, and only `get_place`, `find_data`, `get_data`, `find_features_near`.
+  Its tools get their own host: the only place is the site footprint, nothing can be built or renamed, and findings
+  go into the run instead of the map. The conversation gets a headline (counts, top flags, what failed); detail
+  through `get_run`. The conversation no longer loads the NTR skill itself.
+- **Fetch once, to the wider band.** The run raises `get_data.within_km` and `find_features_near.radius_km` to the
+  wider band (max 50 km) whatever the model asks, so the slider works inside what was fetched.
+- **Run record = GeoJSON FeatureCollection** with a `tobler_run` member (schema `tobler-run/1`): skill and version,
+  model, times, site (how found, confidence, anchor source, footprint, setting, asset, stage), distances with
+  reasons, method line, flags, checked, gaps, the model's own checked list, usage, past assessments. Features: the
+  site (role site) and every feature the tools returned (role evidence) with fid, theme, distance, band, dataset,
+  publisher, licence, checked time. Downloadable from the card; the export schema builds on this.
+- **Traced evidence.** Each evidence item the model gives is matched to a fetched feature (name, then dataset and
+  distance within max(0.5 km, 15%)). Matched items take the fetched distance, band, dataset, licence and date;
+  unmatched ones are shown as "not traced to fetched data" (regional knowledge is honestly untraced).
+- **"What was checked" comes from the tools**, not the model: each `get_data`/`find_features_near` result is
+  features (n), none in dataset, or not checked with the reason.
+- **Scale-aware distances (`catalogue/distances.json`, `js/distances.js`), a draft for Rob:** near/close/wider and a
+  footprint radius per asset type and setting, with size rules (solar under 5 MW smaller, 100 MW+ wider; wind near =
+  10 × tip height, at least 1 km; mine 20 km²+ wider; thermal 500 MW+ wider; offshore wind 1 GW+ wider) and a reason
+  shown on the card. The person's own distances win; wider is capped at 50 km (the tools' reach). Points are screened
+  as a footprint circle, said on the card.
+- **Run card:** flags first (confidence chip, theme swatch, risk, nearest distance), opening a flag picks out its
+  evidence on the map; slider with the nearest finding per theme; flags whose evidence is all beyond the slider are
+  dimmed; "Re-assess at X km" when the slider differs from the distance the flags were written for; distances and
+  why; what was checked; gaps; show on map; download. Showing a run replaces other findings on the map.
+- **NTR 3.3-draft:** distances and footprint come from the run when it gives them; method otherwise unchanged.
+- **Tested:** `test/ntrrun.test.mjs` (11, atlas and model faked); `scripts/browser-run-card.mjs` in headless Chrome
+  at 1280×820 and 390×844 (scripted model and atlas, outline basemap): 20 checks pass, no page errors.
+- **Not done yet:** out-of-date marking when the site is edited; the places-and-runs tray; settings; per-receptor
+  distances in the skill. The "Screen for risks · soon" chip is unchanged (public text: Rob's call).
+
 ## 17–18 Nov 2026 (overnight): cartography, step 3 closed
 - **Findings by theme** (`js/findings.js`): biodiversity green, land and livelihoods ochre, Indigenous Peoples
   violet, cultural heritage pink, community health and safety blue, operating context slate; red stays for the

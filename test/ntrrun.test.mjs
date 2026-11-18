@@ -259,4 +259,25 @@ await test("traceFlags maps PS codes to themes and leaves unknown evidence untra
   assert.equal(f[0].nearest_km, 3);
 });
 
+
+await test("a result cut off at the length cap is asked for again once, as JSON only, from the same history", async () => {
+  const cut = { stop_reason: "max_tokens", content: [{ type: "text", text: "Long summary…\n\n```json\n{\"flags\":[{\"risk\":\"x" }], usage: { input_tokens: 10, output_tokens: 8000 } };
+  const model = scriptedModel([
+    toolTurn(use("a", "find_data", { text: "wreck", area: "Area 1" })),
+    toolTurn(use("b", "get_data", { dataset: "D1", place: "Area 1", theme: "heritage" })),
+    cut,
+    final(RESULT()),
+  ]);
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const rec = await runScreening({ host: host(), site, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
+  assert.equal(model.calls.length, 4);
+  const last = model.calls[3].messages;
+  assert.match(last.at(-1).content, /only the JSON block/);
+  assert.equal(last.at(-2).role, "assistant");
+  assert.equal(rec.tobler_run.flags.length, 3);
+  assert.equal(rec.tobler_run.summary, "Long summary…");
+  assert.match(rec.tobler_run.note, /cut off/);
+  assert.equal(rec.tobler_run.parse_error, undefined);
+});
+
 console.log(`${passed} ntrrun tests passed`);
