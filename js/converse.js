@@ -108,13 +108,14 @@ export function activityFor(name, input = {}) {
   switch (name) {
     case "load_skill": return `Loading the ${input.name} skill`;
     case "find_place": return `Searching for “${input.query}”`;
-    case "find_features_near": return `Looking for ${input.feature_type} within ${input.radius_km} km of ${input.anchor}`;
+    // Ids (D2, C3) are for tool calls only, never shown to the person.
+    case "find_features_near": return `Looking for ${input.feature_type} within ${input.radius_km} km${/^C\d+$/i.test(String(input.anchor || "")) ? "" : ` of ${input.anchor}`}`;
     case "make_place": return "Building the area";
     case "edit_place": return `Changing ${input.place}`;
     case "offer_choices": return "Laying out the options";
     case "get_place": return `Reading ${input.place}`;
     case "find_data": return `Searching the catalogue for “${input.text}”`;
-    case "get_data": return `Fetching ${input.dataset} for ${input.place}`;
+    case "get_data": return `Fetching ${input.theme ? `${input.theme} ` : ""}data for ${input.place}`;
     case "screen_site": return `Screening ${input.place} for non-technical risk (this takes a minute)`;
     case "get_run": return `Reading the screen ${input.run || ""}`.trim();
     case "show_on_map": return input.clear ? "Clearing the map" : "Showing the findings on the map";

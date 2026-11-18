@@ -9,7 +9,7 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=f08e8f35">
+<link rel="stylesheet" href="css/workspace.css?v=f13388e0">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
@@ -21,7 +21,7 @@
   "./js/confidence.js": "./js/confidence.js?v=ad22f5c6",
   "./js/config.js": "./js/config.js?v=06c1aa11",
   "./js/config.js?v=m2b": "./js/config.js?v=06c1aa11",
-  "./js/converse.js": "./js/converse.js?v=8f75dd8d",
+  "./js/converse.js": "./js/converse.js?v=8891fb53",
   "./js/datatools.js": "./js/datatools.js?v=5f3fb517",
   "./js/disclaimer.js": "./js/disclaimer.js?v=8cfa6424",
   "./js/distances.js": "./js/distances.js?v=f8ecffd3",
@@ -30,14 +30,14 @@
   "./js/gazetteer.js": "./js/gazetteer.js?v=390ac614",
   "./js/geometry.js": "./js/geometry.js?v=6bc3cd92",
   "./js/licence.js": "./js/licence.js?v=cf8fd6ef",
-  "./js/ntrrun.js": "./js/ntrrun.js?v=60456c46",
+  "./js/ntrrun.js": "./js/ntrrun.js?v=07ab6eac",
   "./js/placetools.js": "./js/placetools.js?v=e366ee4b",
   "./js/reference.js": "./js/reference.js?v=6eaf57a4",
   "./js/tools.js": "./js/tools.js?v=084a3bd7",
   "./js/units.js": "./js/units.js?v=77029a89",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=12de8e5e",
+  "./js/workspace.js": "./js/workspace.js?v=7bdac298",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -66,25 +66,7 @@
 <body>
 <div id="map" aria-label="Map"></div>
 
-<nav class="tools" aria-label="Drawing tools">
-  <button data-mode="select" aria-pressed="false" title="Select and edit">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 1.6L10 19z"/></svg><span class="sr">Select and edit</span></button>
-  <button data-mode="point" aria-pressed="false" title="Drop a point">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-6.2-6-11a6 6 0 0112 0c0 4.8-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg><span class="sr">Drop a point</span></button>
-  <button data-mode="linestring" aria-pressed="false" title="Draw a line">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l6-8 4 4 6-9"/><circle cx="4" cy="18" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="14" cy="14" r="1.6"/><circle cx="20" cy="5" r="1.6"/></svg><span class="sr">Draw a line</span></button>
-  <button data-mode="polygon" aria-pressed="false" title="Draw an area">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7l8-3 7 6-3 9-11-2z"/></svg><span class="sr">Draw an area</span></button>
-  <button data-mode="rectangle" aria-pressed="false" title="Draw a rectangle">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="12"/></svg><span class="sr">Draw a rectangle</span></button>
-  <button data-mode="circle" aria-pressed="false" title="Draw a circle">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.2"/></svg><span class="sr">Draw a circle</span></button>
-  <span class="tools-gap"></span>
-  <button data-action="delete" title="Delete the selected shape" disabled>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg><span class="sr">Delete the selected shape</span></button>
-</nav>
-
-<p class="hint" id="hint" hidden></p>
+<div class="hint" id="hint" hidden><span class="hint-text"></span><button type="button" data-hint="cancel" hidden>Cancel</button><button type="button" data-hint="delete" hidden>Delete shape</button></div>
 
 <details class="key" id="key" hidden open>
   <summary>On the map</summary>
@@ -114,7 +96,7 @@
   </div>
 
   <div class="composer">
-    <p class="activity" id="activity" role="status"></p>
+    <p class="activity" id="activity" role="status"><svg class="globe" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M5 7.5h14M5 16.5h14"/><g class="spin"><ellipse class="m1" cx="12" cy="12" rx="9" ry="9"/><ellipse class="m2" cx="12" cy="12" rx="9" ry="9"/><ellipse class="m3" cx="12" cy="12" rx="9" ry="9"/></g></svg><span class="activity-text"></span></p>
     <div class="chips" role="group" aria-label="What to do">
       <button class="chip" data-prompt="Find ">Find a place</button>
       <button class="chip" data-draw="polygon">Draw an area</button>
@@ -123,7 +105,25 @@
       <button class="chip soon" data-soon aria-describedby="soon-note">Constraints <span>· soon</span></button>
       <span id="soon-note" class="sr">Coming soon</span>
     </div>
+    <nav class="tools" id="tools" aria-label="Drawing tools" hidden>
+      <button type="button" data-mode="point" aria-pressed="false" title="Drop a point">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-6.2-6-11a6 6 0 0112 0c0 4.8-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg><span class="sr">Drop a point</span></button>
+      <button type="button" data-mode="linestring" aria-pressed="false" title="Draw a line">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l6-8 4 4 6-9"/><circle cx="4" cy="18" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="14" cy="14" r="1.6"/><circle cx="20" cy="5" r="1.6"/></svg><span class="sr">Draw a line</span></button>
+      <button type="button" data-mode="polygon" aria-pressed="false" title="Draw an area">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7l8-3 7 6-3 9-11-2z"/></svg><span class="sr">Draw an area</span></button>
+      <button type="button" data-mode="rectangle" aria-pressed="false" title="Draw a rectangle">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="12"/></svg><span class="sr">Draw a rectangle</span></button>
+      <button type="button" data-mode="circle" aria-pressed="false" title="Draw a circle">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.2"/></svg><span class="sr">Draw a circle</span></button>
+      <span class="tools-gap"></span>
+      <button type="button" data-action="done" class="tools-done" title="Stop drawing and close the tools">Done</button>
+      <button type="button" data-action="delete" title="Delete the selected shape" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg><span class="sr">Delete the selected shape</span></button>
+    </nav>
     <form class="ask" id="ask">
+      <button type="button" class="drawbtn" id="drawbtn" title="Draw on the map" aria-expanded="false" aria-controls="tools">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7l8-3 7 6-3 9-11-2z"/><circle cx="5" cy="7" r="1.6"/><circle cx="13" cy="4" r="1.6"/><circle cx="20" cy="10" r="1.6"/></svg><span class="sr">Draw on the map</span></button>
       <label for="say" class="sr">Message</label>
       <textarea id="say" rows="1" placeholder="Where should we look?" autocomplete="off"></textarea>
       <button type="button" class="mic" id="mic" title="Speak" hidden>
@@ -257,6 +257,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=12de8e5e"></script>
+<script type="module" src="js/workspace.js?v=7bdac298"></script>
 </body>
 </html>

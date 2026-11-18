@@ -63,15 +63,52 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|tiles|openfreemap/i.test(m.text())) errors.push(m.text()); });
   await page.route(/openfreemap|nominatim|wikidata|overpass/, (r) => r.abort());
-  await page.route(/tobler-api.*\/v1\/messages/, async (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(model(JSON.parse(r.request().postData()))) }));
+  // The sealed run's write-up is held back 3 s, so the progress block can be seen while it runs.
+  await page.route(/tobler-api.*\/v1\/messages/, async (r) => {
+    const out = model(JSON.parse(r.request().postData()));
+    if (out.content?.[0]?.text === RESULT) await new Promise((ok) => setTimeout(ok, 3000));
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(out) });
+  });
   await page.route(/tobler-api.*\/atlas/, async (r) => { const b = JSON.parse(r.request().postData()); r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: { structuredContent: atlas(b.params.name, b.params.arguments) } }) }); });
   await page.goto("http://localhost:8000/workspace.html");
   await page.waitForFunction(() => window.__ws?.draw, null, { timeout: 40000 });
+  if (label === "phone") await page.evaluate(() => document.getElementById("panel").classList.remove("collapsed"));
+  // Drawing tools: a tray by the input; the hint has Cancel while drawing and stays clear of the panel.
+  const rect = (sel) => page.evaluate((q) => { const e = document.querySelector(q); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; }, sel);
+  const overlap = (a, b) => !!(a && b && a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b);
+  check(await page.evaluate(() => document.getElementById("tools").hidden), `${label}: drawing tools tucked away at first`);
+  await page.click("#drawbtn");
+  await page.click('#tools [data-mode="polygon"]');
+  let h = await page.evaluate(() => ({ text: document.querySelector("#hint .hint-text").textContent, cancel: !document.querySelector('#hint [data-hint="cancel"]').hidden, mode: window.__ws.draw.getMode(), tray: !document.getElementById("tools").hidden }));
+  check(h.tray && h.mode === "polygon" && h.cancel && /corners/.test(h.text), `${label}: tray open, drawing an area, hint with Cancel (${h.text.slice(0, 30)})`);
+  check(label === "phone" || !overlap(await rect("#hint"), await rect("#panel")), `${label}: hint clear of the panel`);
+  await page.screenshot({ path: `/tmp/ux-${label}-drawing.png` });
+  await page.click('#hint [data-hint="cancel"]');
+  h = await page.evaluate(() => ({ hidden: document.getElementById("hint").hidden, mode: window.__ws.draw.getMode() }));
+  check(h.hidden && h.mode === "select", `${label}: Cancel stops drawing`);
+  await page.click('#tools [data-action="done"]');
+  check(await page.evaluate(() => document.getElementById("tools").hidden), `${label}: Done closes the tray`);
   await page.evaluate((f) => window.__ws.host.addPlace({ feature: f, origin: { method: "words", words: "Rosebank", confidence: "high", anchor: { name: "Rosebank", source: { title: "UKCS offshore hydrocarbon fields (WGS84)", publisher: "North Sea Transition Authority", licence: "not stated" } }, steps: ["outline of Rosebank"], at: new Date().toISOString() } }), SQUARE);
   if (label === "phone") await page.evaluate(() => document.getElementById("panel").classList.remove("collapsed"));
+  await page.evaluate(() => { const id = [...window.__ws.places.keys()][0]; window.__ws.draw.selectFeature(id); });
+  h = await page.evaluate(() => ({ del: !document.querySelector('#hint [data-hint="delete"]').hidden, text: document.querySelector("#hint .hint-text").textContent }));
+  check(h.del && /reshape/.test(h.text), `${label}: selected shape: reshape hint with Delete`);
+  check(label === "phone" || !overlap(await rect("#hint"), await rect("#panel")), `${label}: reshape hint clear of the panel`);
+  await page.screenshot({ path: `/tmp/ux-${label}-selected.png` });
+  await page.evaluate(() => window.__ws.draw.deselectFeature?.() ?? window.__ws.draw.setMode("select"));
   await page.fill("#say", "Screen Area 1 for risks");
   await page.click("#ask button[type=submit]");
+  await page.waitForSelector(".progress", { timeout: 20000 });
+  await page.waitForTimeout(1200);
+  const pr = await page.evaluate(() => ({ title: document.querySelector(".progress-title")?.textContent || "", step: document.querySelector(".progress-step")?.textContent || "",
+    width: parseFloat(document.querySelector(".progress-bar span")?.style.width || "0"), globe: document.getElementById("activity").classList.contains("busy") && getComputedStyle(document.querySelector("#activity .globe")).display !== "none" }));
+  check(/usually takes about/.test(pr.title) && /\d+ s/.test(pr.step) && pr.width > 0, `${label}: progress shown while screening (${pr.title.slice(0, 60)} | ${pr.step.slice(0, 50)} | ${pr.width}%)`);
+  check(pr.globe, `${label}: spinning globe while busy`);
+  check(!/\b[CD]\d+\b/.test(pr.step), `${label}: no internal ids in the progress line (${pr.step.slice(0, 50)})`);
+  await page.$eval(".progress", (e) => e.scrollIntoView({ block: "end" }));
+  await page.screenshot({ path: `/tmp/ux-${label}-progress.png` });
   await page.waitForSelector(".run .flag", { timeout: 30000 });
+  check(await page.evaluate(() => !document.querySelector(".progress") && /took \d+ s/.test(document.querySelector(".run .meta").textContent)), `${label}: progress gone, card says how long it took`);
   await page.waitForTimeout(800);
   const st = () => page.evaluate(() => ({
     flags: [...document.querySelectorAll(".run .flag .risk")].map((e) => e.textContent),

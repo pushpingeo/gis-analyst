@@ -202,6 +202,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   const sb = turf.bbox(fp.feature);
   const layers = (host.trusted?.baseline || []).filter((b) => (b.setting !== "sea" || sea) && !(sb[2] < b.where[0] || sb[0] > b.where[2] || sb[3] < b.where[1] || sb[1] > b.where[3]));
   const before = checked.length;
+  onEvent({ type: "baseline", layers: layers.length });
   await Promise.allSettled(layers.map(async (b) => {
     const id = tools.useDataset({ id: b.atlas_id, title: b.title, publisher: b.publisher, licence: b.licence, capabilities: ["query"], concepts: [] }, "B");
     const input = { dataset: id, place: site.name, theme: b.theme };
@@ -368,6 +369,9 @@ export function createScreening({ host, table, skill, callClaude, model = "", on
       const site = { asset_type: asset, offshore: !!d0.offshore, capacity_mw: num(i.capacity_mw), tip_height_m: num(i.tip_height_m), area_km2: d0.area_km2 ?? null };
       const distances = chooseDistances(tb, site, i.distances || {});
       const id = `R${++n}`;
+      // For the page's progress line: what's being screened, so it can say roughly how long it takes.
+      onEvent({ type: "screen_start", run: id, site: place.name, setting: site.offshore ? "offshore" : "onshore",
+        inside: i.extent === "inside" && /Polygon/.test(place.feature.geometry.type), wider_km: distances.wider });
       const record = await runScreening({
         host, site: { name: place.name, feature: place.feature, origin: place.origin }, distances, skill: sk, callClaude, model, runId: id, onEvent, ...(now ? { now } : {}),
         inputs: { asset_type: asset || "other", asset_label: asset ? tb.assets[asset].label : "site of unknown type", asset_assumed: !asset || !!i.assumed,

@@ -35,27 +35,31 @@ a { color: var(--sea); }
 #map { position: fixed; inset: 0; }
 .maplibregl-ctrl-attrib { font-size: 11px; }
 
-/* ---- drawing tools ---- */
+/* ---- drawing tools: a tray above the input, opened by the Draw button ---- */
 .tools {
-  position: fixed; top: 16px; right: 16px; z-index: 3;
-  display: flex; flex-direction: column; gap: 2px; padding: 5px;
-  background: var(--panel); border-radius: 14px; box-shadow: var(--shadow);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px; margin: 0 0 8px;
+  background: var(--paper); border-radius: 12px;
 }
 .tools button {
-  width: 40px; height: 40px; display: grid; place-items: center;
-  border: 0; border-radius: var(--radius-control); background: transparent; color: var(--ink);
+  width: 38px; height: 38px; display: grid; place-items: center;
+  border: 0; border-radius: var(--radius-control); background: transparent; color: var(--ink); cursor: pointer;
 }
-.tools button:hover:not(:disabled) { background: var(--paper); }
+.tools button:hover:not(:disabled) { background: var(--panel); }
 .tools button[aria-pressed="true"] { background: var(--pole); color: #fff; }
 .tools button:disabled { opacity: .35; cursor: default; }
 .tools svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
-.tools-gap { height: 1px; margin: 4px 6px; background: var(--rule); }
+.tools-gap { flex: 1; }
+.tools .tools-done { width: auto; padding: 0 12px; font: inherit; font-size: 13px; font-weight: 600; color: var(--sea); }
 
+/* The hint sits at the foot of the map, centred in the part the panel doesn't cover (the key has the top right). */
 .hint {
-  position: fixed; z-index: 3; left: 50%; top: 16px; transform: translateX(-50%);
-  margin: 0; padding: 7px 14px; border-radius: 999px; background: var(--ink); color: #fff;
-  font-size: 13.5px; box-shadow: var(--shadow); max-width: calc(100vw - 140px); text-align: center;
+  position: fixed; z-index: 3; bottom: 24px; left: calc(50% + 210px); transform: translateX(-50%);
+  margin: 0; padding: 6px 8px 6px 14px; border-radius: 999px; background: var(--ink); color: #fff;
+  font-size: 13.5px; box-shadow: var(--shadow); max-width: calc(100vw - 560px); text-align: center;
+  display: flex; align-items: center; gap: 8px;
 }
+.hint button { border: 0; border-radius: 999px; padding: 3px 10px; background: #fff; color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; flex: none; }
+.hint [data-hint="delete"] { background: var(--alert); color: #fff; }
 
 /* ---- map key: themes of the findings on the map ---- */
 .key {
@@ -181,8 +185,16 @@ a { color: var(--sea); }
 /* ---- composer ---- */
 .composer { padding: 8px 14px 12px; border-top: 1px solid var(--rule); }
 .activity { margin: 0 2px 8px; min-height: 18px; font-size: 12.5px; color: var(--ink-2); display: flex; align-items: center; gap: 7px; }
-.activity:not(:empty)::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--sea); }
-.activity.busy::before { animation: pulse 1s ease-in-out infinite; }
+/* A small globe: still when idle, turning while the analyst works (the meridians sweep across). */
+.activity .globe { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--sea); stroke-width: 1.4; overflow: visible; }
+.activity.empty .globe { display: none; }
+.activity .globe .spin ellipse { transform-box: fill-box; transform-origin: center; transform: scaleX(.35); }
+.activity .globe .m2, .activity .globe .m3 { display: none; }
+.activity.busy .globe .m2, .activity.busy .globe .m3 { display: inline; }
+.activity.busy .globe .spin ellipse { animation: meridian 2.4s linear infinite; }
+.activity.busy .globe .m2 { animation-delay: -.8s; }
+.activity.busy .globe .m3 { animation-delay: -1.6s; }
+@keyframes meridian { from { transform: scaleX(1); } to { transform: scaleX(-1); } }
 @keyframes pulse { 50% { opacity: .25; } }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .chip { border: 1px solid var(--rule); background: var(--panel); border-radius: 999px; padding: 4px 11px; font-size: 13px; }
@@ -192,6 +204,7 @@ a { color: var(--sea); }
 .ask { display: flex; align-items: flex-end; gap: 6px; padding: 6px 6px 6px 12px; border: 1.5px solid var(--rule); border-radius: 14px; background: var(--panel); }
 .ask:focus-within { border-color: var(--ink); }
 .ask textarea { flex: 1; border: 0; outline: 0; resize: none; padding: 6px 0; max-height: 140px; background: transparent; line-height: 1.4; }
+.ask .drawbtn.on { background: var(--pole); color: #fff; }
 .ask button { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border: 0; border-radius: 10px; background: var(--paper); }
 .ask .send { background: var(--ink); color: #fff; }
 .ask svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -200,11 +213,10 @@ a { color: var(--sea); }
 
 /* ---- phone: the panel becomes a bottom sheet ---- */
 @media (max-width: 720px) {
-  .tools { top: 40px; left: 50%; right: auto; transform: translateX(-50%); flex-direction: row; }
-  .tools button { width: 38px; height: 38px; }
-  .tools-gap { width: 1px; height: auto; margin: 6px 4px; }
-  .hint { top: 94px; left: 12px; right: 12px; transform: none; max-width: none; font-size: 13px; }
-  .key { top: 150px; right: 12px; max-width: 220px; font-size: 12px; }
+  .tools button { width: 40px; height: 40px; }
+  .hint { top: 44px; bottom: auto; left: 12px; right: 12px; transform: none; max-width: none; font-size: 13px; border-radius: 16px; justify-content: space-between; text-align: left; }
+  .key { top: 44px; right: 12px; max-width: 220px; font-size: 12px; }
+  .hint:not([hidden]) ~ .key { top: 120px; }
   .panel {
     top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 52vh;
     border-radius: var(--radius-panel) var(--radius-panel) 0 0; padding-bottom: env(safe-area-inset-bottom);
@@ -314,3 +326,11 @@ a { color: var(--sea); }
 .run .scope button[aria-checked="true"] { background: var(--ink); color: #fff; font-weight: 600; }
 .run .inside-note { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
 .run .reach [hidden] { display: none; }
+
+/* ---- screening progress, in the reply while a screen runs ---- */
+.progress { border: 1px solid var(--rule); border-radius: 12px; padding: 10px 12px; background: var(--paper); }
+.progress p { margin: 0; }
+.progress-title { font-size: 13.5px; }
+.progress-bar { height: 6px; margin: 8px 0 6px; border-radius: 3px; background: var(--rule); overflow: hidden; }
+.progress-bar span { display: block; height: 100%; width: 2%; border-radius: 3px; background: var(--sea); transition: width .9s linear; }
+.progress-step { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }

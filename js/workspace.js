@@ -374,12 +374,37 @@ const SELECTED_HINT = matchMedia("(pointer: coarse)").matches
 function setMode(mode) {
   draw.setMode(mode);
   document.querySelectorAll(".tools [data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
-  hint(mode === "select" ? (selectedId ? SELECTED_HINT : "") : HINTS[mode]);
+  if (mode !== "select") openTray(true);
+  showHint();
 }
-function hint(text) { const h = $("hint"); h.textContent = text; h.hidden = !text; }
+// The hint over the map: how to draw or reshape, with Cancel while drawing and Delete for the selected shape
+// (the map's own toolbar is gone; the tools live by the conversation input).
+function showHint() {
+  const mode = draw?.getMode() || "select";
+  const text = mode === "select" ? (selectedId ? SELECTED_HINT : "") : HINTS[mode];
+  const h = $("hint");
+  h.querySelector(".hint-text").textContent = text;
+  h.querySelector('[data-hint="cancel"]').hidden = mode === "select";
+  h.querySelector('[data-hint="delete"]').hidden = !(mode === "select" && selectedId);
+  h.hidden = !text;
+}
+$("hint").querySelector('[data-hint="cancel"]').addEventListener("click", () => draw && setMode("select"));
+$("hint").querySelector('[data-hint="delete"]').addEventListener("click", () => { if (selectedId) removePlace(selectedId); });
 
+// The drawing tools sit in a tray above the input, opened by the Draw button beside it.
+function openTray(open) {
+  $("tools").hidden = !open;
+  $("drawbtn").setAttribute("aria-expanded", String(open));
+  $("drawbtn").classList.toggle("on", open);
+}
+$("drawbtn").addEventListener("click", () => {
+  const open = $("tools").hidden;
+  openTray(open);
+  if (!open && draw && draw.getMode() !== "select") setMode("select");
+});
 document.querySelectorAll(".tools [data-mode]").forEach((b) => b.addEventListener("click", () => draw && setMode(b.dataset.mode)));
 document.querySelector('.tools [data-action="delete"]').addEventListener("click", () => { if (selectedId) removePlace(selectedId); });
+document.querySelector('.tools [data-action="done"]').addEventListener("click", () => { if (draw) setMode("select"); openTray(false); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && draw && draw.getMode() !== "select") setMode("select"); });
 
 // ---- drawing events ----------------------------------------------------------------------
@@ -407,7 +432,7 @@ function onSelect(id) {
   document.querySelector('.tools [data-action="delete"]').disabled = !selectedId;
   places.forEach((p) => p.card.classList.toggle("active", p.id === selectedId));
   if (selectedId) places.get(selectedId).card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  if (draw.getMode() === "select") hint(selectedId ? SELECTED_HINT : "");
+  if (draw.getMode() === "select") showHint();
 }
 
 function onDeleted(id) {
@@ -507,9 +532,11 @@ host.screening = createScreening({
     // The log keeps what the card shows, so a downloaded log explains the card on its own.
     runLog?.events.push({ screen_result: { run: r.id, distances: r.distances, baseline: r.baseline, flags: r.flags.map((f) => ({ risk: f.risk, theme: f.theme, confidence: f.confidence, nearest_km: f.nearest_km, evidence: f.evidence.map((e) => `${e.name} ${e.distance_km} km${e.traced ? "" : " (not traced)"}`) })),
       checked: r.checked.map((c) => `${c.dataset}: ${c.result}${c.count ? ` ${c.count}` : ""}${c.why ? ` (${c.why})` : ""}`), gaps: r.data_gaps, ...(r.parse_error ? { problem: r.parse_error } : {}) } });
+    stopProgress(record);
     showRun(record);
   },
   onEvent: (ev) => {
+    progressEvent(ev);
     if (ev.type === "tool_start") activity(`Screening: ${activityFor(ev.name, ev.input)}…`, true);
     if (ev.type === "round") runLog?.events.push({ screen_model_round: ev.round, ms: ev.ms, tokens_in: ev.input_tokens, tokens_out: ev.output_tokens, tool_calls: ev.tools });
     if (ev.type === "tool") {
@@ -627,6 +654,80 @@ function makeChoiceCard({ choices, recommended, reason, question }) {
   expandSheet();
 }
 
+// ---- screening progress: how long it usually takes, and where it's got to ----------------------
+// A screen takes a minute or two, so the reply shows it at once: an estimate from this browser's recent screens
+// (by setting), a bar driven by the run's steps and the time so far, and the step in hand. A proxy, not a promise.
+const TYPICAL_S = { offshore: 70, onshore: 100, inside: 45 };
+const timesKey = "screenTimes";
+const pastTimes = () => { try { return JSON.parse(store.get(timesKey) || "{}"); } catch { return {}; } };
+function estimateFor(kind) {
+  const past = pastTimes()[kind] || [];
+  if (past.length >= 2) {
+    const sorted = [...past].sort((a, b) => a - b);
+    return { secs: sorted[Math.floor(sorted.length / 2)], basis: `from your last ${past.length} screens` };
+  }
+  return { secs: TYPICAL_S[kind], basis: kind === "inside" ? "typical inside an area" : `typical for an ${kind} site` };
+}
+const fmtSecs = (s) => (s < 75 ? `${Math.max(10, Math.round(s / 5) * 5)} seconds` : `${Math.round((s / 60) * 2) / 2} minutes`.replace(".5 ", "½ ").replace(/^1 minutes/, "1 minute"));
+let progress = null;
+function startProgress(ev) {
+  stopProgress(null);
+  const kind = ev.inside ? "inside" : ev.setting;
+  const est = estimateFor(kind);
+  const box = el("div", null, "progress");
+  box.append(el("p", `Screening ${ev.site}. This usually takes about ${fmtSecs(est.secs)} (${est.basis}); you can keep looking at the map meanwhile.`, "progress-title"));
+  const bar = el("div", null, "progress-bar"); bar.append(el("span"));
+  bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-label", "Screening progress");
+  box.append(bar, el("p", "Starting…", "progress-step"));
+  const host = pendingReply?.isConnected ? pendingReply : $("conversation");
+  host.append(box);
+  box.scrollIntoView({ block: "end", behavior: "smooth" });
+  progress = { box, kind, est: est.secs, t0: Date.now(), base: 0, baseDone: 0, round: 0, step: "Starting", writing: false };
+  progress.timer = setInterval(paintProgress, 1000);
+  paintProgress();
+}
+function progressEvent(ev) {
+  if (ev.type === "screen_start") return startProgress(ev);
+  const p = progress;
+  if (!p) return;
+  if (ev.type === "baseline") { p.base = ev.layers + 1; p.step = `Checking the must-check layers and boundaries (${ev.layers + 1})`; }
+  if (ev.type === "tool" && ev.baseline) p.baseDone++;
+  if (ev.type === "tool_start" && !p.writing && p.round > 0) p.step = `Analyst, step ${p.round + 1}: ${activityFor(ev.name, ev.input)}`;
+  if (ev.type === "round") {
+    p.round = ev.round;
+    if (!ev.tools) { p.writing = true; p.step = "Writing up the flags"; }
+    else if (p.round === 1 || !p.step.startsWith("Analyst")) p.step = `Analyst, step ${p.round + 1}: searching the catalogue and fetching data`;
+  }
+  paintProgress();
+}
+function paintProgress() {
+  const p = progress;
+  if (!p?.box.isConnected) return;
+  const secs = (Date.now() - p.t0) / 1000;
+  // Steps: the baseline is about a fifth; the analyst usually takes 5 to 8 rounds; writing up is the last bit.
+  const stepFrac = p.writing ? 0.92 : p.round ? 0.2 + 0.65 * (1 - Math.exp(-p.round / 3)) : p.base ? 0.2 * (p.baseDone / p.base) : 0.02;
+  const frac = Math.min(0.96, Math.max(stepFrac, 0.9 * Math.min(1, secs / p.est) * (p.writing ? 1 : 0.9)));
+  p.box.querySelector(".progress-bar span").style.width = `${Math.round(frac * 100)}%`;
+  p.box.querySelector(".progress-bar").setAttribute("aria-valuenow", String(Math.round(frac * 100)));
+  const over = secs > p.est * 1.3;
+  p.box.querySelector(".progress-step").textContent = `${p.step}… · ${Math.round(secs)} s${over ? " · taking longer than usual: busy areas need more searches" : ""}`;
+}
+// record: the finished run (its time is kept for the next estimate), or null when the turn failed.
+function stopProgress(record) {
+  const p = progress;
+  if (!p) return;
+  clearInterval(p.timer);
+  progress = null;
+  if (record) {
+    const secs = Math.round((Date.now() - p.t0) / 1000);
+    record.tobler_run.screen_seconds = secs;
+    const all = pastTimes();
+    all[p.kind] = [...(all[p.kind] || []), secs].slice(-5);
+    store.set(timesKey, JSON.stringify(all));
+  }
+  p.box.remove();
+}
+
 // ---- run cards: a screening run, flags first --------------------------------------------------
 const fmtKm = (km) => (km == null ? "" : km === 0 ? "on site" : U.dist(km));
 const runs = new Map(); // run id → { record, card }
@@ -693,7 +794,7 @@ function showRun(record) {
   runs.set(r.id, entry);
   card.dataset.run = r.id;
   card.querySelector(".site").textContent = r.site.name;
-  card.querySelector(".meta").textContent = `${r.id} · NTR ${r.skill.version} · ${new Date(r.finished_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  card.querySelector(".meta").textContent = `${r.id} · NTR ${r.skill.version} · ${new Date(r.finished_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${r.screen_seconds ? ` · took ${r.screen_seconds} s` : ""}`;
   card.querySelector(".setup").textContent = [
     `${r.site.asset_label[0].toUpperCase()}${r.site.asset_label.slice(1)}${r.site.asset_assumed ? " (assumed)" : ""}`, r.site.stage, r.site.setting, r.site.footprint,
   ].filter(Boolean).join(" · ");
@@ -931,7 +1032,13 @@ function fitPadding() {
 // ---- conversation ---------------------------------------------------------------------
 function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
 function note(text) { $("conversation").append(el("p", text, "msg note")); }
-function activity(text, isBusy = false) { const a = $("activity"); a.textContent = text; a.classList.toggle("busy", isBusy); }
+// The activity line under the conversation: a spinning globe while the analyst works, the text beside it.
+function activity(text, isBusy = false) {
+  const a = $("activity");
+  a.querySelector(".activity-text").textContent = text;
+  a.classList.toggle("busy", isBusy);
+  a.classList.toggle("empty", !text);
+}
 
 // The last few exchanges as plain text; tool results are never replayed (see converse.js).
 const recent = [];
@@ -1042,6 +1149,7 @@ async function send(text) {
     turnLog.error = String(err.message || err);
     activity("");
   } finally {
+    stopProgress(null);
     busy = false;
     pendingReply = null;
     runLog = null; runSteps = null;

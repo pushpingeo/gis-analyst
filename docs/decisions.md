@@ -2,6 +2,28 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (21:00): UX pass: screening progress, globe, tools by the input, hint placement (Rob)
+- **A screen says it takes time, with an estimate.** When `screen_site` starts, the reply shows a progress block
+  at once: "Screening Area 1. This usually takes about 70 seconds (typical for an offshore site)…", a bar and
+  the step in hand with seconds so far. The estimate is the median of this browser's last screens of the same
+  kind (offshore, onshore, inside only; kept in `tobler.screenTimes`, last 5 each), or a typical figure until
+  there are two (offshore 70 s, onshore 100 s, inside 45 s, from the smoke tests). The bar is a proxy: the
+  baseline is the first fifth, then the analyst's rounds (usually 5–8), then the write-up, never ahead of what's
+  done and never past 96%; past 1.3× the estimate it says "taking longer than usual". The card's header then
+  says how long it took. Engine events added: `screen_start`, `baseline`.
+- **A spinning globe** replaces the pulsing dot in the activity line (meridians sweep while busy; still when idle).
+- **Drawing tools moved from the map to a tray above the input**, opened by a Draw button at the left of the
+  input (or the "Draw an area" chip). "Done" closes it. The map's top-right corner now belongs to the map key,
+  which used to sit on top of the tools. On a phone the sheet still folds down while drawing, and the tray stays
+  in view with the input.
+- **The hint moved out from behind the panel**: on desktop it sits at the foot of the map, centred on the part
+  the panel doesn't cover; on a phone, at the top. It carries Cancel while drawing and "Delete shape" when a shape
+  is selected (the toolbar's select and delete buttons went with the toolbar).
+- No ids in progress or activity lines ("Fetching heritage data for Area 1", not "Fetching D2").
+- Tested: headless Chrome `scripts/browser-run-card.mjs` 63 checks at desktop and phone sizes (tray, Cancel,
+  Done, hint clear of the panel, Delete on a selected shape, progress block with estimate and step, globe, no
+  ids, progress gone and the time on the card), all unit suites.
+
 ## 18 Nov 2026 (20:00): inside-the-area option for area screens; the settings gear (Rob)
 - **Area screens default to the area and its surroundings** (unchanged: fetched out to the wider band). Rob asked
   for the option to keep a screen within the polygon. Two ways in, one idea:
