@@ -52,6 +52,8 @@ export function firstMessage({ siteName, describe, inputs, distances, footprintN
     inputs.tip_height_m ? `Turbine tip height: ${inputs.tip_height_m} m.` : null,
     `Distances from the footprint edge: ${distancesLine(distances)}. Why: ${distances.reasons.join("; ")}.`,
     inputs.focus ? `The person asked especially about: ${inputs.focus}.` : null,
+    describe.offshore && describe.coast_km != null && describe.coast_km > distances.wider
+      ? `No land within the wider band (the coast is about ${Math.round(describe.coast_km)} km away): settlements, schools, clinics, roads and other onshore receptors are out of reach. Don't search for them and don't list them as gaps; coastal communities matter only as spill reach beyond the bands.` : null,
     baseline ? `Already checked by the run before you started (don't fetch these again; they are evidence like anything you fetch, and failures are gaps):\n${baseline}` : null,
     `Refer to the site as "${siteName}" in tool calls.`,
   ];
@@ -164,7 +166,9 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       return out;
     } catch (e) {
       calls.push({ tool: name, input: i, ms: Date.now() - t0, error: String(e.message || e).slice(0, 200) });
-      if (name === "get_data" || name === "find_features_near") checked.push({ evidence: i.theme || "", dataset: i.dataset || i.feature_type, result: "not checked", why: String(e.message || e).slice(0, 200) });
+      // A mistyped id (a candidate's C1 passed as a dataset) is the analyst's slip, not a source that wasn't checked.
+      const realSource = name === "find_features_near" || (name === "get_data" && tools.datasets?.has?.(String(i.dataset || "").toUpperCase()));
+      if (realSource) checked.push({ evidence: i.theme || "", dataset: i.dataset || i.feature_type, result: "not checked", why: String(e.message || e).slice(0, 200) });
       throw e;
     }
   };
@@ -180,16 +184,23 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     return `- ${c.dataset} (${c.publisher || "?"}): ${c.result === "features" ? `${c.count} within ${distances.wider} km; nearest ${near.join("; ")}` : c.result}${c.why ? ` (${c.why})` : ""}`;
   };
   try {
+    const tb = Date.now();
     const nb = await nearestBoundaries({ ref: host.ref, site: fp.feature, withinKm: distances.wider, atlas: host.atlas || null, sea, now });
+    onEvent({ type: "tool", name: "nearest_boundaries", input: { within_km: distances.wider, sea }, ms: Date.now() - tb, baseline: true,
+      output: { found: nb.evidence.map((e) => `${e.name} (${e.type}) ${e.distance_km} km`), checked: nb.checked.map((c) => `${c.dataset}: ${c.result}${c.why ? ` (${c.why})` : ""}`) } });
     capture(nb.evidence, { theme: "context" });
     for (const c of nb.checked) { checked.push(c); baselineLines.push(summarise(c)); }
   } catch (e) { checked.push({ evidence: "transboundary", dataset: "boundaries", result: "not checked", why: String(e.message || e).slice(0, 160) }); }
   const sb = turf.bbox(fp.feature);
   const layers = (host.trusted?.baseline || []).filter((b) => (b.setting !== "sea" || sea) && !(sb[2] < b.where[0] || sb[0] > b.where[2] || sb[3] < b.where[1] || sb[1] > b.where[3]));
   const before = checked.length;
-  await Promise.allSettled(layers.map((b) => {
+  await Promise.allSettled(layers.map(async (b) => {
     const id = tools.useDataset({ id: b.atlas_id, title: b.title, publisher: b.publisher, licence: b.licence, capabilities: ["query"], concepts: [] }, "B");
-    return exec("get_data", { dataset: id, place: site.name, theme: b.theme }).catch(() => null);
+    const input = { dataset: id, place: site.name, theme: b.theme };
+    const t0 = Date.now();
+    onEvent({ type: "tool_start", name: "get_data", input });
+    try { const output = await exec("get_data", input); onEvent({ type: "tool", name: "get_data", input, output, ms: Date.now() - t0, baseline: true }); }
+    catch (e) { onEvent({ type: "tool", name: "get_data", input, error: String(e.message || e), ms: Date.now() - t0, baseline: true }); }
   }));
   for (const c of checked.slice(before)) baselineLines.push(summarise(c));
   const baselineCalls = calls.length;

@@ -83,11 +83,25 @@ const kindOf = (geom) => (geom.type === "Point" ? "Point" : /LineString/.test(ge
 const placeByName = (name) => [...places.values()].find((p) => p.name.toLowerCase() === String(name).trim().toLowerCase());
 const featureOf = (id) => { const f = draw.getSnapshotFeature(id); return f && { type: "Feature", properties: {}, geometry: f.geometry }; };
 
+// Multi-part outlines (a field or protected area published in pieces, e.g. Bonga Main, 18 Nov): the drawing tool
+// edits single shapes only, so it holds the largest part and the place keeps the rest beside it. The place, the map,
+// the card and every analysis use the whole outline.
+function splitParts(geometry) {
+  const single = { MultiPolygon: "Polygon", MultiLineString: "LineString" }[geometry.type];
+  if (!single) return { main: geometry, extra: [] };
+  const parts = geometry.coordinates.map((c) => ({ type: single, coordinates: c }));
+  const size = (g) => (single === "Polygon" ? turf.area(g) : turf.length(turf.feature(g)));
+  parts.sort((a, b) => size(b) - size(a));
+  return { main: parts[0], extra: parts.slice(1) };
+}
+const withExtras = (p, geometry) => (p?.extraParts?.length && geometry.type === p.extraParts[0].type
+  ? { type: `Multi${geometry.type}`, coordinates: [geometry.coordinates, ...p.extraParts.map((g) => g.coordinates)] } : geometry);
+
 // Scale is worked out, never asked: from the request if it says, else the shape's size; a point has no size,
 // so a drawn point takes its scale from the zoom level when it was dropped. The person can change it on the card.
-function newPlace(id, feature, { status = "drawn", origin = { method: "drawn", at: new Date().toISOString() }, scale = null } = {}) {
+function newPlace(id, feature, { status = "drawn", origin = { method: "drawn", at: new Date().toISOString() }, scale = null, extraParts = [] } = {}) {
   const kind = kindOf(feature.geometry);
-  const p = { id, kind, name: `${kind} ${++counts[kind]}`, feature, status, origin, edits: [], scaleFrom: "size" };
+  const p = { id, kind, name: `${kind} ${++counts[kind]}`, feature, status, origin, edits: [], scaleFrom: "size", extraParts };
   if (scale && R.SCALES[scale]) { p.scale = scale; p.scaleFrom = "request"; }
   else if (kind === "Point" && origin.method === "drawn") { p.scale = R.scaleForKm(R.viewKm(viewBounds())); p.scaleFrom = "zoom"; }
   places.set(id, p);
@@ -106,7 +120,7 @@ function start() {
   // Your places, drawn as ranging-pole bands. Terra Draw's own layers sit above these, for handles.
   map.addSource("aoi", { type: "geojson", data: turf.featureCollection([]) });
   const proposed = ["==", ["get", "status"], "proposed"];
-  map.addLayer({ id: "aoi-fill", type: "fill", source: "aoi", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": C.pole, "fill-opacity": ["case", proposed, 0.04, 0.07] } });
+  map.addLayer({ id: "aoi-fill", type: "fill", source: "aoi", filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], paint: { "fill-color": C.pole, "fill-opacity": ["case", proposed, 0.04, 0.07] } });
   map.addLayer({ id: "aoi-halo", type: "line", source: "aoi", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": C.ink, "line-width": 6.5, "line-opacity": ["case", proposed, 0.45, 0.85] } });
   map.addLayer({ id: "aoi-white", type: "line", source: "aoi", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": C.white, "line-width": 4.5 } });
   map.addLayer({ id: "aoi-red", type: "line", source: "aoi", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": C.pole, "line-width": 4.5, "line-dasharray": [1.6, 1.6], "line-opacity": ["case", proposed, 0.6, 1] } });
@@ -123,7 +137,7 @@ function start() {
   map.addSource("rings", { type: "geojson", data: turf.featureCollection([]) });
   map.addLayer({ id: "rings-line", type: "line", source: "rings", paint: { "line-color": C.ink, "line-width": 1, "line-opacity": 0.35, "line-dasharray": [3, 3] } });
   map.addSource("findings", { type: "geojson", data: turf.featureCollection([]) });
-  map.addLayer({ id: "find-fill", type: "fill", source: "findings", filter: ["==", ["geometry-type"], "Polygon"],
+  map.addLayer({ id: "find-fill", type: "fill", source: "findings", filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
     layout: { "fill-sort-key": ["-", 0, ["coalesce", ["get", "area_km2"], 0]] },
     // Operating context (blocks, licences, infrastructure) is background: outlines with a whisper of fill.
     paint: { "fill-color": themeColour, "fill-opacity": ["case", big, 0.03, ["==", ["get", "theme"], "context"], ["*", 0.05, emphasis], ["*", 0.14, emphasis]] } });
@@ -192,7 +206,7 @@ function scheduleRefresh() {
     refreshQueued = false;
     const feats = draw.getSnapshot().filter((f) => places.has(f.id) || !isGuide(f)).map((f) => {
       const p = places.get(f.id);
-      return { type: "Feature", geometry: f.geometry, properties: { label: p ? `${p.name}${p.status === "proposed" ? " (proposed)" : ""}` : "", status: p?.status || "" } };
+      return { type: "Feature", geometry: withExtras(p, f.geometry), properties: { label: p ? `${p.name}${p.status === "proposed" ? " (proposed)" : ""}` : "", status: p?.status || "" } };
     });
     map.getSource("aoi")?.setData(turf.featureCollection(feats));
   });
@@ -336,6 +350,7 @@ function onFinish(id, ctx) {
   }
   const p = places.get(id);
   if (!p) return;
+  feature.geometry = withExtras(p, feature.geometry);
   const change = G.describeChange(p.feature, feature);
   p.feature = feature;
   if (change) logEdit(p, `${change} (on the map)`);
@@ -366,7 +381,9 @@ function removePlace(id) { draw.removeFeatures([id]); onDeleted(id); scheduleRef
 // Editing from the card or the analyst goes through the same deterministic functions.
 function applyGeometry(p, raw, words) {
   const feature = G.roundCoords(raw);
-  try { draw.updateFeatureGeometry(p.id, feature.geometry); } catch (e) { activity(`That edit didn't work: ${e.message}`); return false; }
+  const { main, extra } = splitParts(feature.geometry);
+  try { draw.updateFeatureGeometry(p.id, main); } catch (e) { activity(`That edit didn't work: ${e.message}`); return false; }
+  p.extraParts = extra;
   p.feature = { type: "Feature", properties: {}, geometry: feature.geometry };
   logEdit(p, words);
   refreshCard(p);
@@ -407,9 +424,11 @@ const host = {
   addPlace({ feature, origin, scale }) {
     const id = crypto.randomUUID();
     const mode = feature.geometry.type === "Point" ? "point" : /LineString/.test(feature.geometry.type) ? "linestring" : "polygon";
-    const bad = draw.addFeatures([{ id, type: "Feature", geometry: feature.geometry, properties: { mode } }]).find((v) => !v.valid);
+    const { main, extra } = splitParts(feature.geometry);
+    const bad = draw.addFeatures([{ id, type: "Feature", geometry: main, properties: { mode } }]).find((v) => !v.valid);
     if (bad) throw new Error(`The shape couldn't be drawn: ${bad.reason}`);
-    const p = newPlace(id, feature, { status: "proposed", origin, scale });
+    const p = newPlace(id, feature, { status: "proposed", origin, scale, extraParts: extra });
+    if (extra.length) logEdit(p, `Published in ${extra.length + 1} parts; the map's edit handles move the largest part only.`);
     zoomTo(p);
     return p;
   },
@@ -437,13 +456,19 @@ let distTable = null;
 let runLog = null, runSteps = null; // the turn a run belongs to, for the log and "How I worked this out"
 host.screening = createScreening({
   host, table: () => distTable, skill: () => skills["ntr-screening"], callClaude, model: CONFIG.model,
-  onRun: (record) => showRun(record),
+  onRun: (record) => {
+    const r = record.tobler_run;
+    // The log keeps what the card shows, so a downloaded log explains the card on its own.
+    runLog?.events.push({ screen_result: { run: r.id, distances: r.distances, baseline: r.baseline, flags: r.flags.map((f) => ({ risk: f.risk, theme: f.theme, confidence: f.confidence, nearest_km: f.nearest_km, evidence: f.evidence.map((e) => `${e.name} ${e.distance_km} km${e.traced ? "" : " (not traced)"}`) })),
+      checked: r.checked.map((c) => `${c.dataset}: ${c.result}${c.count ? ` ${c.count}` : ""}${c.why ? ` (${c.why})` : ""}`), gaps: r.data_gaps, ...(r.parse_error ? { problem: r.parse_error } : {}) } });
+    showRun(record);
+  },
   onEvent: (ev) => {
     if (ev.type === "tool_start") activity(`Screening: ${activityFor(ev.name, ev.input)}…`, true);
     if (ev.type === "round") runLog?.events.push({ screen_model_round: ev.round, ms: ev.ms, tokens_in: ev.input_tokens, tokens_out: ev.output_tokens, tool_calls: ev.tools });
     if (ev.type === "tool") {
-      runLog?.events.push({ screen_tool: ev.name, input: ev.input, ms: ev.ms, ...(ev.error ? { error: ev.error } : { output: ev.output }) });
-      runSteps?.append(el("li", `Screen: ${traceLine(ev)}`, ev.error ? "err" : ""));
+      runLog?.events.push({ screen_tool: ev.name, ...(ev.baseline ? { baseline: true } : {}), input: ev.input, ms: ev.ms, ...(ev.error ? { error: ev.error } : { output: ev.output }) });
+      runSteps?.append(el("li", `Screen${ev.baseline ? " (baseline)" : ""}: ${ev.name === "nearest_boundaries" ? `Checked boundaries within ${ev.input.within_km} km: ${ev.output?.found?.length ? ev.output.found.join("; ") : "none in reach"}` : traceLine(ev)}`, ev.error ? "err" : ""));
     }
   },
 });

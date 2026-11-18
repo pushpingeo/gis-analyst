@@ -341,4 +341,16 @@ await test("onshore far from the sea: no maritime call, a neighbouring country i
   assert.match(out.checked.find((c) => /Maritime/.test(c.dataset)).why, /no sea within 20 km/);
 });
 
+
+await test("a mistyped dataset id isn't reported as a source not checked; offshore far from land says so; baseline is logged", async () => {
+  const model = scriptedModel([toolTurn(use("x", "get_data", { dataset: "C1", place: "Area 1" })), final(RESULT())]);
+  const events = [];
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const rec = await runScreening({ host: host(), site, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "x" }, onEvent: (e) => events.push(e) });
+  assert.ok(!rec.tobler_run.checked.some((c) => c.dataset === "C1" || c.dataset === undefined), JSON.stringify(rec.tobler_run.checked.map((c) => c.dataset)));
+  assert.match(model.calls[0].messages[0].content, /No land within the wider band \(the coast is about \d+ km away\)/);
+  assert.ok(events.some((e) => e.type === "tool" && e.name === "nearest_boundaries" && e.baseline));
+  assert.ok(events.filter((e) => e.type === "tool" && e.name === "get_data" && e.baseline).length >= 5);
+});
+
 console.log(`${passed} ntrrun tests passed`);

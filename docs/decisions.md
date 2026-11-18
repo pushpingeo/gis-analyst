@@ -2,6 +2,23 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (17:00): fixes from Rob's Bonga log
+- **Multi-part outlines.** Bonga Main (Nigeria's ministry layer) is a MultiPolygon; the drawing tool takes single
+  shapes only, so `make_place` failed and the analyst fell back to a pin (a 77 km² field screened as a 5 km circle).
+  Now the drawing tool holds the largest part and the place keeps the rest (`extraParts`); the place, the map, the
+  card, edits from chat and screening use the whole outline; the card notes "published in N parts". Map fill
+  layers take MultiPolygons too. Browser-tested headless: a two-part outline draws whole and survives a chat edit.
+- **A mistyped id isn't a gap.** The analyst passed a candidate (C1) to `get_data`; the run listed "C1" as a
+  source not checked. Now only real datasets and feature searches count as checked or not checked.
+- **No land in reach.** Offshore with the coast beyond the wider band (Bonga: 124 km), the first message says
+  onshore receptors are out of reach, so the analyst doesn't search for settlements or list them as gaps.
+- **The log explains the card.** Baseline checks (boundaries and baseline layers) now appear in the session log and
+  in "How I worked this out", marked baseline; the run's flags, checked list and gaps go in the log too.
+- Seen, not fixed: the analyst flagged "fishing-protection area overlaps site" from ProtectedSeas' global Level of
+  Fishing Protection layer (one unnamed polygon, no attributes shown; the layer scores 1–5 and covers whole seas),
+  probably a false flag. The global WDPA in the atlas says "No commercial use" (as does WDPA's own licence): the
+  EMODnet WDPA baseline layer carries the same underlying terms. Both raised with Rob.
+
 ## 18 Nov 2026 (late morning): screening baseline in code, boundaries, disclaimer (Rob)
 - Rob: KBAs aren't the only biodiversity source, and a site near an international boundary is an NTR (effects spill
   over). Split agreed: **catalogue** names the must-check layers (`catalogue/trusted.json` "baseline"), **tools** fetch
