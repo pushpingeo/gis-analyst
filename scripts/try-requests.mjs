@@ -51,9 +51,15 @@ for (const conv of convs) {
     fetchFn: (url, opts = {}) => fetch(url, { ...opts, headers: { ...UA, ...(opts.headers || {}) } }),
     atlas: process.env.ATLAS_MCP_KEY ? (tool, args) => atlasCall(tool, args) : null,
     places: () => list,
-    findPlace: (n) => list.find((p) => p.name.toLowerCase() === String(n).toLowerCase()),
+    // As in the page: a place answers to its name and to the "Area N" it was counted as.
+    findPlace: (n) => list.find((p) => p.name.toLowerCase() === String(n).toLowerCase()) || list.find((p) => p.alias.toLowerCase() === String(n).toLowerCase()),
     skillText: (n) => (allSkills.find((x) => x.name === n) || skill).body,
-    addPlace({ feature, origin }) { const p = { name: `Area ${list.length + 1}`, feature, origin, status: "proposed", edits: [] }; list.push(p); return p; },
+    addPlace({ feature, origin, name }) {
+      const alias = `Area ${list.length + 1}`;
+      let nm = name || alias;
+      for (let k = 2; name && list.some((q) => q.name.toLowerCase() === nm.toLowerCase()); k++) nm = `${name} (${k})`;
+      const p = { name: nm, alias, feature, origin, status: "proposed", edits: [] }; list.push(p); return p;
+    },
     updatePlace(name, feature, words) { const p = this.findPlace(name); p.feature = feature; p.edits.push({ change: words }); },
     renamePlace(name, to) { this.findPlace(name).name = to; },
   };
