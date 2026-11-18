@@ -102,7 +102,7 @@ a { color: var(--sea); }
 .shape { border: 1px solid var(--rule); border-radius: 14px; padding: 12px 14px 10px; background: var(--panel); transition: border-color .2s, box-shadow .2s; }
 .shape.active { border-color: var(--pole); box-shadow: 0 0 0 3px var(--pole-wash); }
 .shape.gone { opacity: .55; }
-.shape.gone .edit, .shape.gone .scale { display: none; }
+.shape.gone .actions, .shape.gone .adjust, .shape.gone .scale { display: none; }
 .shape header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
 .shape h2 { margin: 0; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .shape h2 .swatch { width: 14px; height: 14px; border-radius: 3px; border: 2px solid var(--pole); background: repeating-linear-gradient(135deg, var(--pole-wash) 0 3px, #fff 3px 6px); }
@@ -135,10 +135,21 @@ a { color: var(--sea); }
 .shape header .badge:empty { display: none; }
 .shape .badge { font-size: 12px; font-weight: 650; color: var(--pole); margin-right: auto; }
 .shape.proposed { border-style: dashed; }
-.proposal { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--rule); }
-.proposal p { margin: 0 6px 0 0; font-size: 13.5px; font-weight: 600; flex-basis: 100%; }
-.proposal button { border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 5px 12px; font-size: 13.5px; }
-.proposal .primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+/* One row of actions on a shape card; Adjust opens the move, reshape, rotate and resize controls below it. */
+.shape .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--rule); }
+.shape .actions .question { margin: 0 6px 0 0; font-size: 13.5px; font-weight: 600; flex-basis: 100%; }
+.shape .actions button { border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 5px 12px; font-size: 13.5px; cursor: pointer; }
+.shape .actions button:hover { border-color: var(--ink-2); }
+.shape .actions .primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+.shape .actions [data-op="adjust"].on { background: var(--pole-wash); border-color: var(--pole); }
+.shape .actions button { padding: 5px 11px; }
+.shape .actions .icon { width: 32px; height: 32px; padding: 7px; border-color: transparent; background: none; color: var(--ink-2); }
+.shape .actions .icon:hover { color: var(--ink); border-color: var(--rule); }
+.shape .actions .zoom { margin-left: auto; }
+.shape .actions .icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.shape .adjust { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--paper); }
+.shape .adjust-help { margin: 0 0 8px; font-size: 13px; color: var(--ink-2); }
+.shape .adjust .done { margin-left: auto; font-weight: 600; color: var(--sea); }
 .origin { margin: 0 0 8px; font-size: 13px; }
 .origin summary { cursor: pointer; color: var(--sea); }
 .origin div { padding: 6px 0 0 12px; border-left: 2px solid var(--rule); margin-top: 6px; }
@@ -278,9 +289,7 @@ a { color: var(--sea); }
 .run details .nc { color: #9a3412; }
 .run .edit { margin-top: 8px; }
 .run .flag summary { color: var(--ink); }
-.shape .card-delete { width: 26px; height: 26px; padding: 4px; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--ink-2); flex: none; }
-.shape .card-delete:hover { color: var(--pole); border-color: var(--rule); }
-.shape .card-delete svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.shape .actions .card-delete:hover { color: var(--alert); }
 .shape.gone .card-delete { display: none; }
 .shape h2 { white-space: nowrap; }
 .run .disclaimer { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--rule); font-size: 11.5px; line-height: 1.4; color: var(--ink-2); }

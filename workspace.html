@@ -9,7 +9,7 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=f13388e0">
+<link rel="stylesheet" href="css/workspace.css?v=67addf15">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
@@ -37,7 +37,7 @@
   "./js/units.js": "./js/units.js?v=77029a89",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=bd279b38",
+  "./js/workspace.js": "./js/workspace.js?v=17166e2d",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -66,7 +66,7 @@
 <body>
 <div id="map" aria-label="Map"></div>
 
-<div class="hint" id="hint" hidden><span class="hint-text"></span><button type="button" data-hint="cancel" hidden>Cancel</button><button type="button" data-hint="delete" hidden>Delete shape</button></div>
+<div class="hint" id="hint" hidden><span class="hint-text"></span><button type="button" data-hint="cancel" hidden>Cancel</button></div>
 
 <details class="key" id="key" hidden open>
   <summary>On the map</summary>
@@ -183,23 +183,30 @@
         <button role="radio" data-scale="regional">Regional</button>
         <button role="radio" data-scale="global">Global</button>
       </div>
-      <button type="button" class="card-delete" data-op="delete" title="Delete this shape" aria-label="Delete this shape">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>
     </header>
     <p class="summary"></p>
     <details class="origin"><summary></summary><div></div></details>
     <dl class="facts"></dl>
-    <div class="edit">
-      <button data-op="zoom">Zoom to</button>
-      <button data-op="rotate" data-deg="-15" title="Rotate 15° anticlockwise" aria-label="Rotate 15 degrees anticlockwise">↺ 15°</button>
-      <button data-op="rotate" data-deg="15" title="Rotate 15° clockwise" aria-label="Rotate 15 degrees clockwise">↻ 15°</button>
-      <form class="resize"><label><span class="sr">New size</span><input type="number" min="0" step="any" inputmode="decimal"></label><span class="unit"></span><button>Resize</button></form>
-    </div>
     <ol class="history"></ol>
-    <div class="proposal" hidden>
-      <p>Is this the area you meant?</p>
-      <button data-op="accept" class="primary">Use this area</button>
-      <button data-op="revise">Not quite</button>
+    <!-- One row of actions; moving, reshaping, rotating and resizing only show after Adjust. -->
+    <div class="actions">
+      <p class="question" hidden>Is this the area you meant?</p>
+      <button type="button" data-op="accept" class="primary" hidden>Use this area</button>
+      <button type="button" data-op="revise" hidden>Not quite</button>
+      <button type="button" data-op="adjust" aria-expanded="false">Adjust</button>
+      <button type="button" class="icon zoom" data-op="zoom" title="Zoom to this shape" aria-label="Zoom to this shape">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg></button>
+      <button type="button" class="icon card-delete" data-op="delete" title="Delete this shape" aria-label="Delete this shape">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>
+    </div>
+    <div class="adjust" hidden>
+      <p class="adjust-help"></p>
+      <div class="edit">
+        <button type="button" data-op="rotate" data-deg="-15" title="Rotate 15° anticlockwise" aria-label="Rotate 15 degrees anticlockwise">↺ 15°</button>
+        <button type="button" data-op="rotate" data-deg="15" title="Rotate 15° clockwise" aria-label="Rotate 15 degrees clockwise">↻ 15°</button>
+        <form class="resize"><label><span class="sr">New size</span><input type="number" min="0" step="any" inputmode="decimal"></label><span class="unit"></span><button>Resize</button></form>
+        <button type="button" data-op="adjust-done" class="done">Done</button>
+      </div>
     </div>
   </article>
 </template>
@@ -257,6 +264,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=bd279b38"></script>
+<script type="module" src="js/workspace.js?v=17166e2d"></script>
 </body>
 </html>

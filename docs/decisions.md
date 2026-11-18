@@ -2,6 +2,17 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (21:45): shape cards: Adjust instead of a banner (Rob)
+- Rob found the drag/reshape/delete banner too prominent. Now the banner shows only while drawing (with Cancel).
+- Each shape card has one row: "Use this area" and "Not quite" (while proposed), **Adjust**, then a zoom icon
+  and the bin (moved down from the header). Adjust turns on the shape's drag handles on the map and opens a small
+  panel on the card: how to drag and reshape, the rotate buttons and the resize box (all moved in from the always-on
+  row), and Done. Adjust again, Done, Escape or a click on the empty map ends it.
+- Clicking a shape on the map no longer gives it handles: it just brings its card forward and makes it the place
+  in focus, so a stray drag can't move a site. A newly drawn shape is focused, not selected.
+- Tested: headless Chrome 67 checks at desktop and phone sizes (card row, click focuses without handles, Adjust
+  gives handles and controls without a banner, Done closes).
+
 ## 18 Nov 2026 (21:30): places named after what they were built from (Rob)
 - Rob expected names, not "Area 1". The 17 Nov fix had put feature names on the map labels for findings; places
   themselves were still counted ("Area 1", "Point 2"). Now `make_place` names a place after its anchor and shape:

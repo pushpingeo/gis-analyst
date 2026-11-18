@@ -90,12 +90,27 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   check(await page.evaluate(() => document.getElementById("tools").hidden), `${label}: Done closes the tray`);
   await page.evaluate((f) => window.__ws.host.addPlace({ feature: f, origin: { method: "words", words: "Rosebank", confidence: "high", anchor: { name: "Rosebank", source: { title: "UKCS offshore hydrocarbon fields (WGS84)", publisher: "North Sea Transition Authority", licence: "not stated" } }, steps: ["outline of Rosebank"], at: new Date().toISOString() } }), SQUARE);
   if (label === "phone") await page.evaluate(() => document.getElementById("panel").classList.remove("collapsed"));
+  // A shape card: one row of actions; a click on the shape only focuses its card; Adjust gives handles and controls.
+  const card = () => page.evaluate(() => { const c = document.querySelector(".shape"); const ws = window.__ws; return {
+    accept: !c.querySelector('[data-op="accept"]').hidden, delInRow: !!c.querySelector('.actions [data-op="delete"]'), adjustOpen: !c.querySelector(".adjust").hidden,
+    help: c.querySelector(".adjust-help").textContent, hint: !document.getElementById("hint").hidden, active: c.classList.contains("active"),
+    selected: ws.draw.getSnapshot().some((f) => f.properties?.selected) }; });
+  let c = await card();
+  check(c.accept && c.delInRow && !c.adjustOpen && !c.hint, `${label}: card: Use this area, Adjust and delete in one row; no banner`);
   await page.evaluate(() => { const id = [...window.__ws.places.keys()][0]; window.__ws.draw.selectFeature(id); });
-  h = await page.evaluate(() => ({ del: !document.querySelector('#hint [data-hint="delete"]').hidden, text: document.querySelector("#hint .hint-text").textContent }));
-  check(h.del && /reshape/.test(h.text), `${label}: selected shape: reshape hint with Delete`);
-  check(label === "phone" || !overlap(await rect("#hint"), await rect("#panel")), `${label}: reshape hint clear of the panel`);
-  await page.screenshot({ path: `/tmp/ux-${label}-selected.png` });
-  await page.evaluate(() => window.__ws.draw.deselectFeature?.() ?? window.__ws.draw.setMode("select"));
+  await page.waitForTimeout(150);
+  c = await card();
+  check(c.active && !c.selected && !c.hint && !c.adjustOpen, `${label}: clicking the shape focuses its card, no handles, no banner`);
+  await page.click('.shape [data-op="adjust"]');
+  await page.waitForTimeout(150);
+  c = await card();
+  check(c.adjustOpen && c.selected && !c.hint && /reshape/.test(c.help), `${label}: Adjust: handles on, rotate and resize shown, help on the card, no banner`);
+  await page.$eval(".shape", (e) => e.scrollIntoView({ block: "end" }));
+  await page.screenshot({ path: `/tmp/ux-${label}-adjust.png` });
+  await page.click('.shape [data-op="adjust-done"]');
+  await page.waitForTimeout(150);
+  c = await card();
+  check(!c.adjustOpen && !c.selected, `${label}: Done: controls closed, handles off`);
   await page.fill("#say", "Screen Area 1 for risks");
   await page.click("#ask button[type=submit]");
   await page.waitForSelector(".progress", { timeout: 20000 });

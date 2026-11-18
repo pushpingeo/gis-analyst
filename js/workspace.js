@@ -379,8 +379,8 @@ const HINTS = {
   circle: "Click the centre, then click again to set the size.",
 };
 const SELECTED_HINT = matchMedia("(pointer: coarse)").matches
-  ? "Drag to move. Drag a corner to reshape, or a midpoint to add one. Rotate and resize from the card."
-  : "Drag to move. Drag a corner to reshape, or a midpoint to add one. Shift-drag to rotate.";
+  ? "Drag the shape on the map to move it. Drag a corner to reshape, or a midpoint to add one. Rotate and resize with the buttons below."
+  : "Drag the shape on the map to move it. Drag a corner to reshape, or a midpoint to add one. Shift-drag to rotate, or use the buttons below.";
 
 function setMode(mode) {
   draw.setMode(mode);
@@ -388,19 +388,47 @@ function setMode(mode) {
   if (mode !== "select") openTray(true);
   showHint();
 }
-// The hint over the map: how to draw or reshape, with Cancel while drawing and Delete for the selected shape
-// (the map's own toolbar is gone; the tools live by the conversation input).
+// The hint over the map shows only while drawing, with Cancel. Moving and reshaping are explained on the card,
+// after Adjust (Rob, 18 Nov: the banner was too prominent).
 function showHint() {
   const mode = draw?.getMode() || "select";
-  const text = mode === "select" ? (selectedId ? SELECTED_HINT : "") : HINTS[mode];
+  const text = mode === "select" ? "" : HINTS[mode];
   const h = $("hint");
   h.querySelector(".hint-text").textContent = text;
   h.querySelector('[data-hint="cancel"]').hidden = mode === "select";
-  h.querySelector('[data-hint="delete"]').hidden = !(mode === "select" && selectedId);
   h.hidden = !text;
 }
 $("hint").querySelector('[data-hint="cancel"]').addEventListener("click", () => draw && setMode("select"));
-$("hint").querySelector('[data-hint="delete"]').addEventListener("click", () => { if (selectedId) removePlace(selectedId); });
+
+// Adjust: a shape gets its drag handles (and the card its rotate and resize controls) only when the person asks,
+// so a stray drag can't move it. Clicking a shape on the map just brings its card forward.
+let adjustingId = null;
+function startAdjust(p) {
+  if (!places.has(p.id) || !draw) return;
+  if (adjustingId && adjustingId !== p.id) endAdjust();
+  adjustingId = p.id;
+  if (draw.getMode() !== "select") setMode("select");
+  p.card.querySelector(".adjust").hidden = false;
+  p.card.querySelector('[data-op="adjust"]').setAttribute("aria-expanded", "true");
+  p.card.querySelector('[data-op="adjust"]').classList.add("on");
+  draw.selectFeature(p.id);
+}
+function endAdjust() {
+  const p = adjustingId && places.get(adjustingId);
+  adjustingId = null;
+  if (p) {
+    p.card.querySelector(".adjust").hidden = true;
+    p.card.querySelector('[data-op="adjust"]').setAttribute("aria-expanded", "false");
+    p.card.querySelector('[data-op="adjust"]').classList.remove("on");
+  }
+  if (selectedId && draw) { try { draw.deselectFeature(selectedId); } catch { /* already deselected */ } }
+}
+// The place being talked about: its card lights up and the Screen chip names it.
+function focusPlace(p) {
+  focusName = p.name;
+  places.forEach((q) => q.card.classList.toggle("active", q === p));
+  p.card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
 
 // The drawing tools sit in a tray above the input, opened by the Draw button beside it.
 function openTray(open) {
@@ -423,9 +451,9 @@ function onFinish(id, ctx) {
   const feature = featureOf(id);
   if (!feature) return;
   if (ctx?.action === "draw" && !places.has(id)) {
-    newPlace(id, feature);
+    const p = newPlace(id, feature);
     setMode("select");
-    draw.selectFeature(id);
+    focusPlace(p);
     return;
   }
   const p = places.get(id);
@@ -438,17 +466,26 @@ function onFinish(id, ctx) {
 }
 
 function onSelect(id) {
-  selectedId = id && places.has(id) ? id : null;
-  if (selectedId) focusName = places.get(selectedId).name;
+  const p = id && places.get(id);
+  // A click on a shape that isn't being adjusted: focus its card, leave the shape alone.
+  if (p && id !== adjustingId) {
+    if (adjustingId) endAdjust();
+    selectedId = null;
+    setTimeout(() => { try { draw.deselectFeature(id); } catch { /* gone */ } }, 0);
+    focusPlace(p);
+    return;
+  }
+  selectedId = p ? id : null;
+  if (p) focusPlace(p);
+  // Deselected (Escape, or a click on the empty map) while adjusting: adjusting ends.
+  if (!selectedId && adjustingId) endAdjust();
   document.querySelector('.tools [data-action="delete"]').disabled = !selectedId;
-  places.forEach((p) => p.card.classList.toggle("active", p.id === selectedId));
-  if (selectedId) places.get(selectedId).card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  if (draw.getMode() === "select") showHint();
 }
 
 function onDeleted(id) {
   const p = places.get(id);
   if (!p) return;
+  if (adjustingId === id) { adjustingId = null; p.card.querySelector(".adjust").hidden = true; }
   p.card.classList.add("gone");
   p.card.classList.remove("active");
   p.card.querySelector(".summary").textContent = "Deleted.";
@@ -581,6 +618,12 @@ function makeCard(p) {
   paintStatus(p, card);
 
   card.querySelector('[data-op="zoom"]').addEventListener("click", () => zoomTo(p));
+  card.querySelector(".adjust-help").textContent = p.kind === "Point" ? "Drag the point on the map to move it." : SELECTED_HINT;
+  card.querySelector('[data-op="adjust"]').addEventListener("click", () => {
+    if (adjustingId === p.id) endAdjust();
+    else { startAdjust(p); zoomTo(p); }
+  });
+  card.querySelector('[data-op="adjust-done"]').addEventListener("click", () => endAdjust());
   // Delete from the card, without going to the map's tools (handy for shapes the analyst made).
   card.querySelector('[data-op="delete"]').addEventListener("click", () => { if (places.has(p.id)) removePlace(p.id); });
   card.querySelectorAll('[data-op="rotate"]').forEach((b) => b.addEventListener("click", () => {
@@ -615,7 +658,7 @@ function makeCard(p) {
   });
   card.addEventListener("click", (e) => {
     if (e.target.closest("button, input, form, a, summary") || !places.has(p.id)) return;
-    draw.selectFeature(p.id);
+    focusPlace(p);
   });
   // A place the analyst makes goes above its reply, so the reply reads as the caption.
   if (pendingReply?.isConnected) $("conversation").insertBefore(card, pendingReply);
@@ -961,7 +1004,8 @@ function paintReach(entry) {
 
 function paintStatus(p, card = p.card) {
   card.classList.toggle("proposed", p.status === "proposed");
-  card.querySelector(".proposal").hidden = p.status !== "proposed";
+  const asking = p.status === "proposed";
+  card.querySelectorAll('.question, [data-op="accept"], [data-op="revise"]').forEach((e) => { e.hidden = !asking; });
   card.querySelector(".badge").textContent = p.status === "proposed" ? "Proposed" : "";
 }
 
@@ -1033,7 +1077,7 @@ async function refreshCard(p) {
 function zoomTo(p) {
   if (p.kind === "Point") map.flyTo({ center: p.feature.geometry.coordinates, zoom: Math.max(map.getZoom(), 11), padding: fitPadding() });
   else map.fitBounds(turf.bbox(p.feature), { padding: fitPadding(), maxZoom: 15 });
-  if (places.has(p.id) && draw.getMode() === "select") draw.selectFeature(p.id);
+  if (places.has(p.id)) focusPlace(p);
 }
 function fitPadding() {
   if (innerWidth <= 720) return { top: 130, bottom: Math.min(innerHeight * 0.55, 420), left: 50, right: 50 };
