@@ -2,6 +2,14 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (22:00): a quieter composer (Rob)
+- The links under the input (how the screening was tested, the earlier agent page, the code) moved into the
+  settings dialog under "About", with one line on what Tobler does and what's coming next (draft wording, for Rob).
+- Chips: "Find a place" and "Draw an area" removed (typing finds; the Draw button draws); the two "· soon" chips
+  removed (now mentioned in About). One chip remains, "Screen this location for risks", shown only once there's a
+  place; it fills "Screen <place in focus, or the latest place> for risks" in the input.
+- Tested: headless Chrome 73 checks at desktop and phone sizes.
+
 ## 18 Nov 2026 (21:45): shape cards: Adjust instead of a banner (Rob)
 - Rob found the drag/reshape/delete banner too prominent. Now the banner shows only while drawing (with Cancel).
 - Each shape card has one row: "Use this area" and "Not quite" (while proposed), **Adjust**, then a zoom icon

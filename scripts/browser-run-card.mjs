@@ -77,6 +77,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   const rect = (sel) => page.evaluate((q) => { const e = document.querySelector(q); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; }, sel);
   const overlap = (a, b) => !!(a && b && a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b);
   check(await page.evaluate(() => document.getElementById("tools").hidden), `${label}: drawing tools tucked away at first`);
+  check(await page.evaluate(() => document.querySelector(".chips").hidden && !document.querySelector(".composer .links") && !document.querySelector(".chip.soon")), `${label}: no chips before there's a place; no links or "soon" chips under the input`);
   await page.click("#drawbtn");
   await page.click('#tools [data-mode="polygon"]');
   let h = await page.evaluate(() => ({ text: document.querySelector("#hint .hint-text").textContent, cancel: !document.querySelector('#hint [data-hint="cancel"]').hidden, mode: window.__ws.draw.getMode(), tray: !document.getElementById("tools").hidden }));
@@ -95,6 +96,10 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     accept: !c.querySelector('[data-op="accept"]').hidden, delInRow: !!c.querySelector('.actions [data-op="delete"]'), adjustOpen: !c.querySelector(".adjust").hidden,
     help: c.querySelector(".adjust-help").textContent, hint: !document.getElementById("hint").hidden, active: c.classList.contains("active"),
     selected: ws.draw.getSnapshot().some((f) => f.properties?.selected) }; });
+  await page.click(".chip[data-screen]");
+  const chip = await page.evaluate(() => ({ shown: !document.querySelector(".chips").hidden, text: document.querySelector(".chip[data-screen]").textContent, say: document.getElementById("say").value }));
+  check(chip.shown && chip.text === "Screen this location for risks" && chip.say === "Screen Area 1 for risks", `${label}: one chip once there's a place; it fills the place in (${chip.say})`);
+  await page.fill("#say", "");
   let c = await card();
   check(c.accept && c.delInRow && !c.adjustOpen && !c.hint, `${label}: card: Use this area, Adjust and delete in one row; no banner`);
   await page.evaluate(() => { const id = [...window.__ws.places.keys()][0]; window.__ws.draw.selectFeature(id); });
@@ -187,6 +192,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   if (label === "phone") await page.evaluate(() => document.getElementById("panel").classList.remove("collapsed"));
   await page.click("#gear");
   await page.waitForSelector("#settings[open]");
+  check(await page.evaluate(() => document.querySelectorAll('#settings .links a[href="lab.html"]').length === 1), `${label}: About in settings links to how the screening was tested`);
   await page.screenshot({ path: `/tmp/settings-${label}.png` });
   await page.check('#settings input[name="units"][value="imperial"]');
   await page.click('#settings [data-colour="#00a0b0"]');

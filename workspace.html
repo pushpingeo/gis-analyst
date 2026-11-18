@@ -9,7 +9,7 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=67addf15">
+<link rel="stylesheet" href="css/workspace.css?v=520dbff7">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
@@ -37,7 +37,7 @@
   "./js/units.js": "./js/units.js?v=77029a89",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=17166e2d",
+  "./js/workspace.js": "./js/workspace.js?v=14250ce0",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -97,13 +97,9 @@
 
   <div class="composer">
     <p class="activity" id="activity" role="status"><svg class="globe" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M5 7.5h14M5 16.5h14"/><g class="spin"><ellipse class="m1" cx="12" cy="12" rx="9" ry="9"/><ellipse class="m2" cx="12" cy="12" rx="9" ry="9"/><ellipse class="m3" cx="12" cy="12" rx="9" ry="9"/></g></svg><span class="activity-text"></span></p>
-    <div class="chips" role="group" aria-label="What to do">
-      <button class="chip" data-prompt="Find ">Find a place</button>
-      <button class="chip" data-draw="polygon">Draw an area</button>
-      <button class="chip" data-prompt="Screen " data-screen>Screen for risks</button>
-      <button class="chip soon" data-soon aria-describedby="soon-note">Net area <span>· soon</span></button>
-      <button class="chip soon" data-soon aria-describedby="soon-note">Constraints <span>· soon</span></button>
-      <span id="soon-note" class="sr">Coming soon</span>
+    <!-- Shown only once there's a place to screen; it fills in the place in focus. -->
+    <div class="chips" role="group" aria-label="What to do" hidden>
+      <button type="button" class="chip" data-screen>Screen this location for risks</button>
     </div>
     <nav class="tools" id="tools" aria-label="Drawing tools" hidden>
       <button type="button" data-mode="point" aria-pressed="false" title="Drop a point">
@@ -131,7 +127,6 @@
       <button type="submit" class="send" title="Send">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg><span class="sr">Send</span></button>
     </form>
-    <p class="links"><a href="lab.html">How the risk screening was tested</a><a href="index.html">Earlier agent page</a><a href="https://github.com/pushpingeo/tobler">Code</a></p>
   </div>
 </section>
 
@@ -169,7 +164,12 @@
       <div class="keyrow"><label for="own-key" class="sr">Anthropic API key</label><input id="own-key" name="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"><button type="button" data-op="key-save">Use</button><button type="button" data-op="key-clear">Clear</button></div>
       <p class="hint-line" id="key-status">Optional. Without one, Tobler's shared daily allowance is used. A key is kept for this tab only and sent straight to Anthropic.</p>
     </fieldset>
-    <p class="foot">Saved in this browser only.</p>
+    <fieldset>
+      <legend>About</legend>
+      <p class="about">Tobler screens sites for non-technical risk from open data, with written-down methods. Coming next: net developable area, and constraints and access.</p>
+      <p class="links"><a href="lab.html">How the risk screening was tested</a><a href="index.html">Earlier agent page</a><a href="https://github.com/pushpingeo/tobler">Code</a></p>
+    </fieldset>
+    <p class="foot">Settings are saved in this browser only.</p>
   </form>
 </dialog>
 
@@ -264,6 +264,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=17166e2d"></script>
+<script type="module" src="js/workspace.js?v=14250ce0"></script>
 </body>
 </html>

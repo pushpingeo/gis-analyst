@@ -135,6 +135,7 @@ function newPlace(id, feature, { status = "drawn", origin = { method: "drawn", a
   if (scale && R.SCALES[scale]) { p.scale = scale; p.scaleFrom = "request"; }
   else if (kind === "Point" && origin.method === "drawn") { p.scale = R.scaleForKm(R.viewKm(viewBounds())); p.scaleFrom = "zoom"; }
   places.set(id, p);
+  paintChips();
   p.card = makeCard(p);
   focusName = p.name;
   refreshCard(p);
@@ -490,6 +491,7 @@ function onDeleted(id) {
   p.card.classList.remove("active");
   p.card.querySelector(".summary").textContent = "Deleted.";
   places.delete(id);
+  paintChips();
   remember("user", `(I deleted ${p.name}.)`);
   if (selectedId === id) onSelect(null);
 }
@@ -1232,26 +1234,18 @@ function traceLine(ev) {
   }
 }
 
-// Chips: "Find a place" starts a request; "Draw an area" switches the map to drawing;
-// the "soon" chips answer locally (nothing goes to the model).
-document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => {
-  if (c.dataset.soon !== undefined) {
-    const m = el("div", null, "msg analyst");
-    m.append(el("p", "That's coming next. For now I can find and outline the area so it's ready."));
-    $("conversation").append(m); m.scrollIntoView({ block: "end", behavior: "smooth" });
-    return;
-  }
-  if (c.dataset.draw) {
-    if (!draw) return;
-    setMode(c.dataset.draw);
-    if (innerWidth <= 720) setSheet(false);
-    return;
-  }
-  // "Screen for risks" names the place in focus, if there is one; otherwise the person says where.
-  const focus = c.dataset.screen !== undefined && focusName && placeByName(focusName);
-  say.value = focus ? `Screen ${focus.name} for risks` : c.dataset.prompt; grow(); say.focus();
+// One chip, "Screen this location for risks", shown only while there's a place to screen. It fills the input with
+// the place in focus (or the latest place), ready to send or add to. Finding is typing; drawing is the Draw button.
+function focusedOrLatest() {
+  return (focusName && placeByName(focusName)) || [...places.values()].at(-1) || null;
+}
+function paintChips() { document.querySelector(".chips").hidden = !places.size; }
+document.querySelector(".chip[data-screen]").addEventListener("click", () => {
+  const p = focusedOrLatest();
+  if (!p) return;
+  say.value = `Screen ${p.name} for risks`; grow(); say.focus();
   say.setSelectionRange(say.value.length, say.value.length);
-}));
+});
 
 // Speech: the browser's own recognition where it exists (Chrome, Edge, Safari). Typing always works.
 const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
