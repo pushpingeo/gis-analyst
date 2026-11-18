@@ -410,3 +410,10 @@ Judgement calls made while building, newest first. Bigger product decisions live
 - **Shorter replies:** the layers asked are summarised (those that found something, a few failures by name, counts for the rest) instead of listed one by one.
 - Skill 4.9: spellings in one call; don't offer files or web services, which can't be loaded yet.
 - Road and river pieces from one layer are joined into one line (a corridor used one piece of 13 on the live M9 test); areas in pieces are still counted, not joined.
+
+## 18 Nov (late evening): the workspace is the front page (Rob's call)
+- `workspace.html` → `index.html` (asktobler.com). The earlier IFC agent page (was `index.html`) → `lab.html`; the lab results page (was `lab.html`) → `lab-results.html` (Rob chose this over `agent.html`).
+- `workspace.html` stays as a tiny redirect to `/`, keeping `?query` and `#hash`, so old links and future share links still land.
+- Links updated: About in settings → `lab-results.html` and `lab.html`; the results page's "Try the agent" → `lab.html`; the agent page now links to the results, the tools page and the workspace.
+- `scripts/stamp.mjs` now stamps `index.html`; `scripts/browser-run-card.mjs` loads `/`. `noindex` header unchanged.
+- Tested: `npm test`; browser checks 73/73 locally; redirect locally; live in Rob's desktop-app browser (front page is the workspace, no console errors, About links right, all four pages 200, `/workspace.html` redirects). Not tested: a real phone.
