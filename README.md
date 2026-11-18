@@ -1,37 +1,65 @@
 # Tobler
 
-*Formerly GIS Analyst. Named after Waldo Tobler, whose first law of geography says near things are more related than distant ones. Domains: asktobler.com, .ai, .io (not yet pointed at the site). The repo was renamed from `gis-analyst` on 16 November 2026; the site is at pushpingeo.github.io/tobler.*
+A geospatial analyst you talk to. You say where (a place, a project, "3 km² around the Jackdaw platform"), it finds or builds the shape on the map, and then it screens the site for risks: protected areas, settlements, heritage, boundaries, what's already there.
 
-An AI geospatial analyst built the way you'd want one built: an agent that follows **skills** (written-down method), calls **tools** (deterministic spatial operations) and looks things up in a **catalogue** (what the data is, who publishes it, and on what terms).
+Live at **[asktobler.com](https://asktobler.com)**. Early days, so expect rough edges.
 
-The first skill is non-technical risk (NTR) screening of a project site, framed in IFC Performance Standard terms. It's tested against 45 real IFC-financed projects whose locations were checked by hand.
+Named after Waldo Tobler, whose first law of geography says near things are more related than distant things. That's most of site screening, really.
+
+## The idea
+
+GIS has always come in three pieces you buy, find and learn separately: the software, the data, and the know-how. Tobler keeps them together:
+
+- **Tools** do the geometry. Deterministic, in the browser. The model never does geometry in its head.
+- **Data** comes from the [AI Living World Atlas](https://github.com/pushpingeo/ai-living-world-atlas), an index of the world's published map services: what exists for a place, who publishes it, and on what terms.
+- **Skills** are the method, written down so a screen runs the same way every time. They're plain markdown in [`skills/`](skills/) and can be lifted into other AI workflows.
+
+Every result says where it came from: sources, licences, dates, and what wasn't checked. "Not checked" is not the same as "nothing there", and the screen says which is which.
+
+## What works now
+
+- **Finding places from words.** Names, project descriptions, "a 1 km corridor along the M9". It searches the atlas first (so "block 30/2" comes back as the regulator's outline, not a pin), then OpenStreetMap, Wikidata and Natural Earth. If several things fit, it asks.
+- **Drawing and editing** when words aren't enough. Move, reshape, rotate, resize to an exact area.
+- **Non-technical risk screening** of a point, line or area, onshore or offshore. Flags first, each with the evidence it rests on, picked out on the map. A slider changes the distance without fetching again. Download the result as GeoJSON with full provenance.
+- Settings for units, shape colour, your own Anthropic key, and whether you hold an Esri licence or are non-commercial (some data is only for those).
+
+Coming: saved projects, share links, a PDF report, then area discounting (gross to net developable area) and constraints-and-access mapping.
 
 ## Pages
-- `index.html` (asktobler.com): the Tobler workspace. `workspace.html` now just redirects here.
-- `lab.html`: the earlier IFC screening agent, with the skill switch.
-- `lab-results.html`: the lab results, "does the skill help?".
-- `tools.html`: the spatial tools without AI.
 
-## Status
-Milestone 1: the skill text, the concept catalogue and the spatial tools. No AI yet.
+| Page | What |
+|---|---|
+| [`/`](https://asktobler.com) | The workspace |
+| [`lab.html`](https://asktobler.com/lab.html) | The earlier agent: IFC Performance Standard screening, with the skill switchable on and off |
+| [`lab-results.html`](https://asktobler.com/lab-results.html) | Does the skill help? The agent against IFC's own decisions on 45 real projects |
+| [`tools.html`](https://asktobler.com/tools.html) | The spatial tools on their own, no AI |
 
-- `skills/ntr-screening/SKILL.md`: the method the agent will follow.
-- `catalogue/catalogue.json`: concepts (protected area, settlement, farmland…) mapped to sources. OpenStreetMap only for now.
-- `js/tools.js`: one Overpass request per site, then distances and bands with Turf.
-- `tools.html`: a page to run the tools on any evaluation site and see the results on a map.
-- `data/eval-sites.json`: the 45 evaluation sites, with IFC's own answers for checking.
+The lab is where this started. The write-up is in [`docs/lab-writeup.md`](docs/lab-writeup.md).
 
-## Workspace (in progress)
-`index.html` is the public interface: a map and a conversation in one place, where you mark or describe an area and the agent works through it. The plan is in the project notes; it's being built in steps.
+## How it's built
 
-- **Step 1 (this):** the layout, drawing and editing tools (point, line, area, rectangle, circle; move, reshape, add or remove corners, rotate, resize), and reference data from Natural Earth that says where a shape is, how big it is and what scale of work it looks like. No AI yet.
-- `js/geometry.js`: deterministic shape operations (rotate, resize, square or circle of a given area). The agent will use the same functions.
-- `js/reference.js`: country, coast distance, nearby towns and scale for any shape.
-- `data/ref/`: Natural Earth layers, built by `scripts/build-reference.mjs`.
-- `js/vendor/`, `fonts/`: MapLibre, Terra Draw, Turf and Public Sans, bundled by `scripts/build-vendor.mjs` so the page doesn't depend on CDNs.
+- Static site, everything in the browser. MapLibre GL with the OpenFreeMap basemap, Terra Draw, Turf. The workspace bundles its libraries rather than loading them from CDNs.
+- Claude (Haiku) through a small Cloudflare Worker in [`worker/`](worker/), which holds the key, pins the model and caps use per visitor. It also carries the route to the atlas.
+- A screen runs as its own sealed loop (`js/ntrrun.js`), separate from the conversation, so long sessions don't drift.
+- Coordinates are stored in WGS84. Distances and areas are geodesic. Web Mercator is for display only.
 
-## Run the tests
+Judgement calls and test results go in [`docs/decisions.md`](docs/decisions.md).
+
+## Testing
+
 ```
 npm install
 npm test
 ```
+
+Browser checks (headless Chrome, model and atlas scripted, no cost): serve the repo on port 8000, then `node scripts/browser-run-card.mjs` and `node scripts/browser-choice.mjs`. The place-finding and screening evaluations run in GitHub Actions; results are committed under [`eval/`](eval/).
+
+## Data and licences
+
+Every feature keeps its source's licence. OpenStreetMap data is © OpenStreetMap contributors (ODbL). Natural Earth is public domain. Atlas layers carry their publishers' terms, and Tobler leaves out Esri-licensed and non-commercial layers unless you've said they apply to you.
+
+Screening results are a desk-based first look. They don't replace a proper assessment.
+
+---
+
+Built by Rob Dunfey ([pushpingeo](https://github.com/pushpingeo)).
