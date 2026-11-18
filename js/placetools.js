@@ -167,6 +167,8 @@ export function placeToolDefs(skills) {
 // host: { places(), addPlace({feature, origin}), updatePlace(name, feature, words), renamePlace(name, newName),
 //         findPlace(name), ref, anchors (sources), fetchFn, headers, onCandidates(list), skillText(name) }
 export function createPlaceTools(host) {
+  // The person's licence settings, for every catalogue search (Esri MLA and non-commercial data are off by default).
+  const allowed = () => ({ esri: !!host.esriLicence?.(), nonCommercial: !!host.nonCommercial?.() });
   const cands = new Map();
   let n = 0;
   const keep = (c) => { const id = `C${++n}`; cands.set(id, { ...c, id }); return id; };
@@ -253,12 +255,13 @@ export function createPlaceTools(host) {
     const where = await catalogueArea(area, nearAt);
     if (!where) return { report: { not_checked: `"${area}" isn't a country, candidate or place, and there's no map view: find the area first.` } };
     try {
-      const r = await atlasFindNamed(names, kind, where.bbox, { call: host.atlas });
+      const r = await atlasFindNamed(names, kind, where.bbox, { call: host.atlas, allow: allowed() });
       return { candidates: r.candidates, report: {
         searched: `${kind} layers covering ${where.label}`, found: r.candidates.length,
         layers_checked: describeChecked(r.checked), layers_found: r.layers_found,
         ...(r.layers_not_checked ? { more_layers_not_checked: r.layers_not_checked } : {}),
         ...(r.layers_found ? {} : { note: `The catalogue has no ${kind} layers covering ${where.label}.` }),
+        ...(r.left_out?.length ? { left_out_for_licence: `${r.left_out.length} layer${r.left_out.length > 1 ? "s" : ""} (${r.left_out.slice(0, 2).map((x) => x.title).join("; ")}): ${r.left_out[0].why}` } : {}),
       } };
     } catch (e) {
       return { report: { not_checked: String(e.message || e).slice(0, 160) } };
@@ -319,7 +322,7 @@ export function createPlaceTools(host) {
       // For an area or line, search a circle that covers the shape plus the radius, then measure each feature from
       // the shape's edge (Rosebank, 17 Nov: distances were from the field's centre and read as from its edge).
       const reach = shaped ? Math.max(...walkCoords(g).map((c) => turf.distance(a.lonlat, c))) : 0;
-      const r = await findFeaturesNear(a.lonlat, feature_type, Math.min(radius_km + reach, 50), { name, fetchFn: host.fetchFn, headers: host.headers, atlas: host.atlas || null, limit: shaped ? 200 : 15 });
+      const r = await findFeaturesNear(a.lonlat, feature_type, Math.min(radius_km + reach, 50), { name, fetchFn: host.fetchFn, headers: host.headers, atlas: host.atlas || null, limit: shaped ? 200 : 15, allow: allowed() });
       let found = r.candidates;
       if (shaped) {
         for (const c of found) { const d = geometryDistanceKm(g, c.geometry); c.distance_km = d == null ? null : round(d, 2); delete c.bearing; delete c.edge_km; }
@@ -480,6 +483,7 @@ export function createPlaceTools(host) {
     firms: host.firms || null,
     get trusted() { return host.trusted; },
     esriLicence: () => !!host.esriLicence?.(),
+    nonCommercial: () => !!host.nonCommercial?.(),
     resolve,
     area: (ref) => catalogueArea(ref, null),
     keep: (c) => keep(c),

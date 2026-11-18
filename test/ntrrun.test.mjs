@@ -56,7 +56,7 @@ async function atlas(tool, args) {
   if (tool === "fetch_features" && BASELINE_IDS.has(args.id)) return { returned: 0, features: [] };
   throw new Error(`unexpected ${tool} ${JSON.stringify(args)}`);
 }
-const host = () => ({ ref, anchors: [], headers: {}, atlas, firms: null, trusted, esriLicence: () => false, fetchFn: async () => ({ ok: true, json: async () => [] }), places: () => [], findPlace: () => null, skillText: () => "" });
+const host = (nonCommercial = true) => ({ ref, anchors: [], headers: {}, atlas, firms: null, trusted, esriLicence: () => false, nonCommercial: () => nonCommercial, fetchFn: async () => ({ ok: true, json: async () => [] }), places: () => [], findPlace: () => null, skillText: () => "" });
 
 const RESULT = (extra = "") => `Rosebank screened as an offshore oil field (assumed greenfield).
 
@@ -351,6 +351,34 @@ await test("a mistyped dataset id isn't reported as a source not checked; offsho
   assert.match(model.calls[0].messages[0].content, /No land within the wider band \(the coast is about \d+ km away\)/);
   assert.ok(events.some((e) => e.type === "tool" && e.name === "nearest_boundaries" && e.baseline));
   assert.ok(events.filter((e) => e.type === "tool" && e.name === "get_data" && e.baseline).length >= 5);
+});
+
+
+await test("non-commercial data (WDPA) is left out by default and shown as not checked, with the reason", async () => {
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const rec = await runScreening({ host: host(false), site, distances: d, skill, callClaude: standardScript(), inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
+  const w = rec.tobler_run.checked.find((c) => /World Database on Protected Areas/.test(c.dataset));
+  assert.equal(w.result, "not checked");
+  assert.match(w.why, /non-commercial/);
+  assert.ok(!rec.features.some((f) => f.properties.name === "Faroe-Shetland Sponge Belt"), "no WDPA evidence without the switch");
+});
+
+
+await test("licence rule applies to every catalogue search: Esri MLA and non-commercial layers are left out by default", async () => {
+  const { classifyLicence, licenceBlock } = await import("../js/licence.js");
+  const { pickLayers } = await import("../js/atlasfeatures.js");
+  assert.equal(classifyLicence("No commercial use: Neither (a) the WDPCA Materials nor (b) any work derived").class, "non-commercial");
+  assert.equal(licenceBlock("non-commercial", {}) != null, true);
+  assert.equal(licenceBlock("non-commercial", { nonCommercial: true }), null);
+  const finds = [{ results: [
+    { id: "a", title: "WDPA - Marine and Coastal Protected Areas", publisher: "UNEP-WCMC", licence: "No commercial use: Neither …" },
+    { id: "b", title: "Living Atlas copy", publisher: "Esri", licence: "Esri Master License Agreement" },
+    { id: "c", title: "NatureScot SSSI", publisher: "NatureScot", licence: "Open Government Licence v3" }] }];
+  const off = pickLayers(finds, {});
+  assert.deepEqual(off.layers.map((d) => d.id), ["c"]);
+  assert.equal(off.left_out.length, 2);
+  const on = pickLayers(finds, { allow: { esri: true, nonCommercial: true } });
+  assert.equal(on.layers.length, 3);
 });
 
 console.log(`${passed} ntrrun tests passed`);

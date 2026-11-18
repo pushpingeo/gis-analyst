@@ -4,6 +4,7 @@
 // The transport is injected: in the evaluation it calls the atlas MCP server with the key from the environment;
 // in the page it goes through the Worker, which holds the key. No DOM, so it runs in both.
 import * as turf from "./vendor/turf.js";
+import { classifyLicence, licenceBlock } from "./licence.js";
 import { candidate } from "./gazetteer.js";
 
 // Tobler's feature types → the atlas's concepts, and an optional test on the feature's own type field.
@@ -96,11 +97,14 @@ const serverGeometry = (geom) => (geom === "line" ? { geometry: "line" } : geom 
 const WANT = { line: ["line", "polygon"], area: ["polygon"] };
 const wrongGeometry = (d, geom) => Array.isArray(d.geometry) && d.geometry.length > 0 && WANT[geom] && !d.geometry.some((g) => WANT[geom].includes(g));
 
-export function pickLayers(finds, { geom = null, titles = null } = {}) {
+export function pickLayers(finds, { geom = null, titles = null, allow = {} } = {}) {
   const seen = new Set();
   // Layers flagged with a possibly overstated extent are usually local layers claiming the world: skip them.
+  const left_out = [];
   const all = finds.flatMap((f) => f.results || []).filter((d) => !d.extent_may_be_overstated)
-    .filter((d) => { const k = `${d.title}|${d.publisher}`.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+    .filter((d) => { const k = `${d.title}|${d.publisher}`.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+    // The licence rule (Esri's Master License Agreement, non-commercial terms) applies to every search, not only find_data.
+    .filter((d) => { const why = licenceBlock(classifyLicence(d.licence).class, allow); if (why) left_out.push({ title: d.title, why }); return !why; });
   const rank = (d) => authorityRank(d)
     + (geom && geom !== "point" && (wrongGeometry(d, geom) || (!d.geometry?.length && POINTY.test(d.title || ""))) ? 4 : 0)
     + (geom && geom !== "point" && !d.geometry?.length ? 1 : 0)
@@ -108,7 +112,7 @@ export function pickLayers(finds, { geom = null, titles = null } = {}) {
   all.forEach((d, i) => { d._i = i; });
   all.sort((x, y) => rank(x) - rank(y) || x._i - y._i);
   const unlisted = Math.max(0, finds.reduce((n, f) => n + (f.matches || 0), 0) - finds.reduce((n, f) => n + (f.results || []).length, 0));
-  return { layers: all, unlisted };
+  return { layers: all, unlisted, left_out };
 }
 
 // Does a feature's geometry suit what's wanted? A road corridor needs lines; a block or lease needs an outline.
@@ -172,13 +176,13 @@ export function describeChecked(list) {
 }
 
 // call(tool, args) → structuredContent. Returns { candidates, total, checked: [ { dataset, publisher, returned | error } ] }.
-export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, name = null, limit = 15, maxDatasets = 20, budgetMs = 30000 } = {}) {
+export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, name = null, limit = 15, maxDatasets = 20, budgetMs = 30000, allow = {} } = {}) {
   const map = ATLAS_CONCEPTS[featureType];
   if (!map) return null; // not a kind of thing the atlas indexes; OpenStreetMap only
   const r = Math.min(Math.max(radiusKm, 0.5), 50);
   const finds = await Promise.all([map.concept, map.also].filter(Boolean).map((concept) =>
     call("find_datasets", { lon: lonlat[0], lat: lonlat[1], radius_km: r, concept, capability: "query", limit: 100, ...serverGeometry(map.geom) }).catch(() => ({ results: [] }))));
-  const { layers, unlisted } = pickLayers(finds, { geom: map.geom });
+  const { layers, unlisted, left_out } = pickLayers(finds, { geom: map.geom, allow });
   const cands = [];
   let fitting = 0;
   const ask = async (d, isLate) => {
@@ -232,7 +236,7 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
     return true;
   });
   uniq.sort((a, b) => (b.area_km2 || 0) - (a.area_km2 || 0) || a.distance_km - b.distance_km);
-  return { candidates: uniq.slice(0, limit), total: uniq.length, checked, datasets_found: layers.length, layers_not_checked: unasked + unlisted };
+  return { candidates: uniq.slice(0, limit), total: uniq.length, checked, datasets_found: layers.length, layers_not_checked: unasked + unlisted, left_out };
 }
 
 // ---- finding a named thing in the catalogue ---------------------------------------------------
@@ -241,7 +245,9 @@ export async function atlasFeaturesNear(lonlat, featureType, radiusKm, { call, n
 // and its waters, and search them for the name.
 export const NAMED_KINDS = {
   "licence block or concession": { concepts: ["oil-gas", "mineral-extraction", "maritime-boundary"], titles: /block|licen[cs]|concession|lease|permit|tenement|title|acreage|oml|opl|award|round/i, geom: "area" },
-  "oil or gas field": { concepts: ["oil-gas"], titles: /field|discover|reservoir|accumulation/i, geom: "area" },
+  // Outlines preferred, points accepted: global trackers (Global Energy Monitor) hold fields as points, and a field
+  // missing from a national layer may be there (Bonga North and Bonga Southwest Aparo, 18 Nov).
+  "oil or gas field": { concepts: ["oil-gas"], titles: /field|discover|reservoir|accumulation|extraction/i, prefer: "area" },
   "well": { concepts: ["oil-gas"], titles: /well|borehole/i },
   "offshore installation": { concepts: ["oil-gas"], titles: /platform|installation|infrastructure|facilit|structure/i },
   "wind farm or lease": { concepts: ["offshore-wind-site", "power-plant", "renewable-potential"], titles: /wind|lease|agreement|site|zone/i },
@@ -275,13 +281,13 @@ const serverText = (name) => {
 };
 
 // names: one name or several spellings of it. bbox: [w, s, e, n]. Returns { candidates, checked, layers_found, layers_not_checked }.
-export async function atlasFindNamed(names, kind, bbox, { call, limit = 8, max = 40, budgetMs = 25000, layerMs = 8000 } = {}) {
+export async function atlasFindNamed(names, kind, bbox, { call, limit = 8, max = 40, budgetMs = 25000, layerMs = 8000, allow = {} } = {}) {
   const k = NAMED_KINDS[kind];
   if (!k) throw new Error(`Unknown kind. Use one of: ${Object.keys(NAMED_KINDS).join(", ")}.`);
   names = (Array.isArray(names) ? names : [names]).filter(Boolean);
   const finds = await Promise.all(k.concepts.map((concept) =>
     call("find_datasets", { bbox, concept, capability: "query", limit: 100, ...serverGeometry(k.geom) }).catch(() => ({ results: [] }))));
-  const { layers, unlisted } = pickLayers(finds, { geom: k.geom, titles: k.titles });
+  const { layers, unlisted, left_out } = pickLayers(finds, { geom: k.geom, titles: k.titles, allow });
   const cands = [];
   // One server-side search per distinct distinctive word ("145" serves both "OML 145" and "Oil Mining Lease 145").
   const texts = [...new Set(names.map(serverText))];
@@ -305,9 +311,16 @@ export async function atlasFindNamed(names, kind, bbox, { call, limit = 8, max =
     }
     return { returned, kept, ...(wrong ? { wrong_geometry: wrong } : {}) };
   };
-  const { checked, unasked } = await askInBatches(layers, ask, { first: 10, then: 10, max, budgetMs, layerMs, enough: () => cands.length > 0 });
-  // Layers whose titles fit the kind come first, so a match there outranks one from an unrelated layer.
+  // Stop once matches come from two layers, or after a second batch: a match in one layer only (a national layer's
+  // Bonga Main) shouldn't hide namesakes held elsewhere (a global tracker's Bonga North), which the person then
+  // chooses between.
+  let batches = 0;
+  const enough = () => { batches++; return cands.length > 0 && (new Set(cands.map((c) => c.source.atlas_id)).size >= 2 || batches >= 2); };
+  const { checked, unasked } = await askInBatches(layers, ask, { first: 10, then: 10, max, budgetMs, layerMs, enough });
+  // Layers whose titles fit the kind come first, so a match there outranks one from an unrelated layer; then
+  // outlines before points where outlines are preferred.
   const off = (c) => (k.titles && !k.titles.test(c.source.title) ? 1 : 0);
-  cands.sort((a, b) => off(a) - off(b) || authorityRank(a.source) - authorityRank(b.source));
-  return { candidates: cands.slice(0, limit), checked, layers_found: layers.length, layers_not_checked: unasked + unlisted };
+  const pointy = (c) => (k.prefer === "area" && !/Polygon/.test(c.geometry?.type || "") ? 1 : 0);
+  cands.sort((a, b) => off(a) - off(b) || pointy(a) - pointy(b) || authorityRank(a.source) - authorityRank(b.source));
+  return { candidates: cands.slice(0, limit), checked, layers_found: layers.length, layers_not_checked: unasked + unlisted, left_out };
 }

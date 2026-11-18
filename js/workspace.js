@@ -411,6 +411,8 @@ const host = {
   get trusted() { return trusted; },
   // Settings (step 4 adds the gear): whether the person holds an Esri licence, so Esri-licensed layers can be used.
   esriLicence: () => { try { return localStorage.getItem("tobler.esriLicence") === "yes"; } catch { return false; } },
+  // Non-commercial data (e.g. WDPA): off by default; on only for people whose use allows it (Rob, 18 Nov).
+  nonCommercial: () => { try { return localStorage.getItem("tobler.nonCommercial") === "yes"; } catch { return false; } },
   view: () => viewBounds(),
   headers: {},
   places: () => [...places.values()],

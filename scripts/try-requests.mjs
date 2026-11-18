@@ -43,6 +43,7 @@ for (const conv of convs) {
     ref, anchors, headers: UA, list, trusted,
     firms: process.env.FIRMS_MAP_KEY ? firmsCall : null,
     esriLicence: () => process.env.ESRI_LICENCE === "yes",
+    nonCommercial: () => process.env.NON_COMMERCIAL === "yes",
     addFindings(l, g) { this.findings = (this.findings || 0) + l.length; },
     showFindings(ids) { return { shown: ids?.length || this.findings || 0 }; },
     clearFindings() { this.findings = 0; },

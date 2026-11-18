@@ -5,7 +5,7 @@
 import * as turf from "./vendor/turf.js";
 import { atlasCandidate, pickName, edgeDistanceKm } from "./atlasfeatures.js";
 import { candidate } from "./gazetteer.js";
-import { classifyLicence, LICENCE_NOTE } from "./licence.js";
+import { classifyLicence, LICENCE_NOTE, licenceBlock } from "./licence.js";
 import { themeFor, THEME_IDS } from "./findings.js";
 
 const round = (v, d = 2) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
@@ -98,6 +98,7 @@ export function createDataTools(host) {
   const trusted = host.trusted || { services: [], publishers: { patterns: [] } };
   const trustedPublisher = new RegExp((trusted.publishers?.patterns || []).join("|") || "$^", "i");
   const esriOk = () => !!host.esriLicence?.();
+  const allow = () => ({ esri: esriOk(), nonCommercial: !!host.nonCommercial?.() });
 
   // Trusted services whose topics match the words asked (any topic in the text, or any long word of the text in a topic).
   function trustedMatches(text) {
@@ -155,6 +156,8 @@ export function createDataTools(host) {
       });
       const esri = list.filter((d) => classifyLicence(d.licence).class === "esri-mla");
       if (!esriOk()) list = list.filter((d) => !esri.includes(d));
+      const nc = list.filter((d) => classifyLicence(d.licence).class === "non-commercial");
+      if (!allow().nonCommercial) list = list.filter((d) => !nc.includes(d));
       // Fetchable first, then trusted publishers, then open licences, then the atlas's own order.
       const score = (d) => ((d.capabilities || []).includes("query") ? 0 : 4) + (trustedPublisher.test(d.publisher || "") ? 0 : 2) + (classifyLicence(d.licence).class === "open" ? 0 : 1);
       list = list.map((d, i) => ({ d, i })).sort((a, b) => score(a.d) - score(b.d) || a.i - b.i).map((x) => x.d);
@@ -164,6 +167,7 @@ export function createDataTools(host) {
         matches: (r?.matches ?? list.length) + fromTrusted.length, datasets: shown,
         ...(fromTrusted.length + list.length > shown.length ? { more: fromTrusted.length + list.length - shown.length } : {}),
         ...(esri.length && !esriOk() ? { left_out: `${esri.length} dataset${esri.length > 1 ? "s" : ""} under Esri's Master License Agreement (${esri.slice(0, 3).map((d) => d.title).join("; ")}). Tobler doesn't use those unless the person holds an Esri licence; mention it if it matters.` } : {}),
+        ...(nc.length && !allow().nonCommercial ? { left_out_non_commercial: `${nc.length} dataset${nc.length > 1 ? "s" : ""} under non-commercial terms (${nc.slice(0, 3).map((d) => d.title).join("; ")}). Left out unless the person switches on non-commercial data in settings; list it as a gap if it matters.` } : {}),
         ...(failure ? { not_checked: `The catalogue search failed: ${failure}. Say the catalogue couldn't be checked; don't say the data doesn't exist.` } : {}),
         note: shown.length ? undefined : `Nothing found for "${text}" in ${where.label}. Try other words before saying there's no such data, and say what you searched.`,
       };
@@ -173,6 +177,7 @@ export function createDataTools(host) {
       const d = datasets.get(String(dataset).trim().toUpperCase());
       if (!d) throw new Error(`"${dataset}" isn't a dataset id from find_data in this conversation. Use find_data first.`);
       const lic = d.service ? { class: d.licence_class, short: d.licence } : classifyLicence(d.licence);
+      if (lic.class === "non-commercial" && !allow().nonCommercial) return { dataset: d.title, publisher: d.publisher, licence: lic.short, not_checked: "This dataset's licence is non-commercial (e.g. WDPA). Tobler leaves it out unless the person switches on non-commercial data in settings. Use another source, or list it as a gap." };
       if (lic.class === "esri-mla" && !esriOk()) return { dataset: d.title, not_checked: "This dataset is under Esri's Master License Agreement, which Tobler doesn't use unless the person holds an Esri licence. Look for the publisher's own copy or another source." };
       if (!d.service && !(d.capabilities || []).includes("query")) return { dataset: d.title, not_checked: "This dataset is a picture service only (can_fetch false): its features can't be fetched. Pick one with can_fetch true." };
       if (!d.service && !host.atlas) return { not_checked: "The atlas isn't connected here." };

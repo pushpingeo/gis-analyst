@@ -230,7 +230,7 @@ async function nearViaNominatim(lonlat, featureType, radiusKm, { fetchFn, header
 
 // Asks the atlas and OpenStreetMap at the same time and merges what answers. Neither is required:
 // whatever fails is reported as "not checked", never as "none found".
-export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = null, fetchFn = fetch, limit = 15, headers = {}, atlas = null } = {}) {
+export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = null, fetchFn = fetch, limit = 15, headers = {}, atlas = null, allow = {} } = {}) {
   const parts = FEATURE_TYPES[featureType];
   if (!parts) throw new Error(`Unknown feature type. Use one of: ${Object.keys(FEATURE_TYPES).join(", ")}.`);
   const osmP = (async () => {
@@ -241,7 +241,7 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
     }
   })();
   const atlasP = atlas && ATLAS_CONCEPTS[featureType]
-    ? atlasFeaturesNear(lonlat, featureType, radiusKm, { call: atlas, name, limit })
+    ? atlasFeaturesNear(lonlat, featureType, radiusKm, { call: atlas, name, limit, allow })
     : Promise.resolve(null);
   // Once the atlas has found something, OpenStreetMap gets 3 more seconds, not its full 15: when Overpass is
   // struggling, waiting it out was most of a search's time.
@@ -257,7 +257,8 @@ export async function findFeaturesNear(lonlat, featureType, radiusKm, { name = n
   if (at.status === "fulfilled" && at.value) {
     cands.push(...at.value.candidates);
     sources.push({ source: "AI Living World Atlas", found: at.value.total, layers_checked: describeChecked(at.value.checked),
-      ...(at.value.layers_not_checked ? { more_layers_not_checked: at.value.layers_not_checked } : {}) });
+      ...(at.value.layers_not_checked ? { more_layers_not_checked: at.value.layers_not_checked } : {}),
+      ...(at.value.left_out?.length ? { left_out_for_licence: `${at.value.left_out.length} layer${at.value.left_out.length > 1 ? "s" : ""} (${at.value.left_out.slice(0, 2).map((x) => x.title).join("; ")}): ${at.value.left_out[0].why}` } : {}) });
   } else if (atlas && ATLAS_CONCEPTS[featureType]) sources.push({ source: "AI Living World Atlas", not_checked: String(at.reason?.message || at.reason || "unavailable").slice(0, 120) });
   if (osm.status === "fulfilled") { cands.push(...osm.value.candidates); sources.push({ source: "OpenStreetMap", found: osm.value.total, ...(osm.value.note ? { note: osm.value.note } : {}) }); }
   else sources.push({ source: "OpenStreetMap", not_checked: String(osm.reason?.message || osm.reason).slice(0, 160) });
