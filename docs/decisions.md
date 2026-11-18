@@ -19,6 +19,10 @@ Judgement calls made while building, newest first. Bigger product decisions live
   town); Bakersfield (asked questions first). Places in Australia, northern Canada and the Amazon left out of the
   welcome on purpose (screens there rightly raise Indigenous land, which is heavy for a first click), as are
   places where the atlas is thin.
+- Screening examples say where and how big ("Screen a 1 km² wind farm site 3 km south-east of Lemvig, Denmark";
+  "a 1 km² solar farm site 5 km west of Évora, Portugal"): live in Rob's browser, "a small solar farm site near
+  Évora" made the analyst ask where and how big, though the same words had gone straight ahead in Actions. The
+  explicit wording went straight to a screen 4 times out of 4 (Évora 50–63 s, Lemvig 71–98 s, consistent flags).
 - Found on the way: a name the analyst gives a place ("Tabernas solar site (placeholder)") is now used as given;
   tidying had cut the brackets, so its next call missed the place. `try-requests` now keeps place names as the
   page does.
