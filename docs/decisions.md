@@ -35,6 +35,17 @@ Judgement calls made while building, newest first. Bigger product decisions live
 - **NTR 3.3-draft:** distances and footprint come from the run when it gives them; method otherwise unchanged.
 - **Tested:** `test/ntrrun.test.mjs` (11, atlas and model faked); `scripts/browser-run-card.mjs` in headless Chrome
   at 1280×820 and 390×844 (scripted model and atlas, outline basemap): 20 checks pass, no page errors.
+- **Smoke tests (real atlas, Haiku, `try-requests`, 18 Nov ~05:30):** Rosebank (57 s, 6 flags, 43 evidence features;
+  pipelines on site, wrecks at 1.9 and 2.4 km, Faroe-Shetland Sponge Belt at 20 km, all traced), Linlithgow Palace as a
+  20 MW solar farm (116 s, 6 flags; Linlithgow Loch on site, Bo'mains Meadow 1.1 km, St Michael's Hospital; heritage
+  layers not checked because HES fetches fail in the atlas), Mars (44 s, 5 flags; some evidence untraced because the
+  model named leases by tool id). Fixes found on the way: (1) Haiku thinks by default and the thinking counts against
+  the 8,000-token cap, so big screens were cut off before the JSON: the run now asks for a compact result and short
+  thinking, and if the result is cut off asks once for the JSON alone from the same evidence (dropping signed thinking
+  blocks); the card says so. (2) NASA FIRMS now accepts 1–5 days (was 10): trusted.json and `get_data` default to 5.
+  (3) `find_data` with a concept that finds nothing searches the words alone (wrecks are tagged seabed habitat).
+- **Seen, not fixed:** slow screens on busy onshore sites (Linlithgow 7 rounds, 427 evidence features); evidence
+  named by tool id stays untraced; the analyst sometimes passes a stage the person didn't give.
 - **Not done yet:** out-of-date marking when the site is edited; the places-and-runs tray; settings; per-receptor
   distances in the skill. The "Screen for risks · soon" chip is unchanged (public text: Rob's call).
 
