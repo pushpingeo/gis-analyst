@@ -106,14 +106,14 @@ export default {
     const visitor = counter(env, `${day}:${await visitorId(request)}`);
 
     if (route === "/firms") {
-      const { source, bbox, days = 7, date } = body || {};
+      const { source, bbox, days = 5, date } = body || {};
       if (!FIRMS_SOURCES.has(source)) return reply(400, { message: `Unknown FIRMS source. Use one of: ${[...FIRMS_SOURCES].join(", ")}` });
       if (!Array.isArray(bbox) || bbox.length !== 4 || bbox.some((v) => typeof v !== "number" || !isFinite(v))) return reply(400, { message: "bbox must be [west, south, east, north]" });
       const [w, so, e, n] = bbox;
       if (w >= e || so >= n || w < -180 || e > 180 || so < -90 || n > 90) return reply(400, { message: "bbox out of range" });
       if ((e - w) * (n - so) > FIRMS_MAX_DEG2) return reply(400, { message: `Area too large for one call (max ${FIRMS_MAX_DEG2} square degrees).` });
       const d = Math.round(+days);
-      if (!(d >= 1 && d <= 10)) return reply(400, { message: "days must be 1 to 10" });
+      if (!(d >= 1 && d <= 5)) return reply(400, { message: "days must be 1 to 5 (NASA FIRMS allows no more)" });
       if (date != null && !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return reply(400, { message: "date must be YYYY-MM-DD" });
       if (!env.FIRMS_MAP_KEY) return reply(500, { message: "FIRMS isn't set up (FIRMS_MAP_KEY missing)." });
       const used = await visitor.hit("firms", +env.FIRMS_PER_VISITOR_DAILY || 300);

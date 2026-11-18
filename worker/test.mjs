@@ -144,7 +144,7 @@ try {
   });
 
   await t("FIRMS: key added, CSV becomes GeoJSON, empty is empty, NASA's errors don't leak the key", async () => {
-    const r = await post("/firms", { source: "VIIRS_NOAA20_NRT", bbox: [-90, 27.5, -88.5, 29], days: 7 }, { ip: "7.7.7.7" });
+    const r = await post("/firms", { source: "VIIRS_NOAA20_NRT", bbox: [-90, 27.5, -88.5, 29], days: 5 }, { ip: "7.7.7.7" });
     assert.equal(r.status, 200);
     const j = await r.json();
     assert.equal(j.features.length, 2);
@@ -152,7 +152,7 @@ try {
     assert.equal(j.features[0].properties.acquired_utc, "2026-11-16 07:12 UTC");
     assert.equal(j.features[0].properties.frp, 4.2);
     assert.equal(j.features[0].properties.confidence, "n");
-    assert.match(upstreamCalls.firms.at(-1), /\/api\/area\/csv\/firmskey123\/VIIRS_NOAA20_NRT\/-90,27.5,-88.5,29\/7$/);
+    assert.match(upstreamCalls.firms.at(-1), /\/api\/area\/csv\/firmskey123\/VIIRS_NOAA20_NRT\/-90,27.5,-88.5,29\/5$/);
     const empty = await (await post("/firms", { source: "VIIRS_NOAA21_NRT", bbox: [0, 0, 1, 1], days: 1 }, { ip: "7.7.7.7" })).json();
     assert.equal(empty.features.length, 0);
     const bad = await post("/firms", { source: "MODIS_NRT", bbox: [0, 0, 1, 1], days: 1 }, { ip: "7.7.7.7" });
@@ -163,7 +163,7 @@ try {
   await t("FIRMS: checks inputs, and its own daily limit (3)", async () => {
     assert.equal((await post("/firms", { source: "EVIL", bbox: [0, 0, 1, 1] }, { ip: "8.8.8.8" })).status, 400);
     assert.equal((await post("/firms", { source: "MODIS_NRT", bbox: [0, 0, 30, 30] }, { ip: "8.8.8.8" })).status, 400);
-    assert.equal((await post("/firms", { source: "MODIS_NRT", bbox: [0, 0, 1, 1], days: 11 }, { ip: "8.8.8.8" })).status, 400);
+    assert.equal((await post("/firms", { source: "MODIS_NRT", bbox: [0, 0, 1, 1], days: 6 }, { ip: "8.8.8.8" })).status, 400);
     assert.equal((await post("/firms", { source: "MODIS_NRT", bbox: [0, 0, 1, 1], date: "17/11/2026" }, { ip: "8.8.8.8" })).status, 400);
     // 7.7.7.7 has used 3 (two OK, one NASA error): the next is refused.
     assert.equal((await post("/firms", { source: "VIIRS_NOAA20_NRT", bbox: [0, 0, 1, 1] }, { ip: "7.7.7.7" })).status, 429);
