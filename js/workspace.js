@@ -793,7 +793,9 @@ function paintRun(entry) {
   if (!r.flags.length && !r.parse_error) list.replaceChildren(el("li", "No flags raised. See what was checked and the gaps below.", "flag note"));
   card.querySelector(".dists").textContent = r.extent === "inside"
     ? "Inside the area only: findings inside it or touching its edge."
-    : U.localise(`Distances from the site's edge: ${distancesLine(r.distances)}. ${r.distances.reasons[0] ? `Why: ${r.distances.reasons.slice(0, 2).join("; ")}.` : ""}`);
+    : entry.area && r.assessed_within_km === 0
+      ? U.localise(`Flags written for inside the area only. Findings were fetched out to ${r.fetched_to_km} km, so you can switch back to the surroundings.`)
+      : U.localise(`Distances from the site's edge: ${distancesLine(r.distances)}. ${r.distances.reasons[0] ? `Why: ${r.distances.reasons.slice(0, 2).join("; ")}.` : ""}`);
   const checked = card.querySelector(".checked");
   const nc = r.checked.filter((c) => c.result === "not checked");
   checked.querySelector("summary").textContent = `What was checked: ${r.checked.length} source${r.checked.length === 1 ? "" : "s"}${nc.length ? `, ${nc.length} not checked` : ""}`;

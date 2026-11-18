@@ -22,8 +22,13 @@ Judgement calls made while building, newest first. Bigger product decisions live
   page follow; errors now have their own fixed red); your own Anthropic key (kept for the tab only, as before;
   this is its first UI in the workspace). Basemap choice and web search left for later.
 - Tested: 4 new unit tests (inside-only run, inside ignored for a point, re-assess inside, units); headless
-  Chrome `scripts/browser-run-card.mjs` now 39 checks at 1280×820 and 390×844 (scope switch and back, mask and
-  rings, an inside-only screen, settings: miles, colour, Esri switch).
+  Chrome `scripts/browser-run-card.mjs` now 41 checks at 1280×820 and 390×844 (scope switch, re-assess inside and
+  back, mask and rings, an inside-only screen, settings: miles, colour, Esri switch). Live in Rob's desktop-app
+  browser (Haiku, real atlas): a 4 km² box round Linlithgow Palace screened as 20 MW solar (6 flags, 287 findings
+  to 20 km); "Inside the area only" left 9, dimmed the outside and re-assessed in 37 s (5 flags); miles and the
+  colour applied; settings put back afterwards. Fixed from that: after re-assessing inside, the distances line
+  read "near 0 · close 0 · wider 0"; it now says the flags are for inside the area only. Seen, not changed: whole-sea
+  and regional layers (North West European waters, "Eastern Scotland") count as "on site" for an onshore box.
 
 ## 18 Nov 2026 (19:00): NTR skill 3.4-draft live (Rob approved)
 - Changes: start from the baseline; named biodiversity sources (national protected areas, EEA/Natura 2000, WDPA

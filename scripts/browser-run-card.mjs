@@ -123,6 +123,10 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   check(s.insideChecked && s.onMap === 1 && s.mask === 1 && s.rings === 0 && !s.sliderShown, `${label}: inside only: 1 finding, outside dimmed, no rings, slider hidden (${s.onMap}, mask ${s.mask}, rings ${s.rings})`);
   check(/inside the area or touching its edge/.test(s.nearest) && s.stale && s.staleText === "Re-assess inside the area", `${label}: inside wording and re-assess offer (${s.staleText})`);
   await page.screenshot({ path: `/tmp/run-card-${label}-4-inside.png` });
+  await page.click(".run [data-op=reassess]");
+  await page.waitForFunction(() => document.querySelector(".run .stale").hidden, null, { timeout: 10000 });
+  s = await st();
+  check(/^Flags written for inside the area only/.test(s.dists) && s.insideChecked, `${label}: re-assessed inside; distances line says so (${s.dists.slice(0, 45)})`);
   await page.click('.run [data-scope="around"]');
   await page.waitForTimeout(300);
   s = await st();
@@ -142,7 +146,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     esri: localStorage.getItem("tobler.esriLicence"), host: window.__ws.host.esriLicence(), units: localStorage.getItem("tobler.units"),
     rings: window.__ws.map.getSource("rings")._data.features.map((f) => f.properties.label).join(","),
   }));
-  check(set.out === "31.1 mi" && /near 0.62 mi/.test(set.dists) && !/ km/.test(set.dists) && set.unit === "sq mi" && /sq mi/.test(set.facts) && /mi/.test(set.rings), `${label}: miles on the card, shape card and rings (${set.out}; ${set.unit}; ${set.rings})`);
+  check(set.out === "31.1 mi" && /31.1 mi/.test(set.dists) && !/ km/.test(set.dists) && set.unit === "sq mi" && /sq mi/.test(set.facts) && /mi/.test(set.rings), `${label}: miles on the card, shape card and rings (${set.out}; ${set.unit}; ${set.rings})`);
   check(set.line === "#00a0b0" && set.css === "#00a0b0", `${label}: shape colour applied to the map and the page`);
   check(set.esri === "yes" && set.host === true && set.units === "imperial", `${label}: Esri switch and units saved`);
   await page.click("#settings .close");
