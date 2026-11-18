@@ -70,7 +70,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(out) });
   });
   await page.route(/tobler-api.*\/atlas/, async (r) => { const b = JSON.parse(r.request().postData()); r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: { structuredContent: atlas(b.params.name, b.params.arguments) } }) }); });
-  await page.goto("http://localhost:8000/workspace.html");
+  await page.goto("http://localhost:8000/");
   await page.waitForFunction(() => window.__ws?.draw, null, { timeout: 40000 });
   if (label === "phone") await page.evaluate(() => document.getElementById("panel").classList.remove("collapsed"));
   // Drawing tools: a tray by the input; the hint has Cancel while drawing and stays clear of the panel.
@@ -192,7 +192,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   if (label === "phone") await page.evaluate(() => document.getElementById("panel").classList.remove("collapsed"));
   await page.click("#gear");
   await page.waitForSelector("#settings[open]");
-  check(await page.evaluate(() => document.querySelectorAll('#settings .links a[href="lab.html"]').length === 1), `${label}: About in settings links to how the screening was tested`);
+  check(await page.evaluate(() => document.querySelectorAll('#settings .links a[href="lab-results.html"]').length === 1), `${label}: About in settings links to how the screening was tested`);
   await page.screenshot({ path: `/tmp/settings-${label}.png` });
   await page.check('#settings input[name="units"][value="imperial"]');
   await page.click('#settings [data-colour="#00a0b0"]');
@@ -221,7 +221,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   await page.route(/openfreemap|nominatim|wikidata|overpass/, (r) => r.abort());
   await page.route(/tobler-api.*\/v1\/messages/, async (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(model(JSON.parse(r.request().postData()))) }));
   await page.route(/tobler-api.*\/atlas/, async (r) => { const b = JSON.parse(r.request().postData()); r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: { structuredContent: atlas(b.params.name, b.params.arguments) } }) }); });
-  await page.goto("http://localhost:8000/workspace.html");
+  await page.goto("http://localhost:8000/");
   await page.waitForFunction(() => window.__ws?.draw, null, { timeout: 40000 });
   await page.evaluate((f) => window.__ws.host.addPlace({ feature: f, origin: { method: "drawn", at: new Date().toISOString() } }), SQUARE);
   await page.fill("#say", "Screen Area 1, only inside the area");

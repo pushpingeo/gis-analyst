@@ -6,17 +6,23 @@ An AI geospatial analyst built the way you'd want one built: an agent that follo
 
 The first skill is non-technical risk (NTR) screening of a project site, framed in IFC Performance Standard terms. It's tested against 45 real IFC-financed projects whose locations were checked by hand.
 
+## Pages
+- `index.html` (asktobler.com): the Tobler workspace. `workspace.html` now just redirects here.
+- `lab.html`: the earlier IFC screening agent, with the skill switch.
+- `lab-results.html`: the lab results, "does the skill help?".
+- `tools.html`: the spatial tools without AI.
+
 ## Status
 Milestone 1: the skill text, the concept catalogue and the spatial tools. No AI yet.
 
 - `skills/ntr-screening/SKILL.md`: the method the agent will follow.
 - `catalogue/catalogue.json`: concepts (protected area, settlement, farmland…) mapped to sources. OpenStreetMap only for now.
 - `js/tools.js`: one Overpass request per site, then distances and bands with Turf.
-- `index.html`: a page to run the tools on any evaluation site and see the results on a map.
+- `tools.html`: a page to run the tools on any evaluation site and see the results on a map.
 - `data/eval-sites.json`: the 45 evaluation sites, with IFC's own answers for checking.
 
 ## Workspace (in progress)
-`workspace.html` is the new public interface: a map and a conversation in one place, where you mark or describe an area and the agent works through it. The plan is in the project notes; it's being built in steps.
+`index.html` is the public interface: a map and a conversation in one place, where you mark or describe an area and the agent works through it. The plan is in the project notes; it's being built in steps.
 
 - **Step 1 (this):** the layout, drawing and editing tools (point, line, area, rectangle, circle; move, reshape, add or remove corners, rotate, resize), and reference data from Natural Earth that says where a shape is, how big it is and what scale of work it looks like. No AI yet.
 - `js/geometry.js`: deterministic shape operations (rotate, resize, square or circle of a given area). The agent will use the same functions.

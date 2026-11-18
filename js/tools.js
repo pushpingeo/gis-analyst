@@ -1,5 +1,5 @@
 // Spatial tools for the NTR skill. Deterministic: no AI in here.
-// Works in the browser (bare imports resolved by the import map in index.html) and in Node (npm packages).
+// Works in the browser (bare imports resolved by the import map in lab.html) and in Node (npm packages).
 import * as turf from "@turf/turf";
 import osmtogeojson from "osmtogeojson";
 

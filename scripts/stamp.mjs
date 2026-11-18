@@ -5,15 +5,15 @@
 //     so no module is ever loaded twice under two names).
 //   - The stylesheet and the main script: in their tags.
 //   - Files the page fetches (skills, catalogue, reference data): a small JSON block the page reads.
-// Run: node scripts/stamp.mjs        (rewrites workspace.html)
-//      node scripts/stamp.mjs --check (exits 1 if workspace.html is out of date; used by npm test)
+// Run: node scripts/stamp.mjs        (rewrites index.html, the workspace)
+//      node scripts/stamp.mjs --check (exits 1 if index.html is out of date; used by npm test)
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const PAGE = "workspace.html";
+const PAGE = "index.html";
 const ENTRY = "js/workspace.js";
 const FETCHED_DIRS = ["skills", "catalogue", "data/ref"];
 const FETCHED_EXT = /\.(json|md)$/;

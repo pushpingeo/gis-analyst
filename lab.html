@@ -4,103 +4,290 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Tobler lab: does the skill help?</title>
+<title>Tobler: site risk screening agent</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script type="importmap">
+{ "imports": {
+  "@turf/turf": "https://esm.sh/@turf/turf@7.2.0",
+  "osmtogeojson": "https://esm.sh/osmtogeojson@3.0.0-beta.5"
+} }
+</script>
 <style>
   :root { --ink:#1d2430; --muted:#5b6575; --line:#e3e6eb; --bg:#f7f8fa; --accent:#0b6e4f; --bad:#b42318; --good:#067647; }
   * { box-sizing: border-box; }
-  body { margin:0; font:15px/1.55 system-ui, -apple-system, Segoe UI, sans-serif; color:var(--ink); background:var(--bg); }
-  .wrap { max-width: 980px; margin: 0 auto; padding: 18px 16px 60px; }
-  h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 17px; margin: 28px 0 6px; }
-  p { margin: 6px 0; } a { color: var(--accent); }
-  .muted { color: var(--muted); font-size: 13px; }
-  .card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:12px 0; }
-  table { width:100%; border-collapse:collapse; font-size:13.5px; }
-  th, td { text-align:left; padding:5px 7px; border-bottom:1px solid var(--line); vertical-align:top; }
+  body { margin:0; font:14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; color:var(--ink); background:var(--bg); }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); background:#fff; }
+  header h1 { margin:0; font-size:17px; }
+  header p { margin:2px 0 0; color:var(--muted); font-size:13px; max-width:900px; }
+  header a { color:var(--accent); }
+  main { display:grid; grid-template-columns: minmax(0,1fr) 480px; height: calc(100vh - 70px); }
+  #map { height:100%; min-height:260px; }
+  aside { overflow:auto; background:#fff; border-left:1px solid var(--line); padding:12px 14px 40px; }
+  @media (max-width: 860px) {
+    main { display:block; height:auto; }
+    #map { height:40vh; }
+    aside { border-left:0; }
+  }
+  .controls { display:grid; gap:8px; margin-bottom:8px; }
+  select, input, button { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button { background:var(--accent); color:#fff; border:0; cursor:pointer; padding:8px; }
+  button.secondary { background:#fff; color:var(--accent); border:1px solid var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  .toggles { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; }
+  .toggles label { display:flex; gap:6px; align-items:center; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  .status { color:var(--muted); font-size:13px; min-height:1.4em; }
+  .muted { color:var(--muted); font-size:13px; }
+  .box { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:13px; }
+  .run { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:12px 0; background:#fff; }
+  .run h3 { margin:0 0 4px; font-size:14px; display:flex; justify-content:space-between; gap:8px; }
+  .tag { font-size:11px; font-weight:600; padding:1px 6px; border-radius:10px; background:#e7f3ee; color:var(--accent); white-space:nowrap; }
+  .tag.off { background:#f2f4f7; color:var(--muted); }
+  .summary p { margin:6px 0; } .summary ul { margin:4px 0 6px 18px; padding:0; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0; }
+  th, td { text-align:left; padding:3px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
   th { color:var(--muted); font-weight:600; }
-  td.num, th.num { text-align:right; font-variant-numeric: tabular-nums; }
-  .bar { height: 8px; background: var(--accent); border-radius: 4px; display:inline-block; vertical-align: middle; }
-  .ok { color:var(--good); } .no { color:var(--bad); }
-  .scroll { overflow-x:auto; }
-  select { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; }
-  code { font-size: 12.5px; background: var(--bg); padding: 0 3px; border-radius: 3px; }
+  .ok { color:var(--good); font-weight:600; } .no { color:var(--bad); font-weight:600; }
+  details { margin-top:6px; } summary { cursor:pointer; color:var(--accent); font-size:13px; }
+  pre { white-space:pre-wrap; word-break:break-word; font-size:11px; background:var(--bg); padding:8px; border-radius:6px; max-height:320px; overflow:auto; margin:4px 0; }
+  .trace { list-style:none; margin:6px 0 0; padding:0; font-size:12.5px; }
+  .trace li { border-left:3px solid var(--line); padding:3px 0 3px 8px; margin:4px 0; }
+  .trace li.tool { border-color:#2e90fa; } .trace li.search { border-color:#f79009; } .trace li.model { border-color:#7a5af8; }
+  .trace li.warn { border-color:var(--bad); }
+  code { font-size:12px; background:var(--bg); padding:0 3px; border-radius:3px; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Does the skill help? Scoring the agent against IFC</h1>
-  <p>For each of the IFC projects in the test set, the agent screens the site knowing only its coordinates, country and asset type. Its answer to "does this Performance Standard apply?" is compared with what IFC's own specialists decided. <a href="index.html">Try the agent</a> · <a href="https://github.com/pushpingeo/tobler/tree/main/eval">Raw results and traces</a></p>
-  <p>Run: <select id="run"></select> <span class="muted" id="meta"></span></p>
-  <div id="out"><p class="muted">Loading…</p></div>
-
-  <h2>How to read this</h2>
-  <div class="card">
-    <p><b>Agreement</b> is the share of yes/no calls that match IFC's. Because IFC applies PS5 and PS6 to most projects, saying yes to everything already scores well on those, so compare against that column. <b>Kappa</b> is the fairer measure. It corrects for agreement you'd get by chance: 0 means no better than guessing, 1 means perfect. <b>Consistency</b> is how often repeated runs on the same site give the same answer. <b>Flag recall</b> asks the question that matters for a screening tool: for each standard IFC applied, did at least one of the agent's flags point to it? <b>Evidence traceable</b> is the share of features the agent cites (by name and distance) that can be found in what the tools actually returned; the rest are paraphrased, translated or invented.</p>
-    <p><b>The four set-ups:</b> <i>Rules only</i> applies the skill's distance rules mechanically, with no AI. <i>Skill off</i> is Claude with the same tools but no method. <i>Skill on</i> adds the NTR skill. <i>Skill + web</i> also lets it search the web.</p>
-    <p><b>What keeps it honest.</b> The agent never sees the project name or IFC's answer. Web search blocks IFC's and other lenders' disclosure sites, and any run whose searches turn up the project's name is flagged as a leak and scored both with and without. Some hindsight can't be removed: today's web knows what happened after IFC's decision.</p>
-    <p><b>Limits.</b> IFC's calls rest on field surveys and project design as well as location, so 100% isn't the target. PS7 (Indigenous Peoples) is triggered for only a few projects in the set, so its numbers are fragile.</p>
-  </div>
-</div>
+<header>
+  <h1>Tobler: site risk screening agent</h1>
+  <p>Claude screens a project site for environmental and social risk in IFC Performance Standard terms, using open map data. Switch the <b>skill</b> off to see what the same model does without a method. It only sees the coordinates, country and asset type. <a href="lab-results.html">Results</a> · <a href="tools.html">Tools without AI</a> · <a href="./">Tobler workspace</a> · <a href="https://github.com/pushpingeo/tobler">GitHub</a></p>
+</header>
+<main>
+  <div id="map"></div>
+  <aside>
+    <div class="controls">
+      <select id="site" aria-label="Site"></select>
+      <label class="muted">Project stage (optional)
+        <select id="stage"><option value="">Not known</option><option>greenfield</option><option>expansion</option><option>refinancing</option></select></label>
+      <div class="toggles">
+        <label><input type="checkbox" id="skill" checked> Use the NTR skill</label>
+        <label><input type="checkbox" id="desk"> Desk research (web search)</label>
+      </div>
+      <div class="row">
+        <button id="run">Screen this site</button>
+        <button id="both" class="secondary">Run skill off, then on</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+    <details><summary>IFC's answer (for checking, never shown to the model)</summary><div class="box" id="ifc"></div></details>
+    <details><summary>Use your own Anthropic API key</summary>
+      <div class="box">The demo uses a shared, rate-limited connection. With your own key, calls go straight from this tab to Anthropic and the key is kept only for this tab.
+        <div class="row" style="margin-top:6px"><input id="key" type="password" placeholder="sk-ant-..." autocomplete="off"><button id="saveKey" class="secondary">Use key</button></div>
+      </div>
+    </details>
+    <div id="runs"></div>
+  </aside>
+</main>
 <script type="module">
+import { CONFIG } from "./js/config.js?v=m2b";
+import { callClaude, setUserKey, getUserKey, LimitReached } from "./js/claude.js?v=m2b";
+import { runAgent, prepareData } from "./js/agent.js?v=m2b";
+import { FOOTPRINT_KM, buildOverpassQuery, fetchOverpass, OVERPASS_ENDPOINTS, gbifUrl, slimGbif, wikidataUrl } from "./js/tools.js?v=m2b";
+import * as turf from "@turf/turf";
+
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const NAMES = { rules: "Rules only (no AI)", off: "Skill off", on: "Skill on", web: "Skill + web search" };
-const PS = ["ps5", "ps6", "ps7", "ps8"];
-const PSNAME = { ps5: "PS5 Land", ps6: "PS6 Biodiversity", ps7: "PS7 Indigenous Peoples", ps8: "PS8 Heritage" };
+window.addEventListener("unhandledrejection", (e) => { $("status").textContent = "Error: " + (e.reason?.message || e.reason); });
 
-const index = await fetch("eval/index.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { runs: [] })).catch(() => ({ runs: [] }));
-const runs = index.runs.filter((r) => r.label !== "smoke").reverse();
-if (!runs.length) { $("out").innerHTML = `<p class="muted">No evaluation runs published yet.</p>`; }
-$("run").innerHTML = runs.map((r) => `<option>${esc(r.label)}</option>`).join("");
-$("run").onchange = () => show($("run").value);
-if (runs.length) show(runs[0].label);
+const [catalogue, evalSites, skillText] = await Promise.all([
+  fetch("catalogue/catalogue.json").then((r) => r.json()),
+  fetch("data/eval-sites.json").then((r) => r.json()),
+  fetch("skills/ntr-screening-ifc/SKILL.md", { cache: "no-store" }).then((r) => r.text()),
+]);
+// Never run "skill on" with something that isn't the skill (e.g. an error page).
+const skillOk = /^---\s*\nname: ntr-screening/.test(skillText);
+if (!skillOk) { $("skill").checked = false; $("skill").disabled = true; }
+const sites = evalSites.sites;
+$("site").innerHTML = sites.map((s, i) => `<option value="${i}">${esc(s.name)} (${esc(s.country)}), ${esc(s.asset_type)}</option>`).join("");
+if (getUserKey()) $("key").placeholder = "Your key is set for this tab";
+$("saveKey").onclick = () => { setUserKey($("key").value.trim()); $("key").value = ""; $("key").placeholder = getUserKey() ? "Your key is set for this tab" : "sk-ant-..."; };
 
-async function show(label) {
-  const s = await fetch(`eval/runs/${label}/summary.json`, { cache: "no-store" }).then((r) => r.json());
-  $("meta").textContent = `${s.created.slice(0, 10)} · ${s.sites} sites · ${s.model} · skill ${s.skill_sha} · catalogue ${s.catalogue_version}${s.repeats > 1 ? ` · ${s.repeats} repeats` : ""}`;
-  const arms = Object.keys(s.arms);
-  const pct = (x) => (x == null ? "–" : `${Math.round(x * 100)}%`);
-  const bar = (x) => (x == null ? "" : `<span class="bar" style="width:${Math.max(2, x * 120)}px"></span>`);
-  const head = `<tr><th></th>${arms.map((a) => `<th class="num">${NAMES[a] || a}</th>`).join("")}</tr>`;
-  const row = (label, f) => `<tr><td>${label}</td>${arms.map((a) => `<td class="num">${f(s.arms[a], a)}</td>`).join("")}</tr>`;
-  // What a "yes to everything" answer would score: the bar any method has to clear.
-  const truth = s.per_site.map((x) => x.ifc);
-  const yesRate = (k) => truth.filter((t) => t[k]).length / truth.length;
-  const allYes = PS.reduce((a, k) => a + yesRate(k), 0) / PS.length;
-  const head2 = `<tr><th></th>${arms.map((a) => `<th class="num">${NAMES[a] || a}</th>`).join("")}<th class="num muted">Saying yes to everything</th></tr>`;
-  let html = `<h2>Headline</h2><div class="card scroll"><table>${head2}
-    ${row("<b>Agreement with IFC, all four standards</b>", (x) => `<b>${pct(x.overall.agree)}</b>`).replace("</tr>", `<td class="num muted">${pct(allYes)}</td></tr>`)}
-    ${row("Kappa (0 = chance, 1 = perfect)", (x) => x.overall.kappa ?? "–").replace("</tr>", `<td class="num muted">0</td></tr>`)}
-    ${PS.map((k) => row(PSNAME[k], (x) => `${pct(x.per_ps[k].agree)} <span class="muted">κ ${x.per_ps[k].kappa ?? "–"}</span>`).replace("</tr>", `<td class="num muted">${pct(yesRate(k))} <span class="muted">κ 0</span></td></tr>`)).join("")}
-    ${row("Category A/B/C matches", (x) => pct(x.category_agree))}
-    ${s.repeats > 1 ? row("Consistency across repeats", (x, a) => (a === "rules" ? "–" : pct(x.consistency))) : ""}
-    ${arms.some((a) => s.arms[a].flags) ? PS.map((k) => row(`Flag recall: ${PSNAME[k]}`, (x) => (x.flags ? pct(x.flags.recall[k]) : "–"))).join("") : ""}
-    ${arms.some((a) => s.arms[a].flags) ? row("Flags per site (low-confidence share)", (x) => (x.flags ? `${x.flags.flags_per_site} <span class="muted">(${pct(x.flags.low_confidence_share)})</span>` : "–")) : ""}
-    ${row("Evidence traceable to the tools", (x) => (x.evidence ? `${pct(x.evidence.share)} <span class="muted">of ${x.evidence.checkable}</span>` : "–"))}
-    ${row("Runs that failed", (x) => x.failed)}
-    ${arms.includes("web") ? row("Web runs that found the project (leaks)", (x, a) => (a === "web" ? `${x.leaks} of ${x.runs}` : "–")) : ""}
-    ${arms.includes("web") && s.arms.web.without_leaks ? row("Skill + web agreement, leaks excluded", (x, a) => (a === "web" ? pct(x.without_leaks.overall.agree) : "")) : ""}
-  </table></div>`;
-
-  html += `<h2>Misses and false alarms</h2><div class="card scroll"><table><tr><th></th>${arms.map((a) => `<th class="num">${NAMES[a] || a}</th>`).join("")}</tr>
-    ${PS.map((k) => row(PSNAME[k], (x) => `<span title="missed: IFC said yes, agent said no">${x.per_ps[k].fn} missed</span> · <span title="false alarm: IFC said no, agent said yes">${x.per_ps[k].fp} extra</span>`)).join("")}
-  </table><p class="muted">Missed: IFC applied the standard and the agent didn't. Extra: the agent applied it and IFC didn't. For a screening tool a miss is usually worse than a false alarm.</p></div>`;
-
-  html += `<h2>Site by site</h2><div class="card scroll"><table><tr><th>Site</th><th>IFC</th>${arms.map((a) => `<th>${NAMES[a] || a}</th>`).join("")}</tr>`;
-  for (const site of s.per_site) {
-    const ifc = PS.map((k) => (site.ifc[k] ? k.slice(2) : "·")).join(" ") + " " + site.ifc.category;
-    html += `<tr><td>${esc(site.name)} <span class="muted">${esc(site.country)}, ${esc(site.asset_type)}</span></td><td><code>${ifc}</code></td>`;
-    for (const a of arms) {
-      const cell = (site.arms[a] || []).map((r) => {
-        if (!r.result) return `<span class="no">failed</span>`;
-        return `<code>${PS.map((k) => `<span class="${r.result[k] === site.ifc[k] ? "ok" : "no"}">${r.result[k] ? k.slice(2) : "·"}</span>`).join(" ")} <span class="${r.result.category === site.ifc.category ? "ok" : "no"}">${esc(r.result.category ?? "?")}</span></code>${r.leak ? ` <span class="no" title="Web search found the project">leak</span>` : ""}`;
-      }).join("<br>");
-      html += `<td>${cell}</td>`;
-    }
-    html += "</tr>";
-  }
-  html += `</table><p class="muted">Each cell lists the standards applied (5, 6, 7, 8) and the category. Green matches IFC, red doesn't.</p></div>`;
-  $("out").innerHTML = html;
+// Map: optional. Everything works without it (no WebGL, background tab).
+let map = null, mapReady = Promise.resolve(false);
+try {
+  map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/positron", center: [20, 10], zoom: 1.5 });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  mapReady = new Promise((r) => map.on("load", () => r(true)));
+} catch (e) {
+  $("map").innerHTML = `<p class="muted" style="padding:16px">The map can't be drawn in this browser. The agent still runs.</p>`;
 }
+async function drawSite(s, r) {
+  if (!map || !(await mapReady)) return;
+  const data = turf.featureCollection([turf.circle([s.lon, s.lat], r, { units: "kilometers" }), turf.point([s.lon, s.lat])]);
+  const ring = turf.circle([s.lon, s.lat], r + 20, { units: "kilometers" });
+  if (map.getSource("site")) { map.getSource("site").setData(data); map.getSource("ring").setData(ring); }
+  else {
+    map.addSource("site", { type: "geojson", data }); map.addSource("ring", { type: "geojson", data: ring });
+    map.addLayer({ id: "ring", source: "ring", type: "line", paint: { "line-color": "#64748b", "line-dasharray": [2, 2] } });
+    map.addLayer({ id: "site-fill", source: "site", type: "fill", filter: ["==", "$type", "Polygon"], paint: { "fill-color": "#0b6e4f", "fill-opacity": 0.15 } });
+    map.addLayer({ id: "site-pt", source: "site", type: "circle", filter: ["==", "$type", "Point"], paint: { "circle-radius": 6, "circle-color": "#0b6e4f", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+  }
+  map.fitBounds(turf.bbox(ring), { padding: 20, duration: 0 });
+}
+
+function pickSite() {
+  const s = sites[+$("site").value];
+  const ps = ["ps5", "ps6", "ps7", "ps8"].map((k) => `${k.toUpperCase()} ${s.ifc[k] ? "yes" : "no"}`).join(" · ");
+  $("ifc").innerHTML = `${esc(s.name)}: Category ${s.ifc.category} · ${ps}<br><a href="${esc(s.esrs_url)}" target="_blank" rel="noopener">IFC review summary</a>`;
+  drawSite(s, FOOTPRINT_KM[s.asset_type]);
+}
+$("site").onchange = pickSite;
+pickSite();
+
+// Site data: the saved snapshot if there is one (so every run sees the same data), otherwise live.
+const dataCache = new Map();
+async function siteData(s, r) {
+  if (dataCache.has(s.id)) return dataCache.get(s.id);
+  const snap = (dir) => fetch(`data/${dir}/${s.id}.json`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  let [osmSnap, gbifSnap, wdSnap] = await Promise.all([snap("osm"), snap("gbif"), snap("wikidata")]);
+  const notes = [];
+  let osm = osmSnap?.osm;
+  if (osm) notes.push(`OSM snapshot ${osmSnap.fetched.slice(0, 10)}`);
+  else {
+    const q = buildOverpassQuery(catalogue, s.lon, s.lat, r);
+    for (const ep of OVERPASS_ENDPOINTS) {
+      try { $("status").textContent = `Fetching OpenStreetMap data from ${new URL(ep).host}…`; osm = await fetchOverpass(q, ep); notes.push("OSM live"); break; } catch { /* next */ }
+    }
+  }
+  const get = (u) => fetch(u).then((x) => (x.ok ? x.json() : Promise.reject(new Error(x.status))));
+  let gbif = gbifSnap ? { near: gbifSnap.near, wide: gbifSnap.wide } : null;
+  if (!gbif) try { const [n, w] = await Promise.all([get(gbifUrl(s.lon, s.lat, r + 5)), get(gbifUrl(s.lon, s.lat, r + 20, { facetOnly: true }))]); gbif = { near: slimGbif(n), wide: w }; notes.push("GBIF live"); } catch { notes.push("GBIF unavailable"); }
+  else notes.push(`GBIF snapshot ${gbifSnap.fetched.slice(0, 10)}`);
+  let wikidata = wdSnap?.wikidata;
+  if (!wikidata) try { wikidata = await get(wikidataUrl(s.lon, s.lat, r + 20)); notes.push("Wikidata live"); } catch { notes.push("Wikidata unavailable"); }
+  else notes.push(`Wikidata snapshot ${wdSnap.fetched.slice(0, 10)}`);
+  if (osmSnap && osmSnap.catalogue_version !== catalogue.version) notes.push(`OSM snapshot is catalogue ${osmSnap.catalogue_version}; newer concepts read as none found`);
+  const d = { data: prepareData({ catalogue, site: s, footprintKm: r, osm, gbif, wikidata, osmQuery: osmSnap?.query }), notes };
+  dataCache.set(s.id, d);
+  return d;
+}
+
+// ---- Rendering --------------------------------------------------------------
+
+function mdLite(text) {
+  const body = text.replace(/```json[\s\S]*?```/i, "").trim();
+  const lines = esc(body).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*\w])\*([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>").split("\n");
+  let html = "", inList = false;
+  for (const l of lines) {
+    const li = l.match(/^\s*[-*•]\s+(.*)/);
+    if (li) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${li[1]}</li>`; continue; }
+    if (inList) { html += "</ul>"; inList = false; }
+    const h = l.match(/^#+\s*(.*)/);
+    if (h) html += `<p><b>${h[1]}</b></p>`; else if (l.trim()) html += `<p>${l}</p>`;
+  }
+  return html + (inList ? "</ul>" : "");
+}
+
+function compareTable(res, s) {
+  if (!res) return `<p class="no">The agent didn't return the JSON result, so this run can't be scored.</p>`;
+  const rating = (ps) => (res.themes || []).find((t) => (t.ps || "").toUpperCase() === ps)?.rating || "";
+  const rows = ["ps5", "ps6", "ps7", "ps8"].map((k) => {
+    const a = res[k], b = s.ifc[k];
+    return `<tr><td><b>${k.toUpperCase()}</b></td><td>${a === undefined ? "?" : a ? "yes" : "no"} <span class="muted">${esc(rating(k.toUpperCase()))}</span></td><td>${b ? "yes" : "no"}</td><td class="${a === b ? "ok" : "no"}">${a === b ? "✓" : "✗"}</td></tr>`;
+  });
+  const cOk = res.category === s.ifc.category;
+  rows.push(`<tr><td><b>Category</b></td><td>${esc(res.category ?? "?")}</td><td>${s.ifc.category}</td><td class="${cOk ? "ok" : "no"}">${cOk ? "✓" : "✗"}</td></tr>`);
+  return `<table><tr><th></th><th>Agent</th><th>IFC</th><th></th></tr>${rows.join("")}</table>`;
+}
+
+const CONF = { high: 0, medium: 1, low: 2 };
+function flagsTable(res) {
+  const flags = (res?.flags || []).slice().sort((a, b) => (CONF[a.confidence] ?? 3) - (CONF[b.confidence] ?? 3));
+  if (!flags.length) return "";
+  const rows = flags.map((f) => {
+    const ev = (f.evidence || []).slice(0, 3).map((e) => `${esc(e.name || e.concept || "")}${e.distance_km != null ? ` (${esc(e.distance_km)} km)` : ""}`).join("; ");
+    return `<tr><td><span class="tag ${f.confidence === "low" ? "off" : ""}">${esc(f.ps || "")}</span></td><td><b>${esc(f.risk)}</b>${ev ? `<br><span class="muted">${ev}</span>` : ""}${f.why ? `<br>${esc(f.why)}` : ""}</td><td class="muted">${esc(f.confidence || "")}</td></tr>`;
+  });
+  return `<p style="margin:8px 0 2px"><b>${flags.length} flags</b> <span class="muted">for the opportunity manager to weigh, most certain first</span></p><table>${rows.join("")}</table>`;
+}
+
+function traceItem(e) {
+  const j = (o, n = 6000) => esc(JSON.stringify(o, null, 1).slice(0, n));
+  if (e.type === "start") return `<li>Started with ${e.tools.length} tools: ${e.tools.map((t) => `<code>${esc(t)}</code>`).join(" ")}<details><summary>System prompt (${e.system.length.toLocaleString()} characters)</summary><pre>${esc(e.system)}</pre></details><details><summary>User message</summary><pre>${esc(e.user)}</pre></details></li>`;
+  if (e.type === "response") {
+    const parts = [];
+    for (const b of e.content) {
+      if (b.type === "text" && b.text.trim()) parts.push(`<li class="model">${esc(b.text.replace(/```json[\s\S]*?```/i, "[JSON result]").slice(0, 600))}${b.text.length > 600 ? "…" : ""}</li>`);
+      if (b.type === "tool_use") parts.push(`<li class="tool">Calls <code>${esc(b.name)}</code> ${Object.keys(b.input || {}).length ? `<code>${esc(JSON.stringify(b.input))}</code>` : ""}</li>`);
+      if (b.type === "server_tool_use") parts.push(`<li class="search">Web search: <b>${esc(b.input?.query)}</b></li>`);
+      if (b.type === "web_search_tool_result") {
+        const rs = Array.isArray(b.content) ? b.content : [];
+        parts.push(`<li class="search">${rs.length ? rs.slice(0, 6).map((r) => `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.url)}</a>`).join("<br>") : `<span class="no">Search failed: ${esc(b.content?.error_code || "no results")}</span>`}</li>`);
+      }
+    }
+    return `<li class="muted">Model turn ${e.round + 1}: ${(e.ms / 1000).toFixed(1)} s, stop: ${esc(e.stop_reason)}</li>` + parts.join("");
+  }
+  if (e.type === "tool") return `<li class="tool"><code>${esc(e.name)}</code> returned ${e.error ? `<span class="no">an error: ${esc(e.error)}</span>` : ""}<details><summary>Result</summary><pre>${j(e.output ?? e.error)}</pre></details></li>`;
+  if (e.type === "warning") return `<li class="warn">${esc(e.message)}</li>`;
+  return "";
+}
+
+// ---- Running ----------------------------------------------------------------
+
+let busy = false;
+async function runOnce(skillOn) {
+  if (skillOn && !skillOk) throw new Error("The skill file didn't load, so a skill-on run isn't possible. Reload the page.");
+  const s = sites[+$("site").value];
+  const r = FOOTPRINT_KM[s.asset_type];
+  const desk = $("desk").checked;
+  const card = document.createElement("div");
+  card.className = "run";
+  card.innerHTML = `<h3><span>${esc(s.name)}</span><span><span class="tag ${skillOn ? "" : "off"}">skill ${skillOn ? "on" : "off"}</span> <span class="tag ${desk ? "" : "off"}">${desk ? "maps + web" : "maps only"}</span></span></h3>
+    <div class="muted state">Loading site data…</div><div class="flags"></div><div class="summary"></div><div class="compare"></div>
+    <details open><summary>Trace: what the agent did</summary><ul class="trace"></ul></details>`;
+  $("runs").prepend(card);
+  const q = (sel) => card.querySelector(sel);
+  // Leak check for the honesty of the test: did anything the agent read or wrote name the project?
+  const GENERIC = new Set(["solar", "wind", "hydro", "power", "plant", "project", "ipp", "gold", "copper", "lithium", "terminal", "expansion", "phase", "corporation", "refi", "lng", "wpp", "hpp", "the", "and", "energy"]);
+  const nameWords = s.name.toLowerCase().replace(/[()]/g, " ").split(/[\s\-]+/).filter((w) => w.length > 3 && !GENERIC.has(w));
+  let leak = "";
+  // Match the distinctive part of the name as a phrase ("upper trishuli"), not single words: a river can share the name.
+  const phrase = nameWords.join(" ");
+  const checkLeak = (str) => { const t = String(str || "").toLowerCase().replace(/[-_]+/g, " "); if (phrase && t.includes(phrase) && !leak) leak = phrase; };
+  const { data, notes } = await siteData(s, r);
+  q(".state").textContent = `Data: ${notes.join(" · ")}. Thinking…`;
+  const t0 = Date.now();
+  try {
+    const out = await runAgent({
+      site: s, footprintKm: r, skillOn, skillText, deskResearch: desk, data, callClaude, maxRounds: CONFIG.maxRounds, stage: $("stage").value || null,
+      onEvent: (e) => {
+        q(".trace").insertAdjacentHTML("beforeend", traceItem(e));
+        if (e.type === "response") for (const b of e.content) {
+          if (b.type === "web_search_tool_result" && Array.isArray(b.content)) b.content.forEach((r) => { checkLeak(r.title); checkLeak(r.url); });
+          if (b.type === "server_tool_use") checkLeak(b.input?.query);
+        }
+      },
+    });
+    const u = out.usage;
+    q(".state").textContent = `Data: ${notes.join(" · ")}. Finished in ${((Date.now() - t0) / 1000).toFixed(0)} s · ${u.input_tokens.toLocaleString()} input and ${u.output_tokens.toLocaleString()} output tokens${u.web_searches ? ` · ${u.web_searches} web searches` : ""}.`;
+    q(".summary").innerHTML = (leak ? `<p class="box no">Leak warning: the agent's web searches or results mention "${esc(leak)}", from the project's name. It may have found documents about this project, so this result can't count as a blind test.</p>` : "") + mdLite(out.text);
+    q(".flags").innerHTML = flagsTable(out.result);
+    q(".compare").innerHTML = `<p class="muted" style="margin:8px 0 0">IFC view, compared with IFC's own screening:</p>` + compareTable(out.result, s);
+    q("details").open = false;
+  } catch (e) {
+    q(".state").innerHTML = `<span class="no">${e instanceof LimitReached ? esc(e.message) : "The run stopped: " + esc(e.message)}</span>`;
+    throw e;
+  }
+}
+
+async function guarded(fn) {
+  if (busy) return;
+  busy = true; $("run").disabled = $("both").disabled = true; $("status").textContent = "";
+  try { await fn(); } catch (e) { $("status").textContent = e.message; } finally { busy = false; $("run").disabled = $("both").disabled = false; }
+}
+$("run").onclick = () => guarded(() => runOnce($("skill").checked));
+$("both").onclick = () => guarded(async () => { await runOnce(false); await runOnce(true); });
 </script>
 </body>
 </html>
