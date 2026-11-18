@@ -13,6 +13,7 @@ import { CONFIG } from "./config.js";
 import { THEMES, themeFor, bandOf, BAND_OPACITY, BIG_AREA_KM2, chooseLabels, ringDistances } from "./findings.js";
 import { createScreening, evidenceOf, evidenceWithin, nearestByTheme, flagBeyond, reassess, isArea, THEME_CODE } from "./ntrrun.js";
 import * as U from "./units.js";
+import { pickExamples } from "./examples.js";
 import { getUserKey, setUserKey } from "./claude.js";
 import { distancesLine, bandFor } from "./distances.js";
 import { DISCLAIMER } from "./disclaimer.js";
@@ -1132,6 +1133,8 @@ let pendingReply = null;
 // Once a skill is loaded, later turns carry it in the system prompt instead of spending a round on load_skill.
 const loadedSkills = new Set();
 $("ask").addEventListener("submit", (e) => { e.preventDefault(); send(say.value.trim()); });
+// The welcome examples change on every load: one of each kind from a small pool (js/examples.js).
+pickExamples().forEach((text, i) => { const b = document.querySelectorAll("[data-example]")[i]; if (b) b.textContent = text; });
 document.querySelectorAll("[data-example]").forEach((b) => b.addEventListener("click", () => send(b.textContent.trim())));
 
 // The whole session, tool inputs and outputs included, for checking what the analyst did. Kept in the page only;

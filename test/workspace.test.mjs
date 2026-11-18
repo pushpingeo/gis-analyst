@@ -113,4 +113,13 @@ await test("a shape across a border names both countries", async () => {
   assert.ok(d.countries.includes("Switzerland") && d.countries.includes("Germany"), d.countries.join());
 });
 
+await test("welcome examples: one of each kind, rotating, none about oil and gas", async () => {
+  const { EXAMPLES, pickExamples } = await import("../js/examples.js");
+  const first = pickExamples(EXAMPLES, () => 0), last = pickExamples(EXAMPLES, () => 0.999);
+  assert.equal(first.length, 3);
+  assert.deepEqual(first, [EXAMPLES.find[0], EXAMPLES.shape[0], EXAMPLES.screen[0]]);
+  assert.deepEqual(last, [EXAMPLES.find.at(-1), EXAMPLES.shape.at(-1), EXAMPLES.screen.at(-1)]);
+  assert.ok(!Object.values(EXAMPLES).flat().some((e) => /oil|gas|platform|block \d|mine|pipeline/i.test(e)));
+});
+
 console.log(`${passed} workspace tests passed`);

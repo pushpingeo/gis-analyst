@@ -532,7 +532,8 @@ export function cleanName(raw) {
   return n.length > 40 ? `${n.slice(0, 39).trim()}…` : n;
 }
 export function placeName(i, a, f) {
-  if (i.name && String(i.name).trim()) return cleanName(i.name);
+  // A name the analyst gives is used as given (trimmed), so the name it then uses in tool calls matches.
+  if (i.name && String(i.name).trim()) return String(i.name).replace(/\s+/g, " ").trim().slice(0, 60);
   const base = cleanName(a.cand ? a.cand.name || a.cand.type : a.place?.name || a.label);
   if (!base || /^C\d+$/i.test(base)) return null;
   const km2 = turf.area(f) / 1e6;

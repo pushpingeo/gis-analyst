@@ -2,6 +2,27 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (22:30): welcome examples: global, calm, rotating (Rob)
+- The examples (Jackdaw, block 30/2, Linlithgow) were UK and oil-and-gas. Now one of each kind (find, shape, screen)
+  is picked at random on every load from a small pool (`js/examples.js`): find: Linlithgow Palace and 5 km around
+  it; Lake Tekapo, New Zealand. Shape: a 2 km square round the Kinderdijk windmills; 10 km round Peggy's Cove,
+  Nova Scotia; 3 km round Mont-Saint-Michel. Screen: a small wind farm site near Lemvig, Denmark; a small solar
+  farm site near Évora, Portugal. The page's own HTML holds one set, so it still reads right before the script runs.
+- Chosen by running candidates through the live analyst (`try-requests`, Haiku and the real atlas, three rounds):
+  kept: Linlithgow 8 s; Lake Tekapo outline (OSM); Kinderdijk 10 s (centred on the village; the mills fall inside);
+  Peggy's Cove 7 s; Mont-Saint-Michel as "mark out 3 km" (read as a radius; "draw 3 km around" was read as across);
+  Lemvig: placed and screened in one go, 91 s, designated nature, a power line, Natura 2000 nearby; Évora 77 s,
+  other solar farms nearby, Natura 2000 at 6.5 km. Dropped: "what's around Lake Tekapo" (30 s of searching, no
+  shape); a solar farm "just outside Tucson" (the analyst's guessed spot fell in Saguaro National Park); "the Jutland
+  coast" (too vague; the site ended up in a fjord); Marana (asked questions first); Red Rock, Arizona (three
+  places of that name; the screen landed in a national forest); Herning (screened a town); Tabernas (centred on the
+  town); Bakersfield (asked questions first). Places in Australia, northern Canada and the Amazon left out of the
+  welcome on purpose (screens there rightly raise Indigenous land, which is heavy for a first click), as are
+  places where the atlas is thin.
+- Found on the way: a name the analyst gives a place ("Tabernas solar site (placeholder)") is now used as given;
+  tidying had cut the brackets, so its next call missed the place. `try-requests` now keeps place names as the
+  page does.
+
 ## 18 Nov 2026 (22:00): a quieter composer (Rob)
 - The links under the input (how the screening was tested, the earlier agent page, the code) moved into the
   settings dialog under "About", with one line on what Tobler does and what's coming next (draft wording, for Rob).

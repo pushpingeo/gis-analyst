@@ -424,6 +424,7 @@ await test("places are named after what they were built from, not 'Area 1'", () 
   assert.equal(placeName({ shape: "feature" }, cand("Linlithgow Loch"), sq), "Linlithgow Loch");
   assert.equal(placeName({ shape: "buffer" }, cand("M9"), sq), "M9 corridor");
   assert.equal(placeName({ shape: "square", name: "the Jackdaw box" }, cand("JACKDAW"), sq), "the Jackdaw box");
+  assert.equal(placeName({ shape: "square", name: "Tabernas solar site (placeholder)" }, cand("Tabernas"), sq), "Tabernas solar site (placeholder)", "the analyst's own name isn't rewritten");
   assert.equal(placeName({ shape: "point" }, { cand: { name: "" }, label: "C4" }, sq), null, "no name, no made-up one");
 });
 
