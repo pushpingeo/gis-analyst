@@ -2,6 +2,13 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (10:30): FIRMS key on the live Worker
+- Rob's live screen reported NASA FIRMS "API key missing". Cause: the Worker's last good deploy (17 Nov 18:34) came
+  before `FIRMS_MAP_KEY` was a repo secret, and the two deploys after it (20:06, 20:07) failed their live FIRMS check
+  because the secret was still empty. Redeployed (push under `worker/`): the key loaded and the live FIRMS check
+  answers 200. Same deploy: the Worker accepts 1–5 days, NASA's limit (was 1–10). Lesson: after adding a repo secret
+  the Worker needs, push under `worker/` (or run Worker deploy) and read the log.
+
 ## 18 Nov 2026 (05:10): chip, tagline, delete on the card (Rob)
 - "Screen for risks" chip live: it fills "Screen <place in focus> for risks" (or "Screen " with no place) and waits
   for Send. Tagline: "Your geospatial screening analyst." Shape cards get a small trash button (deletes the shape
