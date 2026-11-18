@@ -247,12 +247,12 @@ export const NAMED_KINDS = {
   "licence block or concession": { concepts: ["oil-gas", "mineral-extraction", "maritime-boundary"], titles: /block|licen[cs]|concession|lease|permit|tenement|title|acreage|oml|opl|award|round/i, geom: "area" },
   // Outlines preferred, points accepted: global trackers (Global Energy Monitor) hold fields as points, and a field
   // missing from a national layer may be there (Bonga North and Bonga Southwest Aparo, 18 Nov).
-  "oil or gas field": { concepts: ["oil-gas"], titles: /field|discover|reservoir|accumulation|extraction/i, prefer: "area" },
+  "oil or gas field": { concepts: ["oil-gas"], titles: /field|discover|reservoir|accumulation|extraction/i, prefer: "area", trackers: true },
   "well": { concepts: ["oil-gas"], titles: /well|borehole/i },
   "offshore installation": { concepts: ["oil-gas"], titles: /platform|installation|infrastructure|facilit|structure/i },
-  "wind farm or lease": { concepts: ["offshore-wind-site", "power-plant", "renewable-potential"], titles: /wind|lease|agreement|site|zone/i },
-  "power plant": { concepts: ["power-plant"] },
-  "mine or quarry": { concepts: ["mineral-extraction"] },
+  "wind farm or lease": { concepts: ["offshore-wind-site", "power-plant", "renewable-potential"], titles: /wind|lease|agreement|site|zone/i, trackers: true },
+  "power plant": { concepts: ["power-plant"], trackers: true },
+  "mine or quarry": { concepts: ["mineral-extraction"], trackers: true },
   "protected area": { concepts: ["protected-area"], geom: "area" },
   "heritage site": { concepts: ["heritage-site"] },
   "admin area": { concepts: ["admin-boundary"], geom: "area" },
@@ -311,11 +311,12 @@ export async function atlasFindNamed(names, kind, bbox, { call, limit = 8, max =
     }
     return { returned, kept, ...(wrong ? { wrong_geometry: wrong } : {}) };
   };
-  // Stop once matches come from two layers, or after a second batch: a match in one layer only (a national layer's
-  // Bonga Main) shouldn't hide namesakes held elsewhere (a global tracker's Bonga North), which the person then
-  // chooses between.
+  // For kinds global trackers also hold (fields, plants, mines, wind farms), stop once matches come from two layers or
+  // after a second batch: a match in one national layer (Bonga Main) shouldn't hide namesakes held elsewhere (Global
+  // Energy Monitor's Bonga North), which the person then chooses between. Other kinds stop at the first match
+  // (Linlithgow Loch took 14 s instead of 3 with the extra batch).
   let batches = 0;
-  const enough = () => { batches++; return cands.length > 0 && (new Set(cands.map((c) => c.source.atlas_id)).size >= 2 || batches >= 2); };
+  const enough = () => { batches++; return cands.length > 0 && (!k.trackers || new Set(cands.map((c) => c.source.atlas_id)).size >= 2 || batches >= 2); };
   const { checked, unasked } = await askInBatches(layers, ask, { first: 10, then: 10, max, budgetMs, layerMs, enough });
   // Layers whose titles fit the kind come first, so a match there outranks one from an unrelated layer; then
   // outlines before points where outlines are preferred.

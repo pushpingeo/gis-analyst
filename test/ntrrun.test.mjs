@@ -381,4 +381,25 @@ await test("licence rule applies to every catalogue search: Esri MLA and non-com
   assert.equal(on.layers.length, 3);
 });
 
+
+await test("named field search: a national outline and a tracker's points both come back, outline first; other kinds stop at the first match", async () => {
+  const { atlasFindNamed } = await import("../js/atlasfeatures.js");
+  const layers = Array.from({ length: 15 }, (_, i) => ({ id: `L${i}`, title: i === 0 ? "Gas fields" : i === 12 ? "Global Oil and Gas Extraction Tracker (fields)" : `Other field layer ${i}`,
+    publisher: i === 0 ? "Federal Ministry of Power (Nigeria)" : i === 12 ? "Global Energy Monitor" : "Someone", publisher_type: i === 0 ? "central-gov" : "ngo", capabilities: ["query"], licence: "not stated" }));
+  const asked = [];
+  const call = async (tool, a) => {
+    if (tool === "find_datasets") return { matches: layers.length, results: layers };
+    asked.push(a.id);
+    if (a.id === "L0") return { returned: 1, features: [{ type: "Feature", geometry: turf.circle([4.47, 4.37], 5).geometry, properties: { name: "Bonga Main" } }] };
+    if (a.id === "L12") return { returned: 1, features: [{ type: "Feature", geometry: { type: "Point", coordinates: [4.61, 4.59] }, properties: { name: "Bonga North Oil and Gas Field (Nigeria)" } }] };
+    return { returned: 0, features: [] };
+  };
+  const r = await atlasFindNamed(["Bonga"], "oil or gas field", [0, 2, 17, 16], { call });
+  assert.deepEqual(r.candidates.map((c) => c.name), ["Bonga Main", "Bonga North Oil and Gas Field (Nigeria)"]);
+  asked.length = 0;
+  const p = await atlasFindNamed(["Bonga"], "protected area", [0, 2, 17, 16], { call });
+  assert.equal(asked.length, 10, "one batch only for kinds without trackers");
+  assert.equal(p.candidates.length, 1);
+});
+
 console.log(`${passed} ntrrun tests passed`);
