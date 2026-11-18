@@ -1,6 +1,6 @@
 ---
 name: ntr-screening
-version: 3.2-draft
+version: 3.3-draft
 description: Screen a site, onshore or offshore, for non-technical risk (NTR) from published spatial data. Flags anything that could become a risk, concern or delay (land and livelihoods, biodiversity, Indigenous Peoples, cultural heritage, community health and safety, and the operating context), with traced evidence and what wasn't checked. Use when someone asks what risks, sensitivities or constraints a site, block, field, route or area might raise.
 ---
 
@@ -15,10 +15,10 @@ It is a screen, not an impact assessment. The themes follow IFC's Performance St
 - **Asset type:** e.g. solar, wind (onshore or offshore), hydro, thermal plant, mine, oil and gas field or platform, pipeline or cable, port or terminal, exploration block, seismic survey. Ask if it isn't clear and it changes the answer; otherwise say what you assumed.
 - **Stage:** greenfield, expansion of an existing site, or an existing asset. If it isn't given, assume **greenfield** and say so. *Most risk comes from new land or sea-bed take and construction.*
 - **Onshore or offshore:** from the site itself (the place's details say whether it's offshore). A coastal site screens both ways.
-- **Footprint:** if there's only a point, use a footprint radius and say so: thermal, substation or terminal 0.5 km; solar 1 km; oil and gas plant or platform 1 km; wind 3 km; mine 3 km; hydro 5 km (the reservoir and the dried-out reach run along the river); oil and gas field 5 km. Screen linear assets along the whole line.
+- **Footprint:** when the screen runs as its own run, the run gives the footprint (a point becomes a circle of a radius set by the asset type) and says so; use it. Otherwise, if there's only a point, use a footprint radius and say so: thermal, substation or terminal 0.5 km; solar 1 km; oil and gas plant or platform 1 km; wind 3 km; mine 3 km; hydro 5 km (the reservoir and the dried-out reach run along the river); oil and gas field 5 km. Screen linear assets along the whole line.
 
 ## Distances (defaults; the person can change any of them)
-Distances are measured from the footprint edge. Use these unless the person gives others; when they do, use theirs, say so, and keep them for the rest of the conversation.
+Distances are measured from the footprint edge. When the screen runs as its own run, the run gives the distances, chosen from the asset type and size (or set by the person), with the reason: use those and quote the reason. Otherwise use the table below unless the person gives others; when they do, use theirs, say so, and keep them for the rest of the conversation.
 
 | Band | Onshore | Offshore | Why |
 |---|---|---|---|

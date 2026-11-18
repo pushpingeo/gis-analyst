@@ -1,0 +1,262 @@
+// Tests for sealed NTR runs, the run record, the slider helpers, re-assessment and scale-aware distances.
+// Atlas and model are faked; the site is a 10 km square field west of Shetland (Rosebank-like).
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import * as turf from "../js/vendor/turf.js";
+import * as R from "../js/reference.js";
+import { createPlaceTools } from "../js/placetools.js";
+import { parseSkill } from "../js/converse.js";
+import { chooseDistances, bandFor, distancesLine } from "../js/distances.js";
+import { runScreening, createScreening, evidenceWithin, nearestByTheme, flagBeyond, reassess, parseResult, traceFlags, footprintOf, headline, RUN_SCHEMA } from "../js/ntrrun.js";
+import * as G from "../js/geometry.js";
+
+let passed = 0;
+const test = async (name, fn) => { await fn(); passed++; console.log("ok", name); };
+const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
+const table = JSON.parse(read("../catalogue/distances.json"));
+const trusted = JSON.parse(read("../catalogue/trusted.json"));
+const skill = parseSkill(read("../skills/ntr-screening/SKILL.md"));
+const ref = R.createReference(async (n) => JSON.parse(read(`../data/ref/${n}.json`)));
+
+const FIELD = [-3.95, 60.98];
+const square = G.squareAround(FIELD, 100, 0); // 10 km square
+const east = (km) => turf.destination(FIELD, 5 + km, 90).geometry.coordinates;
+
+// Fake atlas: pipelines (one inside, one 1.5 km out, one 30 km out), wrecks (2 km and 45 km), a failing heritage layer.
+const atlasCalls = [];
+async function atlas(tool, args) {
+  atlasCalls.push([tool, args]);
+  if (tool === "find_datasets" && /pipeline/i.test(args.text || "")) return { matches: 1, results: [{ id: "pipe", title: "UKCS pipelines (WGS84)", publisher: "North Sea Transition Authority", capabilities: ["query"], licence: "NSTA Open User Licence" }] };
+  if (tool === "find_datasets" && /wreck/i.test(args.text || "")) return { matches: 2, results: [
+    { id: "wreck", title: "Worldwide wreck locations (UK Hydrographic Office)", publisher: "EMODnet Human Activities", capabilities: ["query"], licence: "Creative Commons CC-BY 4.0" },
+    { id: "broken", title: "Heritage Ship Wrecks", publisher: "EMODnet Human Activities", capabilities: ["query"], licence: "Creative Commons CC-BY 4.0" }] };
+  if (tool === "find_datasets") return { matches: 0, results: [] };
+  if (tool === "fetch_features" && args.id === "pipe") {
+    const line = (a, b, name) => ({ type: "Feature", geometry: { type: "LineString", coordinates: [a, b] }, properties: { PIPE_NAME: name } });
+    return { returned: 3, features: [
+      line(FIELD, turf.destination(FIELD, 2, 0).geometry.coordinates, "Rosebank 9 inch Production flowline 1"),
+      line(east(1.5), turf.destination(east(1.5), 2, 0).geometry.coordinates, "West of Shetland Pipeline"),
+      line(east(30), turf.destination(east(30), 2, 0).geometry.coordinates, "Clair export"),
+    ] };
+  }
+  if (tool === "fetch_features" && args.id === "wreck") return { returned: 2, features: [
+    { type: "Feature", geometry: { type: "Point", coordinates: east(2) }, properties: { name: "TROLDFOS (POSSIBLY)", date_sunk: "19170418" } },
+    { type: "Feature", geometry: { type: "Point", coordinates: east(45) }, properties: { name: "FAR WRECK" } },
+  ] };
+  if (tool === "fetch_features" && args.id === "broken") throw new Error("atlas: fetch failed");
+  throw new Error(`unexpected ${tool} ${JSON.stringify(args)}`);
+}
+const host = () => ({ ref, anchors: [], headers: {}, atlas, firms: null, trusted, esriLicence: () => false, fetchFn: async () => ({ ok: true, json: async () => [] }), places: () => [], findPlace: () => null, skillText: () => "" });
+
+const RESULT = (extra = "") => `Rosebank screened as an offshore oil field (assumed greenfield).
+
+\`\`\`json
+{"site":{"place":"Area 1"},"distances_km":{"near":2,"close":10,"wider":50},
+ "flags":[
+  {"risk":"Wreck close to the field could need a survey and avoidance zone","theme":"PS8","confidence":"medium","why":"heritage and safety",
+   "evidence":[{"name":"TROLDFOS (POSSIBLY)","distance_km":2,"dataset":"Worldwide wreck locations (UK Hydrographic Office)","publisher":"EMODnet Human Activities"}]},
+  {"risk":"Existing pipelines on and near site (simultaneous operations)","theme":"PS4","confidence":"high","why":"SIMOPS",
+   "evidence":[{"name":"Rosebank 9 inch Production flowline 1","distance_km":0,"dataset":"UKCS pipelines (WGS84)"},{"name":"West of Shetland Pipeline","distance_km":1.5,"dataset":"UKCS pipelines (WGS84)"}]},
+  {"risk":"Seabird colonies on Shetland may be in spill reach","theme":"PS6","confidence":"low","why":"regional knowledge",
+   "evidence":[{"name":"Foula seabird colony","distance_km":40,"dataset":"none (regional knowledge)"}]}${extra}
+ ],
+ "checked":[],"data_gaps":["Key Biodiversity Areas not checked","Heritage Ship Wrecks not checked (service failed)"]}
+\`\`\``;
+
+// A scripted model: find data, then fetch (asking for less than the wider band, which the run overrides), then answer.
+function scriptedModel(script) {
+  const calls = [];
+  let i = 0;
+  const fn = async (req) => {
+    calls.push(req);
+    const step = script[Math.min(i++, script.length - 1)];
+    return typeof step === "function" ? step(req) : step;
+  };
+  fn.calls = calls;
+  return fn;
+}
+const use = (id, name, input) => ({ type: "tool_use", id, name, input });
+const toolTurn = (...uses) => ({ stop_reason: "tool_use", content: uses, usage: { input_tokens: 1000, output_tokens: 50 } });
+const final = (text) => ({ stop_reason: "end_turn", content: [{ type: "text", text }], usage: { input_tokens: 2000, output_tokens: 400 } });
+const standardScript = () => scriptedModel([
+  toolTurn(use("a", "find_data", { text: "pipeline", area: "Area 1" }), use("b", "find_data", { text: "wreck", area: "Area 1" })),
+  toolTurn(use("c", "get_data", { dataset: "D1", place: "Area 1", within_km: 5, theme: "community" }), use("d", "get_data", { dataset: "D2", place: "Area 1", within_km: 10, theme: "heritage" }), use("e", "get_data", { dataset: "D3", place: "Area 1", theme: "heritage" })),
+  final(RESULT()),
+]);
+const site = { name: "Area 1", feature: square, origin: { method: "words", words: "Rosebank", confidence: "high", anchor: { name: "Rosebank", source: { title: "UKCS offshore hydrocarbon fields (WGS84)", publisher: "North Sea Transition Authority", licence: "not stated" } } } };
+
+await test("distances: offshore oil field defaults, with the reason", () => {
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  assert.deepEqual([d.near, d.close, d.wider], [2, 10, 50]);
+  assert.equal(d.set_by, "default");
+  assert.match(d.reasons[0], /offshore oil or gas field offshore/);
+  assert.match(distancesLine(d), /near 2 km · close 10 km · wider 50 km \(default for offshore oil or gas field offshore\)/);
+});
+
+await test("distances: scale-aware (small solar, wind tip height, large mine) and the person's own, capped at 50 km", () => {
+  const small = chooseDistances(table, { asset_type: "solar", capacity_mw: 2 });
+  assert.deepEqual([small.near, small.close, small.wider, small.footprint_km], [0.5, 2, 10, 0.3]);
+  const big = chooseDistances(table, { asset_type: "solar", capacity_mw: 300 });
+  assert.equal(big.wider, 25);
+  const wind = chooseDistances(table, { asset_type: "wind-onshore", tip_height_m: 230 });
+  assert.equal(wind.near, 2.3);
+  assert.match(wind.reasons.at(-1), /230 m tip height gives 2.3 km/);
+  const mine = chooseDistances(table, { asset_type: "mine", area_km2: 35 });
+  assert.deepEqual([mine.close, mine.wider], [10, 30]);
+  const mine2 = chooseDistances(table, { asset_type: "mine", area_km2: 5 });
+  assert.equal(mine2.wider, 25);
+  const mine3 = chooseDistances(table, { asset_type: "mine" }, { wider: 80, near: 0.5 });
+  assert.equal(mine3.wider, 50);
+  assert.equal(mine3.near, 0.5);
+  assert.equal(mine3.set_by, "person");
+  assert.match(mine3.reasons.join(" "), /capped at 50 km/);
+  const odd = chooseDistances(table, { asset_type: "solar", offshore: true });
+  assert.deepEqual([odd.near, odd.close, odd.wider], [2, 10, 50]);
+  assert.match(odd.reasons[0], /no offshore default for solar farm/);
+  const unknown = chooseDistances(table, { asset_type: null });
+  assert.deepEqual([unknown.near, unknown.close, unknown.wider], [1, 5, 20]);
+});
+
+await test("bands from the run's distances", () => {
+  const d = { near: 2, close: 10, wider: 50 };
+  assert.deepEqual([0, 1.9, 2, 7, 49, 51].map((k) => bandFor(k, d)), ["on site", "near", "near", "close", "wider", "beyond"]);
+});
+
+await test("parseResult takes the last JSON block and keeps the summary above it", () => {
+  const p = parseResult(RESULT());
+  assert.equal(p.json.flags.length, 3);
+  assert.match(p.summary, /^Rosebank screened/);
+  assert.equal(parseResult("no json here").json, null);
+});
+
+let record;
+await test("sealed run: fetches out to the wider band, records evidence with provenance, traces flags, reports what failed", async () => {
+  atlasCalls.length = 0;
+  const model = standardScript();
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  record = await runScreening({ host: host(), site, distances: d, skill, callClaude: model, model: "claude-haiku-5-5", runId: "R1",
+    inputs: { asset_type: "oil-gas-field", asset_label: "offshore oil or gas field", asset_assumed: true }, now: () => "2026-11-18T05:00:00Z" });
+  // The model asked for 5 and 10 km; the run fetched to 50 km both times.
+  const fetches = atlasCalls.filter(([t]) => t === "fetch_features");
+  for (const [, a] of fetches) {
+    const [w, , e] = a.bbox;
+    assert.ok(turf.distance([w, FIELD[1]], [e, FIELD[1]]) > 100 + 10, `bbox wide enough: ${a.bbox}`);
+  }
+  const r = record.tobler_run;
+  assert.equal(record.type, "FeatureCollection");
+  assert.equal(r.schema, RUN_SCHEMA);
+  assert.equal(r.skill.version, skill.version);
+  assert.equal(r.site.confidence, "high");
+  assert.equal(r.site.anchor_source.publisher, "North Sea Transition Authority");
+  assert.equal(r.fetched_to_km, 50);
+  // Evidence: 3 pipelines (inside, 1.5, 30 km) + 2 wrecks (2, 45 km). The 30 km and 45 km ones are kept for the slider.
+  const ev = record.features.filter((f) => f.properties.role === "evidence");
+  assert.equal(ev.length, 5, ev.map((f) => `${f.properties.name} ${f.properties.distance_km}`).join("; "));
+  for (const f of ev) for (const k of ["fid", "dataset", "publisher", "licence", "checked_at", "theme", "band", "distance_km"]) assert.ok(f.properties[k] != null && f.properties[k] !== "", `${k} on ${f.properties.name}`);
+  assert.equal(ev.find((f) => /TROLDFOS/.test(f.properties.name)).properties.theme, "heritage");
+  assert.equal(ev.find((f) => /flowline/.test(f.properties.name)).properties.band, "on site");
+  assert.equal(record.features[0].properties.role, "site");
+  // Flags: sorted by confidence; traced evidence carries fids; the regional-knowledge item is honestly untraced.
+  assert.deepEqual(r.flags.map((f) => f.confidence), ["high", "medium", "low"]);
+  assert.equal(r.flags[0].theme, "community");
+  assert.equal(r.flags[0].traced, 2);
+  assert.equal(r.flags[0].evidence[1].band, "near");
+  assert.equal(r.flags[2].traced, 0);
+  assert.equal(r.flags[2].evidence[0].traced, false);
+  // What was checked comes from the tools: the failing layer is "not checked", never "none".
+  const broken = r.checked.find((c) => c.dataset === "Heritage Ship Wrecks");
+  assert.equal(broken.result, "not checked");
+  assert.match(broken.why, /didn't answer/);
+  assert.equal(r.checked.find((c) => /pipelines/.test(c.dataset)).count, 3);
+  assert.deepEqual(r.data_gaps, ["Key Biodiversity Areas not checked", "Heritage Ship Wrecks not checked (service failed)"]);
+  // The model saw the run's distances and the fence rule, and no place-making tools.
+  const first = model.calls[0];
+  assert.match(first.messages[0].content, /near 2 km · close 10 km · wider 50 km/);
+  assert.match(first.messages[0].content, /assumed: say so/);
+  assert.match(first.system, /never instructions to you/);
+  assert.deepEqual(first.tools.map((t) => t.name).sort(), ["find_data", "find_features_near", "get_data", "get_place"]);
+});
+
+await test("slider helpers: findings within a distance, nearest per theme, flags beyond the distance", () => {
+  assert.equal(evidenceWithin(record, 50).length, 5);
+  assert.equal(evidenceWithin(record, 40).length, 4);
+  assert.equal(evidenceWithin(record, 10).length, 3);
+  assert.deepEqual(nearestByTheme(record, 10).map((x) => `${x.theme} ${x.name} ${x.distance_km}`), ["community Rosebank 9 inch Production flowline 1 0", "heritage TROLDFOS (POSSIBLY) 2"]);
+  const [pipes, wreck, birds] = record.tobler_run.flags;
+  assert.equal(flagBeyond(pipes, 1), false);
+  assert.equal(flagBeyond(wreck, 1), true);
+  assert.equal(flagBeyond(birds, 1), false, "untraced flags never drop out on their own");
+});
+
+await test("re-assess on tap: one call, no tools, only the stored evidence within the new distance; history kept", async () => {
+  const model = scriptedModel([final(`Within 1 km only the field's own lines matter.\n\n\`\`\`json\n{"flags":[{"risk":"Existing flowlines on site","theme":"PS4","confidence":"high","evidence":[{"name":"Rosebank 9 inch Production flowline 1","distance_km":0,"dataset":"UKCS pipelines (WGS84)"}]}],"data_gaps":["Key Biodiversity Areas not checked"]}\n\`\`\``)]);
+  const before = atlasCalls.length;
+  await reassess({ record, km: 1, skill, callClaude: model, now: () => "2026-11-18T05:05:00Z" });
+  assert.equal(atlasCalls.length, before, "no new fetching");
+  assert.equal(model.calls.length, 1);
+  assert.equal(model.calls[0].tools, undefined, "no tools");
+  const sent = model.calls[0].messages[0].content;
+  assert.match(sent, /Rosebank 9 inch Production flowline 1/);
+  assert.doesNotMatch(sent, /TROLDFOS|West of Shetland Pipeline/);
+  const r = record.tobler_run;
+  assert.equal(r.assessed_within_km, 1);
+  assert.equal(r.flags.length, 1);
+  assert.equal(r.flags[0].traced, 1);
+  assert.equal(r.assessments.length, 1);
+  assert.equal(r.assessments[0].flags.length, 3);
+  assert.equal(r.distances.wider, 1);
+  assert.equal(r.fetched_to_km, 50, "the slider can still go back out to 50 km");
+});
+
+await test("a point site is screened as a footprint circle, and the run says so", () => {
+  const d = chooseDistances(table, { asset_type: "platform", offshore: true });
+  const fp = footprintOf(turf.point(FIELD), d);
+  assert.equal(fp.feature.geometry.type, "Polygon");
+  assert.ok(Math.abs(turf.area(fp.feature) / 1e6 - Math.PI * 0.25) < 0.02);
+  assert.match(fp.note, /0.5 km footprint/);
+});
+
+await test("screen_site from the conversation: needs a place, runs sealed, returns the headline, get_run gives detail", async () => {
+  const h = host();
+  const list = [{ name: "Area 1", feature: square, origin: site.origin, status: "accepted", edits: [] }];
+  h.places = () => list;
+  h.findPlace = (n) => list.find((p) => p.name.toLowerCase() === String(n).toLowerCase());
+  const shown = [];
+  h.screening = createScreening({ host: h, table, skill, callClaude: standardScript(), onRun: (rec) => shown.push(rec) });
+  const t = createPlaceTools(h);
+  await assert.rejects(t.exec("screen_site", { place: "Area 9", asset_type: "oil-gas-field" }), /No place called "Area 9"/);
+  const out = await t.exec("screen_site", { place: "Area 1", asset_type: "oil-gas-field", assumed: true });
+  assert.equal(out.run, "R1");
+  assert.equal(out.flags, 3);
+  assert.deepEqual(out.by_confidence, { high: 1, medium: 1, low: 1 });
+  assert.match(out.distances, /wider 50 km/);
+  assert.equal(out.asset, "offshore oil or gas field (assumed)");
+  assert.ok(out.not_checked.includes("Heritage Ship Wrecks"));
+  assert.ok(!JSON.stringify(out).includes("coordinates"), "no geometry to the conversation");
+  assert.equal(shown.length, 1);
+  const g = await t.exec("get_run", {});
+  assert.equal(g.run, "R1");
+  assert.equal(g.flags[0].evidence[0].traced, true);
+  assert.equal(g.flags[0].theme, "PS4");
+});
+
+await test("a sealed run can't build places, and a missing JSON block is reported, not hidden", async () => {
+  const model = scriptedModel([toolTurn(use("x", "make_place", { anchor: "Area 1", shape: "circle", radius_km: 5, words: "x", match: "none", reason: "x" })), final("I looked but couldn't finish.")]);
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const rec = await runScreening({ host: host(), site, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
+  const toolResult = model.calls[1].messages.at(-1).content[0];
+  assert.equal(toolResult.is_error, true);
+  assert.match(toolResult.content, /isn't available in a screening run/);
+  assert.equal(rec.tobler_run.flags.length, 0);
+  assert.match(rec.tobler_run.parse_error, /no readable JSON/);
+  assert.match(headline(rec).problem, /no readable JSON/);
+});
+
+await test("traceFlags maps PS codes to themes and leaves unknown evidence untraced", () => {
+  const f = traceFlags([{ risk: "x", theme: "PS6", confidence: "medium", evidence: [{ name: "Nowhere", distance_km: 3 }] }], [], { near: 1, close: 5, wider: 20 });
+  assert.equal(f[0].theme, "biodiversity");
+  assert.equal(f[0].untraced, 1);
+  assert.equal(f[0].nearest_km, 3);
+});
+
+console.log(`${passed} ntrrun tests passed`);

@@ -11,6 +11,8 @@ import { callClaude, LimitReached } from "./claude.js";
 import { atlasViaWorker, firmsViaWorker } from "./atlasclient.js";
 import { CONFIG } from "./config.js";
 import { THEMES, themeFor, bandOf, BAND_OPACITY, BIG_AREA_KM2, chooseLabels, ringDistances } from "./findings.js";
+import { createScreening, evidenceOf, evidenceWithin, nearestByTheme, flagBeyond, reassess, THEME_CODE } from "./ntrrun.js";
+import { distancesLine, bandFor } from "./distances.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
@@ -128,6 +130,10 @@ function start() {
     paint: { "line-color": themeColour, "line-width": ["case", big, 1, 2], "line-opacity": emphasis } });
   map.addLayer({ id: "find-pt", type: "circle", source: "findings", filter: ["==", ["geometry-type"], "Point"],
     paint: { "circle-radius": ["match", ["get", "band"], "near", 6, 5], "circle-color": themeColour, "circle-opacity": emphasis, "circle-stroke-color": C.white, "circle-stroke-width": 1.5 } });
+  // The evidence behind one flag, picked out on the map when the flag is opened on the run card.
+  map.addSource("hl", { type: "geojson", data: turf.featureCollection([]) });
+  map.addLayer({ id: "hl-line", type: "line", source: "hl", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": C.ink, "line-width": 5, "line-opacity": 0.55 } }, "find-line");
+  map.addLayer({ id: "hl-pt", type: "circle", source: "hl", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 11, "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": C.ink, "circle-stroke-width": 2.5 } });
   // Tap a point or an outline to see what it is (not a big area's inside: that would get in the way of the site).
   for (const id of ["find-pt", "find-line"]) map.on("click", id, (e) => findingPopup(e));
   if (map.getStyle().glyphs) {
@@ -202,8 +208,10 @@ function showCandidates(list) {
 const findings = new Map();
 const hiddenThemes = new Set();
 let ringsAround = null;
+// A run's evidence is fetched out to its widest band once; the run card's slider sets how far is shown.
+let findingLimit = Infinity;
 function drawFindings() {
-  const feats = [...findings.values()].filter((f) => !hiddenThemes.has(f.properties.theme));
+  const feats = [...findings.values()].filter((f) => !hiddenThemes.has(f.properties.theme) && !(f.properties.run && f.properties.distance_km > findingLimit + 1e-9));
   chooseLabels(feats);
   map.getSource("findings")?.setData(turf.featureCollection(feats));
   drawKey();
@@ -219,13 +227,13 @@ function addFindings(list, meta = {}) {
   if (meta.place) drawRings(meta.place);
   drawFindings();
 }
-async function drawRings(place) {
-  const key = JSON.stringify(place.geometry).slice(0, 200);
+async function drawRings(place, kms = null) {
+  const key = JSON.stringify(place.geometry).slice(0, 200) + (kms || []).join(",");
   if (ringsAround === key) return;
   ringsAround = key;
   let offshore = false;
-  try { offshore = !!(await R.describe(ref, place)).offshore; } catch { /* reference not loaded */ }
-  const rings = ringDistances(offshore).map((km) => {
+  if (!kms) { try { offshore = !!(await R.describe(ref, place)).offshore; } catch { /* reference not loaded */ } }
+  const rings = (kms || ringDistances(offshore)).map((km) => {
     const b = turf.buffer(place, km, { units: "kilometers", steps: 32 });
     const line = turf.polygonToLine(b);
     const f = line.type === "FeatureCollection" ? line.features[0] : line;
@@ -235,7 +243,8 @@ async function drawRings(place) {
   map.getSource("rings")?.setData(turf.featureCollection(rings));
 }
 function clearFindings() {
-  findings.clear(); hiddenThemes.clear(); ringsAround = null;
+  findings.clear(); hiddenThemes.clear(); ringsAround = null; findingLimit = Infinity;
+  map.getSource("hl")?.setData(turf.featureCollection([]));
   map.getSource("rings")?.setData(turf.featureCollection([]));
   drawFindings();
 }
@@ -422,12 +431,30 @@ const host = {
     scheduleRefresh();
   },
 };
+// Screening runs: sealed NTR runs with their own tools; the conversation gets the headline, the card the detail.
+let distTable = null;
+let runLog = null, runSteps = null; // the turn a run belongs to, for the log and "How I worked this out"
+host.screening = createScreening({
+  host, table: () => distTable, skill: () => skills["ntr-screening"], callClaude, model: CONFIG.model,
+  onRun: (record) => showRun(record),
+  onEvent: (ev) => {
+    if (ev.type === "tool_start") activity(`Screening: ${activityFor(ev.name, ev.input)}…`, true);
+    if (ev.type === "round") runLog?.events.push({ screen_model_round: ev.round, ms: ev.ms, tokens_in: ev.input_tokens, tokens_out: ev.output_tokens, tool_calls: ev.tools });
+    if (ev.type === "tool") {
+      runLog?.events.push({ screen_tool: ev.name, input: ev.input, ms: ev.ms, ...(ev.error ? { error: ev.error } : { output: ev.output }) });
+      runSteps?.append(el("li", `Screen: ${traceLine(ev)}`, ev.error ? "err" : ""));
+    }
+  },
+});
 const tools = createPlaceTools(host);
+// The conversation doesn't load the NTR method itself: screen_site runs it as a sealed run.
+const conversationSkills = () => Object.values(skills).filter((s) => s.name !== "ntr-screening");
 
 Promise.all([
   ...["skills/place-finding/SKILL.md", "skills/ntr-screening/SKILL.md"].map((f) => fetch(asset(f)).then((r) => r.text()).then((t) => { const s = parseSkill(t); skills[s.name] = s; })),
   fetch(asset("catalogue/anchors.json")).then((r) => r.json()).then((j) => { anchors = j.sources; }),
   fetch(asset("catalogue/trusted.json")).then((r) => r.json()).then((j) => { trusted = j; }),
+  fetch(asset("catalogue/distances.json")).then((r) => r.json()).then((j) => { distTable = j; }),
 ]).catch((e) => note(`Something the analyst needs didn't load: ${e.message}`));
 
 // ---- cards ----------------------------------------------------------------------------
@@ -522,6 +549,166 @@ function makeChoiceCard({ choices, recommended, reason, question }) {
   i = Math.max(0, choices.indexOf(recommended));
   show();
   expandSheet();
+}
+
+// ---- run cards: a screening run, flags first --------------------------------------------------
+const fmtKm = (km) => (km == null ? "" : km === 0 ? "on site" : `${R.fmtNum(km)} km`);
+const runs = new Map(); // run id → { record, card }
+let shownRun = null;
+
+// Put a run's evidence on the map (replacing other findings), up to the card's slider.
+function showRunOnMap(record, { fit = true } = {}) {
+  const r = record.tobler_run;
+  findings.clear(); hiddenThemes.clear();
+  for (const f of evidenceOf(record)) {
+    const p = f.properties;
+    const band = p.band === "on site" ? "near" : p.band === "beyond" || p.band === "unknown" ? "wider" : p.band;
+    findings.set(`${r.id}:${p.fid}`, { type: "Feature", geometry: f.geometry, properties: {
+      id: `${r.id}:${p.fid}`, run: r.id, label: p.name, theme: p.theme, band, distance_km: p.distance_km, area_km2: p.area_km2 ?? null, dataset: p.dataset, publisher: p.publisher,
+    } });
+  }
+  shownRun = r.id;
+  const site = record.features.find((f) => f.properties.role === "site");
+  findingLimit = runs.get(r.id)?.km ?? r.assessed_within_km;
+  ringsAround = null;
+  drawRings(site, [r.distances.near, r.distances.close, r.fetched_to_km].filter((v, i, a) => v > 0 && a.indexOf(v) === i));
+  map.getSource("hl")?.setData(turf.featureCollection([]));
+  drawFindings();
+  if (fit) map.fitBounds(turf.bbox(turf.buffer(site, Math.max(r.distances.close, 1), { units: "kilometers", steps: 16 })), { padding: fitPadding(), maxZoom: 13 });
+}
+
+function highlight(record, fids) {
+  const want = new Set(fids || []);
+  const feats = evidenceOf(record).filter((f) => want.has(f.properties.fid));
+  map.getSource("hl")?.setData(turf.featureCollection(feats));
+  if (!feats.length) return;
+  const site = record.features.find((f) => f.properties.role === "site");
+  map.fitBounds(turf.bbox(turf.featureCollection([...feats, site])), { padding: fitPadding(), maxZoom: 14 });
+}
+
+function showRun(record) {
+  const card = $("run-card").content.firstElementChild.cloneNode(true);
+  const r = record.tobler_run;
+  const entry = { record, card, km: r.assessed_within_km };
+  runs.set(r.id, entry);
+  card.dataset.run = r.id;
+  card.querySelector(".site").textContent = r.site.name;
+  card.querySelector(".meta").textContent = `${r.id} · NTR ${r.skill.version} · ${new Date(r.finished_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  card.querySelector(".setup").textContent = [
+    `${r.site.asset_label[0].toUpperCase()}${r.site.asset_label.slice(1)}${r.site.asset_assumed ? " (assumed)" : ""}`, r.site.stage, r.site.setting, r.site.footprint,
+  ].filter(Boolean).join(" · ");
+  if (r.parse_error) { const pr = card.querySelector(".problem"); pr.hidden = false; pr.textContent = r.parse_error; }
+  const slider = card.querySelector('input[type="range"]');
+  slider.max = String(r.fetched_to_km);
+  slider.step = r.fetched_to_km <= 10 ? "0.1" : "0.5";
+  slider.value = String(r.assessed_within_km);
+  slider.addEventListener("input", () => { entry.km = +slider.value; paintReach(entry); if (shownRun === r.id) { findingLimit = entry.km; drawFindings(); } });
+  card.querySelector('[data-op="reassess"]').addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const was = btn.textContent;
+    btn.textContent = "Re-assessing…";
+    activity(`Re-assessing ${r.site.name} within ${R.fmtNum(entry.km)} km…`, true);
+    const t0 = Date.now();
+    try {
+      await reassess({ record, km: entry.km, skill: skills["ntr-screening"], callClaude });
+      sessionLog.push({ at: new Date().toISOString(), reassess: r.id, within_km: entry.km, ms: Date.now() - t0, flags: r.flags.length });
+      paintRun(entry);
+      if (shownRun === r.id) showRunOnMap(record, { fit: false });
+    } catch (err) {
+      btn.textContent = was;
+      const pr = card.querySelector(".problem"); pr.hidden = false;
+      pr.textContent = err instanceof LimitReached ? err.message : `Re-assessing didn't work: ${err.message}. The flags are unchanged.`;
+    } finally { btn.disabled = false; activity(""); }
+  });
+  card.querySelector('[data-op="show"]').addEventListener("click", () => { slider.value = String(entry.km); showRunOnMap(record); });
+  card.querySelector('[data-op="download"]').addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(record, null, 1)], { type: "application/geo+json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `tobler-${r.id}-${r.site.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.geojson`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  });
+  paintRun(entry);
+  if (pendingReply?.isConnected) $("conversation").insertBefore(card, pendingReply);
+  else $("conversation").append(card);
+  showRunOnMap(record);
+  expandSheet();
+}
+
+function paintRun(entry) {
+  const { record, card } = entry;
+  const r = record.tobler_run;
+  const list = card.querySelector(".flags");
+  list.replaceChildren(...r.flags.map((f) => {
+    const li = el("li", null, "flag");
+    li.dataset.conf = f.confidence;
+    const d = document.createElement("details");
+    const s = document.createElement("summary");
+    const sw = el("span", null, "swatch"); sw.style.background = THEMES[f.theme]?.colour || THEMES.context.colour; sw.title = THEMES[f.theme]?.label || "";
+    s.append(el("span", f.confidence, "conf"), sw, el("span", f.risk, "risk"), el("span", f.nearest_km == null ? "" : fmtKm(f.nearest_km), "dist"));
+    const body = el("div", null, "body");
+    body.append(el("p", `${THEMES[f.theme]?.label || "Operating context"}${THEME_CODE[f.theme] && THEME_CODE[f.theme] !== "context" ? ` (${THEME_CODE[f.theme]})` : ""}. ${f.why || ""}`, "why"));
+    const ev = el("ul", null, "ev");
+    for (const e of f.evidence) {
+      const item = el("li");
+      item.append(el("b", e.name || "Unnamed"), document.createTextNode(` · ${e.distance_km == null ? "distance not given" : `${fmtKm(e.distance_km)}${e.band && e.band !== "on site" ? ` (${e.band})` : ""}`} `));
+      item.append(el("span", `· ${[e.dataset, e.publisher && `(${e.publisher})`].filter(Boolean).join(" ")}${e.licence ? `, ${e.licence}` : ""}${e.checked ? `, checked ${String(e.checked).slice(0, 10)}` : ""} `, "src"));
+      item.append(e.traced ? el("span", "· traced to the data", "src") : el("span", "· not traced to fetched data", "untraced"));
+      ev.append(item);
+    }
+    body.append(ev);
+    if (!f.evidence.length) body.append(el("p", "No evidence items given.", "note"));
+    d.append(s, body);
+    d.addEventListener("toggle", () => { if (d.open) { if (shownRun !== r.id) showRunOnMap(record, { fit: false }); highlight(record, f.fids); } });
+    li.append(d);
+    return li;
+  }));
+  if (!r.flags.length && !r.parse_error) list.replaceChildren(el("li", "No flags raised. See what was checked and the gaps below.", "flag note"));
+  card.querySelector(".dists").textContent = `Distances from the site's edge: ${distancesLine(r.distances)}. ${r.distances.reasons[0] ? `Why: ${r.distances.reasons.slice(0, 2).join("; ")}.` : ""}`;
+  const checked = card.querySelector(".checked");
+  const nc = r.checked.filter((c) => c.result === "not checked");
+  checked.querySelector("summary").textContent = `What was checked: ${r.checked.length} source${r.checked.length === 1 ? "" : "s"}${nc.length ? `, ${nc.length} not checked` : ""}`;
+  checked.querySelector("ul").replaceChildren(...r.checked.map((c) => {
+    const li = el("li", `${c.dataset}${c.publisher ? ` (${c.publisher})` : ""}: ${c.result === "features" ? `${c.count} found` : c.result}${c.why ? ` (${c.why.slice(0, 120)})` : ""}`);
+    if (c.result === "not checked") li.className = "nc";
+    return li;
+  }));
+  const gaps = card.querySelector(".gaps");
+  gaps.querySelector("summary").textContent = `Gaps: ${r.data_gaps.length}`;
+  gaps.querySelector("ul").replaceChildren(...r.data_gaps.map((g) => el("li", g)));
+  gaps.hidden = !r.data_gaps.length;
+  card.querySelector('input[type="range"]').value = String(entry.km);
+  paintReach(entry);
+}
+
+// The slider's line: how far, the nearest finding of each theme, flags whose evidence is all further out,
+// and the offer to re-assess when the distance differs from the one the flags were written for.
+function paintReach(entry) {
+  const { record, card, km } = entry;
+  const r = record.tobler_run;
+  card.querySelector(".reach output").textContent = `${R.fmtNum(km)} km`;
+  const near = nearestByTheme(record, km);
+  const n = evidenceWithin(record, km).length;
+  card.querySelector(".nearest").textContent = n
+    ? `${n} finding${n === 1 ? "" : "s"} within ${R.fmtNum(km)} km. Nearest: ${near.map((x) => `${(THEMES[x.theme]?.label || x.theme).toLowerCase()}, ${x.name} (${fmtKm(x.distance_km)})`).join("; ")}.`
+    : `Nothing found within ${R.fmtNum(km)} km in the sources checked.`;
+  card.querySelectorAll(".flag").forEach((li, i) => {
+    const f = r.flags[i];
+    if (!f) return;
+    const beyond = flagBeyond(f, km);
+    li.classList.toggle("beyond", beyond);
+    li.title = beyond ? `All of this flag's evidence is beyond ${R.fmtNum(km)} km` : "";
+  });
+  const stale = card.querySelector(".stale");
+  const differs = Math.abs(km - r.assessed_within_km) > 1e-9;
+  stale.hidden = !differs;
+  if (differs) {
+    stale.querySelector("span").textContent = `The flags were written for findings up to ${R.fmtNum(r.assessed_within_km)} km.`;
+    stale.querySelector("button").textContent = `Re-assess at ${R.fmtNum(km)} km`;
+  }
 }
 
 function paintStatus(p, card = p.card) {
@@ -681,7 +868,8 @@ async function send(text) {
   sessionLog.push(turnLog);
   try {
     const summary = await projectSummary(ref, host.places(), focusName, viewBounds());
-    const skillList = Object.values(skills);
+    const skillList = conversationSkills();
+    runLog = turnLog; runSteps = steps;
     const res = await runTurn({
       system: systemPrompt({ skills: skillList, loaded: skillList.filter((s) => loadedSkills.has(s.name)), comingSoon: ["net developable area and constraints-and-access analysis"] }),
       messages: buildMessages({ recent, summary, userText: text }),
@@ -719,6 +907,7 @@ async function send(text) {
   } finally {
     busy = false;
     pendingReply = null;
+    runLog = null; runSteps = null;
     $("ask").classList.remove("busy");
     reply.scrollIntoView({ block: "end", behavior: "smooth" });
   }
@@ -735,6 +924,10 @@ function traceLine(ev) {
     case "make_place": return `Built ${o.place}: ${o.how}`;
     case "edit_place": return `Changed ${o.place}: ${o.changed}`;
     case "get_place": return `Read ${i.place}`;
+    case "find_data": return `Searched the catalogue for “${i.text}”: ${o.datasets?.length || 0} datasets${o.not_checked ? " (catalogue not checked)" : ""}`;
+    case "get_data": return o.not_checked ? `Fetched ${o.dataset || i.dataset}: not checked (${String(o.not_checked).slice(0, 80)})` : `Fetched ${o.dataset} (${o.publisher}): ${o.within_distance} within ${o.within_km} km`;
+    case "screen_site": return o.run ? `Screened ${o.site} (${o.run}): ${o.flags} flags; ${o.distances}` : `Screening: ${o.not_available || "no result"}`;
+    case "get_run": return `Read the screen ${o.run || ""}`;
     default: return ev.name;
   }
 }

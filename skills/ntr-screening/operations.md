@@ -28,3 +28,9 @@ geodesic and measured from the footprint edge.
 
 ## Failures, in any setting
 A source that fails or isn't reached is reported as *not checked*, never as *nothing found*. Say which.
+
+## Run a screen as its own run (Tobler)
+- **Does:** runs this method as a sealed loop with only the operations above, on a fixed site, footprint and set of
+  distances (chosen from the asset type and size, or set by the person), and keeps every feature the operations
+  return, with its source, licence and date, as the run's evidence. The result is matched back to that evidence.
+- **Tobler:** `screen_site` from the conversation (`js/ntrrun.js`; distances from `catalogue/distances.json`).

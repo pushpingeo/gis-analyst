@@ -8,6 +8,7 @@ import { rateConfidence, runCheck, MATCHES } from "./confidence.js";
 import { atlasFindNamed, NAMED_KINDS, describeChecked } from "./atlasfeatures.js";
 import { DATA_TOOL_DEFS, createDataTools, geometryDistanceKm } from "./datatools.js";
 import { themeFor, THEME_IDS } from "./findings.js";
+import { ASSET_TYPES } from "./distances.js";
 import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES } from "./gazetteer.js";
 
 // Common names that aren't Natural Earth's own, and seas (energy basins especially) by rough box.
@@ -132,6 +133,29 @@ export function placeToolDefs(skills) {
       input_schema: { type: "object", properties: { place: { type: "string" } }, required: ["place"] },
     },
     ...DATA_TOOL_DEFS,
+    {
+      name: "screen_site",
+      description: "Screen a place for non-technical risk (NTR: land and livelihoods, biodiversity, Indigenous Peoples, cultural heritage, community health and safety, operating context). Runs the NTR method as its own sealed run with the data tools, then shows a run card (flags first, evidence on the map, the distances used with a slider, gaps) and returns the headline. Use it for any request to screen a site or ask what risks, sensitivities or constraints it raises. The place must already exist (find or build it first). Distances come from the asset type and size unless the person gives their own. Takes 30 to 90 seconds.",
+      input_schema: {
+        type: "object",
+        properties: {
+          place: { type: "string", description: "Place name, e.g. Area 1" },
+          asset_type: { type: "string", enum: ASSET_TYPES, description: "What would be built or done there. Use 'other' if unknown." },
+          assumed: { type: "boolean", description: "True if the person didn't say the asset type and you inferred it (e.g. an oil field's name)." },
+          stage: { type: "string", enum: ["greenfield", "expansion", "existing asset"], description: "Only if the person said; otherwise leave out (greenfield is assumed and said)." },
+          capacity_mw: { type: "number", description: "Only if the person gave it" },
+          tip_height_m: { type: "number", description: "Wind turbine tip height, only if the person gave it" },
+          distances: { type: "object", description: "Only if the person gave distances: near, close and/or wider in km (wider up to 50).", properties: { near: { type: "number" }, close: { type: "number" }, wider: { type: "number" } } },
+          focus: { type: "string", description: "Optional: what the person is most concerned about, in their words" },
+        },
+        required: ["place", "asset_type"],
+      },
+    },
+    {
+      name: "get_run",
+      description: "Details of a screening run (R1, R2…; leave out for the latest): flags with their evidence, what was checked and the gaps. For follow-up questions about a screen; don't re-run to answer them.",
+      input_schema: { type: "object", properties: { run: { type: "string" } } },
+    },
     {
       name: "show_on_map",
       description: "Bring findings into view: fits the map to the given feature ids (from find_features_near or get_data), or to everything found so far, together with the place in focus. Findings already stay on the map; use this when the person asks to see them. clear: true removes all findings from the map.",
@@ -469,6 +493,16 @@ export function createPlaceTools(host) {
     return r.shown ? { ...r, note: "The map now shows these with the place in focus." } : { shown: 0, note: "Nothing to show: no findings with those ids are on the map." };
   };
   run.get_data = (i) => data.get_data(i);
+  run.screen_site = async (i) => {
+    if (!host.screening) return { not_available: "Screening isn't connected here." };
+    const p = host.findPlace(i.place);
+    if (!p) throw new Error(`No place called "${i.place}". Find or build the site first.`);
+    return host.screening.screen(i, p);
+  };
+  run.get_run = async ({ run: id }) => {
+    if (!host.screening) return { not_available: "Screening isn't connected here." };
+    return host.screening.getRun(id);
+  };
 
   return {
     candidates: cands,

@@ -7,6 +7,7 @@ import * as R from "../js/reference.js";
 import { createPlaceTools, placeToolDefs, projectSummary } from "../js/placetools.js";
 import { parseSkill, systemPrompt, buildMessages, runTurn } from "../js/converse.js";
 import { atlasCall } from "./atlas-client.mjs";
+import { createScreening, evidenceOf } from "../js/ntrrun.js";
 import { firmsCall } from "./firms-client.mjs";
 
 const UA = { "User-Agent": "tobler-try/1.0 (+https://github.com/pushpingeo/tobler)" };
@@ -16,6 +17,9 @@ const trusted = JSON.parse(readFileSync("catalogue/trusted.json", "utf8"));
 const skill = parseSkill(readFileSync("skills/place-finding/SKILL.md", "utf8"));
 const ntr = parseSkill(readFileSync("skills/ntr-screening/SKILL.md", "utf8"));
 const allSkills = [skill, ntr];
+// The conversation doesn't load the NTR method itself: screen_site runs it as a sealed run (as in the page).
+const convSkills = [skill];
+const distTable = JSON.parse(readFileSync("catalogue/distances.json", "utf8"));
 let spend = { input: 0, output: 0 };
 
 async function callClaude({ system, messages, tools }) {
@@ -52,6 +56,22 @@ for (const conv of convs) {
     updatePlace(name, feature, words) { const p = this.findPlace(name); p.feature = feature; p.edits.push({ change: words }); },
     renamePlace(name, to) { this.findPlace(name).name = to; },
   };
+  host.screening = createScreening({
+    host, table: distTable, skill: ntr, callClaude, model: "claude-haiku-5-5",
+    onEvent: (ev) => {
+      if (ev.type === "round") console.log(`     [screen round ${ev.round + 1}: ${(ev.ms / 1000).toFixed(1)} s, ${ev.input_tokens} in / ${ev.output_tokens} out, ${ev.tools} tool calls]`);
+      if (ev.type === "tool") { const o = ev.output || {}; console.log(`     · screen ${ev.name} (${(ev.ms / 1000).toFixed(1)} s) ${JSON.stringify(ev.input).slice(0, 140)} → ${ev.error ? `ERROR ${ev.error}` : ev.name === "get_data" ? (o.not_checked ? `NOT CHECKED ${String(o.not_checked).slice(0, 120)}` : `${o.dataset}: ${o.within_distance} within ${o.within_km} km`) : ev.name === "find_data" ? (o.datasets || []).map((d) => `${d.id} ${d.title} (${d.publisher})`).join("; ").slice(0, 300) : ev.name === "find_features_near" ? `${o.found} found` : JSON.stringify(o).slice(0, 160)}`); }
+    },
+    onRun: (rec) => {
+      const r = rec.tobler_run;
+      console.log(`   [RUN CARD ${r.id}: ${r.site.name}; ${r.site.asset_label}${r.site.asset_assumed ? " (assumed)" : ""}; ${r.site.footprint}; ${r.distances.near}/${r.distances.close}/${r.distances.wider} km (${r.distances.reasons[0]})]`);
+      for (const f of r.flags) console.log(`     ${f.confidence.toUpperCase()} [${f.theme}] ${f.risk} | nearest ${f.nearest_km} km | evidence ${f.traced} traced, ${f.untraced} not traced: ${f.evidence.map((e) => `${e.name} ${e.distance_km} km${e.traced ? "" : " (untraced)"}`).join("; ").slice(0, 400)}`);
+      console.log(`     checked: ${r.checked.map((c) => `${c.dataset} → ${c.result}${c.count ? ` ${c.count}` : ""}`).join("; ").slice(0, 900)}`);
+      console.log(`     gaps: ${r.data_gaps.join(" | ").slice(0, 600)}`);
+      console.log(`     evidence features: ${evidenceOf(rec).length}; tokens ${r.usage.input_tokens} in / ${r.usage.output_tokens} out${r.parse_error ? `; PROBLEM ${r.parse_error}` : ""}`);
+      console.log(`     summary: ${r.summary.replace(/\s+/g, " ").slice(0, 700)}`);
+    },
+  });
   const tools = createPlaceTools(host);
   const recent = [];
   let loaded = [];
@@ -62,9 +82,9 @@ for (const conv of convs) {
     console.log(`\n> ${text}`);
     try {
       const res = await runTurn({
-        system: systemPrompt({ skills: allSkills, loaded, comingSoon: ["net developable area and constraints-and-access analysis"] }),
+        system: systemPrompt({ skills: convSkills, loaded, comingSoon: ["net developable area and constraints-and-access analysis"] }),
         messages: buildMessages({ recent, summary: await projectSummary(ref, list, list.at(-1)?.name), userText: text }),
-        tools: placeToolDefs(allSkills),
+        tools: placeToolDefs(convSkills),
         maxRounds: 14,
         exec: (name, input) => tools.exec(name, input),
         callClaude,

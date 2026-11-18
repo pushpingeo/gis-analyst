@@ -21,6 +21,7 @@ How you work:
 - Never work out coordinates, areas or distances in your head. Tools find places and build shapes; you choose the tool and the numbers and explain why.
 - For data about a topic (thermal hotspots, fish habitat, flood zones, wrecks, anything not in find_features_near's types): find_data with short words that would appear in a dataset title, two or three wordings in one step; then get_data on the best fetchable dataset (prefer national and intergovernmental publishers) for the place. Report the dataset, publisher and date checked with the result.
 - Never say data doesn't exist unless find_data searched for it and found nothing, and then say which words and area were searched. If no tool of yours could check something, say you couldn't check it, never that it isn't there. "Nothing found" from one dataset means nothing in that dataset, not nothing at all.
+- To screen a site for risks, sensitivities or constraints (NTR), use screen_site on a place that's on the map: it runs the screening method as its own run and shows a run card. Don't screen step by step with find_data yourself. Infer the asset type from the request or the place (an oil field's outline → oil-gas-field, with assumed: true); ask only if you can't and it matters. After a screen, answer in two or three sentences; for follow-ups use get_run, and run screen_site again only for new distances, a changed site or a different asset type.
 - For things of a kind near somewhere ("schools near 7 High Street", "substations within 10 km of Area 1"): find the place once, then one find_features_near call. Don't search for a kind of thing by name.
 - If a data service fails, don't keep retrying it with different settings: try once more at most, then tell the person what failed and offer to try again later.
 - Refer to places by name (e.g. "Area 1"). Use ids (C3, D2) only in tool calls, never in what you write to the person: name features and datasets as the data names them, adding the source or a distance if two share a name. Don't repeat coordinates to the person unless they ask.
@@ -60,7 +61,7 @@ export function buildMessages({ recent = [], summary, userText }) {
 
 // One turn. Throws on failure so the caller can roll back and leave no half exchange behind.
 // Tools that only look things up, so several can run at once.
-export const READ_ONLY = new Set(["load_skill", "find_place", "find_features_near", "get_place", "find_data", "get_data"]);
+export const READ_ONLY = new Set(["load_skill", "find_place", "find_features_near", "get_place", "find_data", "get_data", "get_run"]);
 
 export async function runTurn({ system, messages, tools, exec, callClaude, onEvent = () => {}, maxRounds = 10 }) {
   const history = messages.map((m) => ({ ...m }));
@@ -114,6 +115,8 @@ export function activityFor(name, input = {}) {
     case "get_place": return `Reading ${input.place}`;
     case "find_data": return `Searching the catalogue for “${input.text}”`;
     case "get_data": return `Fetching ${input.dataset} for ${input.place}`;
+    case "screen_site": return `Screening ${input.place} for non-technical risk (this takes a minute)`;
+    case "get_run": return `Reading the screen ${input.run || ""}`.trim();
     case "show_on_map": return input.clear ? "Clearing the map" : "Showing the findings on the map";
     default: return `Running ${name}`;
   }

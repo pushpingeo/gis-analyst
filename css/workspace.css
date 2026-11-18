@@ -223,3 +223,45 @@ a { color: var(--sea); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* run card: a sealed screening run, flags first */
+.run { border: 1px solid var(--rule); border-radius: 14px; padding: 12px 14px; }
+.run header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.run h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.run .meta { font-size: 12px; color: var(--ink-2); }
+.run .setup, .run .dists { margin: 4px 0 8px; font-size: 13px; color: var(--ink-2); }
+.run .problem { margin: 4px 0 8px; font-size: 13px; color: #9a3412; }
+.run .flags { list-style: none; margin: 0 0 10px; padding: 0; }
+.run .flag { border-top: 1px solid var(--rule); }
+.run .flag:first-child { border-top: 0; }
+.run .flag summary { list-style: none; display: grid; grid-template-columns: auto 12px 1fr auto; gap: 8px; align-items: baseline; padding: 7px 0; cursor: pointer; }
+.run .flag summary::-webkit-details-marker { display: none; }
+.run .conf { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; border-radius: 999px; padding: 1px 7px; border: 1px solid var(--ink); }
+.run .flag[data-conf="high"] .conf { background: var(--ink); color: #fff; }
+.run .flag[data-conf="medium"] .conf { background: #fff; color: var(--ink); }
+.run .flag[data-conf="low"] .conf { border-style: dashed; color: var(--ink-2); border-color: var(--ink-2); }
+.run .flag .swatch { width: 12px; height: 12px; border-radius: 3px; align-self: center; }
+.run .flag .risk { font-size: 14px; font-weight: 600; }
+.run .flag .dist { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.run .flag.beyond .risk, .run .flag.beyond .conf { opacity: .5; }
+.run .flag .body { padding: 0 0 8px 20px; font-size: 13px; }
+.run .flag .why { margin: 0 0 4px; }
+.run .flag .ev { margin: 0; padding-left: 16px; }
+.run .flag .ev li { margin: 2px 0; }
+.run .flag .ev .src { color: var(--ink-2); }
+.run .flag .ev .untraced { color: #9a3412; }
+.run .flag .note { color: var(--ink-2); font-style: italic; margin: 4px 0 0; }
+.run .reach { background: var(--paper); border-radius: 10px; padding: 8px 10px; margin: 0 0 6px; }
+.run .reach-label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; }
+.run .reach output { font-variant-numeric: tabular-nums; }
+.run .reach input[type="range"] { width: 100%; margin: 6px 0 2px; accent-color: var(--ink); }
+.run .nearest { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.run .stale { margin: 6px 0 0; font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.run .stale button { border: 1px solid var(--ink); background: var(--ink); color: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px; }
+.run .stale button[disabled] { opacity: .6; cursor: wait; }
+.run details.checked, .run details.gaps { font-size: 13px; margin: 2px 0; }
+.run details summary { cursor: pointer; color: var(--sea); }
+.run details ul { margin: 4px 0 6px; padding-left: 18px; }
+.run details .nc { color: #9a3412; }
+.run .edit { margin-top: 8px; }
+.run .flag summary { color: var(--ink); }

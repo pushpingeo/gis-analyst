@@ -9,7 +9,7 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=97a7b5b1">
+<link rel="stylesheet" href="css/workspace.css?v=13b61175">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
@@ -20,19 +20,21 @@
   "./js/confidence.js": "./js/confidence.js?v=ad22f5c6",
   "./js/config.js": "./js/config.js?v=06c1aa11",
   "./js/config.js?v=m2b": "./js/config.js?v=06c1aa11",
-  "./js/converse.js": "./js/converse.js?v=3c8df453",
+  "./js/converse.js": "./js/converse.js?v=8f75dd8d",
   "./js/datatools.js": "./js/datatools.js?v=dcf65781",
+  "./js/distances.js": "./js/distances.js?v=f8ecffd3",
   "./js/fence.js": "./js/fence.js?v=eee6e5f0",
   "./js/findings.js": "./js/findings.js?v=b71c96c8",
   "./js/gazetteer.js": "./js/gazetteer.js?v=a08aca9c",
   "./js/geometry.js": "./js/geometry.js?v=6bc3cd92",
   "./js/licence.js": "./js/licence.js?v=33e1d941",
-  "./js/placetools.js": "./js/placetools.js?v=1905e371",
+  "./js/ntrrun.js": "./js/ntrrun.js?v=1f8cdd42",
+  "./js/placetools.js": "./js/placetools.js?v=ce24edac",
   "./js/reference.js": "./js/reference.js?v=6eaf57a4",
   "./js/tools.js": "./js/tools.js?v=084a3bd7",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=034ed70f",
+  "./js/workspace.js": "./js/workspace.js?v=06501a21",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -40,14 +42,15 @@
 </script>
 <script type="application/json" id="asset-versions">
 {
- "skills/ntr-screening/SKILL.md": "skills/ntr-screening/SKILL.md?v=8d595dd0",
- "skills/ntr-screening/operations.md": "skills/ntr-screening/operations.md?v=04713a18",
+ "skills/ntr-screening/SKILL.md": "skills/ntr-screening/SKILL.md?v=ed26ca51",
+ "skills/ntr-screening/operations.md": "skills/ntr-screening/operations.md?v=4819a19c",
  "skills/ntr-screening-ifc/SKILL.md": "skills/ntr-screening-ifc/SKILL.md?v=d087c0ba",
  "skills/ntr-screening-ifc/operations.md": "skills/ntr-screening-ifc/operations.md?v=2277331a",
  "skills/place-finding/SKILL.md": "skills/place-finding/SKILL.md?v=02f99535",
  "skills/place-finding/operations.md": "skills/place-finding/operations.md?v=ade1e924",
  "catalogue/anchors.json": "catalogue/anchors.json?v=4239096c",
  "catalogue/catalogue.json": "catalogue/catalogue.json?v=1fae6aef",
+ "catalogue/distances.json": "catalogue/distances.json?v=7a222460",
  "catalogue/trusted.json": "catalogue/trusted.json?v=2aa372d7",
  "data/ref/coastline.json": "data/ref/coastline.json?v=e913d7a4",
  "data/ref/countries.json": "data/ref/countries.json?v=bd02bffd",
@@ -178,6 +181,31 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=034ed70f"></script>
+<template id="run-card">
+  <article class="msg analyst run">
+    <header>
+      <h2>Risk screen: <span class="site"></span></h2>
+      <span class="meta"></span>
+    </header>
+    <p class="setup"></p>
+    <p class="problem" hidden></p>
+    <ol class="flags"></ol>
+    <div class="reach">
+      <label class="reach-label"><span>Show findings up to</span> <output></output></label>
+      <input type="range" min="0" step="0.5" aria-label="Show findings up to this distance from the site">
+      <p class="nearest"></p>
+      <p class="stale" hidden><span></span> <button type="button" data-op="reassess" class="primary"></button></p>
+    </div>
+    <p class="dists"></p>
+    <details class="checked"><summary></summary><ul></ul></details>
+    <details class="gaps"><summary></summary><ul></ul></details>
+    <div class="edit">
+      <button type="button" data-op="show">Show on map</button>
+      <button type="button" data-op="download">Download run (GeoJSON)</button>
+    </div>
+  </article>
+</template>
+
+<script type="module" src="js/workspace.js?v=06501a21"></script>
 </body>
 </html>
