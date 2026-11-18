@@ -70,6 +70,7 @@ for (const conv of convs) {
       console.log(`     gaps: ${r.data_gaps.join(" | ").slice(0, 600)}`);
       console.log(`     evidence features: ${evidenceOf(rec).length}; tokens ${r.usage.input_tokens} in / ${r.usage.output_tokens} out${r.parse_error ? `; PROBLEM ${r.parse_error}` : ""}`);
       console.log(`     summary: ${r.summary.replace(/\s+/g, " ").slice(0, 700)}`);
+      if (r.debug) console.log(`     DEBUG ${JSON.stringify(r.debug).slice(0, 4000)}`);
     },
   });
   const tools = createPlaceTools(host);

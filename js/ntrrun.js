@@ -178,6 +178,8 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   let parsed = parseResult(res.text);
   const usage = { ...res.usage };
   let repaired = false;
+  const lastMsg = res.history.at(-1);
+  const debug = { final_chars: String(res.text || "").length, final_blocks: Array.isArray(lastMsg?.content) ? lastMsg.content.map((b) => b.type).join(",") : typeof lastMsg?.content };
   if (!parsed.json) {
     // Cut off (the reply hit the length cap) or no JSON block: ask once for the JSON alone, from the same history.
     const history = res.history.map((m, i) => (i === res.history.length - 1 && m.role === "assistant" && Array.isArray(m.content)
@@ -186,9 +188,12 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     try {
       const resp = await callClaude({ system: systemFor(skill), tools: defs, messages: [...history, { role: "user", content: "Your result was cut off or had no JSON block. Reply now with only the JSON block, compact: at most 8 flags, at most 4 evidence items each, data_gaps at most 12 short lines, checked as []." }] });
       usage.input_tokens += resp.usage?.input_tokens || 0; usage.output_tokens += resp.usage?.output_tokens || 0;
-      const again = parseResult((resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join(""));
+      const t2 = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+      debug.repair_stop = resp.stop_reason; debug.repair_chars = t2.length; debug.repair_head = t2.slice(0, 300);
+      const again = parseResult(t2);
       if (again.json) { parsed = { json: again.json, summary: String(res.text || "").split("```")[0].trim() }; repaired = true; }
-    } catch { /* keep the unparsed result and say so */ }
+    } catch (e) { debug.repair_error = String(e.message || e).slice(0, 300); }
+    debug.raw_tail = String(res.text || "").slice(-1500);
   }
   const flags = traceFlags(parsed.json?.flags, evidence, distances);
   const siteFeature = { type: "Feature", geometry: fp.feature.geometry, properties: { role: "site", name: site.name, run: runId } };
@@ -210,7 +215,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       flags, checked, data_gaps: Array.isArray(parsed.json?.data_gaps) ? parsed.json.data_gaps.map(String) : [],
       model_checked: Array.isArray(parsed.json?.checked) ? parsed.json.checked : [],
       summary: parsed.summary, ...(parsed.json ? {} : { parse_error: "The analyst's result had no readable JSON block, so there are no structured flags. The summary is kept as written." }),
-      calls, usage, ...(repaired ? { note: "The first result was cut off; the structured result was asked for again from the same evidence." } : {}), assessments: [],
+      calls, usage, ...(parsed.json && !repaired ? {} : { debug }), ...(repaired ? { note: "The first result was cut off; the structured result was asked for again from the same evidence." } : {}), assessments: [],
     },
     features: [siteFeature, ...evidence],
   };
