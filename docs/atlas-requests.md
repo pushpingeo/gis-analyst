@@ -4,6 +4,24 @@ Tobler and the atlas are worked on in separate chats (decided 17 Nov). Tobler do
 What Tobler can rely on is written down in the atlas repo's `docs/mcp-tools.md`. When Tobler needs something
 new from the atlas, add it here (newest first), tell Rob, and he passes it to the atlas chat.
 
+- **18 Nov (early): re-test of the 17 Nov fixes from Tobler, and two new faults.** Done and working from Tobler
+  (atlas probe and a replayed Rosebank conversation, 03:38 UTC): `fetch_features` answers again (NatureScot
+  protected areas, SEPA river flooding, NOAA EFH); UKHO worldwide wrecks through EMODnet finds 2 wrecks within 10 km
+  of Rosebank (Troldfos, Bourbon Dolphin), CC-BY 4.0; NSTA "pipeline linear (WGS84)" now returns Rosebank's live
+  flowlines, and the "– removed" twins come back empty as they should. **Still failing, new asks:**
+  (1) **ArcGIS MapServers that don't support pagination.** `fetch_features` on Historic Environment Scotland
+  Scheduled Monuments (`25ffbbeec3836e1a`) fails with "WFS offers GML only; arcgis-mapserver: Pagination is not
+  supported", and on Hutton land capability (`bd18c4d31d168bf4`) with "Pagination is not supported". Both near
+  Linlithgow (-3.60, 55.977, 10 km). Ask: when a layer says `supportsPagination: false`, query without
+  `resultOffset`/`resultRecordCount` (one page, capped by `maxRecordCount`), and fall back to GML for WFS that offer
+  nothing else if that's cheap. Scheduled monuments matter for every Scottish screen.
+  (2) **Wrecks tagged as seabed habitat.** `d266bb32a493da90` (worldwide wrecks) has concepts `["seabed-habitat"]`,
+  so a search by concept files wrecks under biodiversity. Ask: tag wreck layers `heritage-site` (and keep
+  seabed-habitat only if there's a reason). Minor.
+  (3) Once, in the replay, `fetch_features` on EMODnet Heritage Ship Wrecks (`ee41a8d58f1fe201`) failed instantly with
+  "fetch failed" while the UKHO call beside it worked; the probe a minute earlier got a clean empty answer. Probably
+  transient; worth a look if it recurs in `mcp-check`.
+
 - **17 Nov (night): EMODnet as feature services, with their licences.** All 169 EMODnet Human Activities records in
   the atlas are WMS only (picture services) with "licence not stated" (find_datasets "EMODnet" around Shetland). EMODnet
   publishes the same layers as WFS at `https://ows.emodnet-humanactivities.eu/wfs?`, and its GeoNetwork records give
