@@ -18,6 +18,8 @@ function atlas(tool, args) {
   if (tool === "find_datasets" && /pipeline/i.test(args.text || "")) return { matches: 1, results: [{ id: "pipe", title: "UKCS pipelines (WGS84)", publisher: "North Sea Transition Authority", capabilities: ["query"], licence: "NSTA Open User Licence" }] };
   if (tool === "find_datasets" && /wreck/i.test(args.text || "")) return { matches: 1, results: [{ id: "wreck", title: "Worldwide wreck locations (UK Hydrographic Office)", publisher: "EMODnet Human Activities", capabilities: ["query"], licence: "Creative Commons CC-BY 4.0" }] };
   if (tool === "find_datasets") return { matches: 0, results: [] };
+  // MARPOL's North West European waters: a wide area the field lies within ("around the site").
+  if (tool === "fetch_features" && args.id === "751ddc65885f897d") return { returned: 1, features: [{ type: "Feature", geometry: turf.bboxPolygon([-15, 48, 10, 64]).geometry, properties: { name: "North West European waters" } }] };
   if (tool === "fetch_features" && args.id === "pipe") {
     const line = (a, name) => ({ type: "Feature", geometry: { type: "LineString", coordinates: [a, turf.destination(a, 2, 0).geometry.coordinates] }, properties: { PIPE_NAME: name } });
     return { returned: 3, features: [line(FIELD, "Rosebank 9 inch Production flowline 1"), line(east(1.5), "West of Shetland Pipeline"), line(east(30), "Clair export")] };
@@ -33,7 +35,7 @@ const RESULT = "Screened as an offshore oil field (assumed, greenfield).\n\n" + 
   { risk: "Existing pipelines on and near the site (simultaneous operations)", theme: "PS4", confidence: "high", why: "Work beside live lines needs SIMOPS planning.", evidence: [{ name: "Rosebank 9 inch Production flowline 1", distance_km: 0, dataset: "UKCS pipelines (WGS84)" }, { name: "West of Shetland Pipeline", distance_km: 1.5, dataset: "UKCS pipelines (WGS84)" }] },
   { risk: "A wreck close to the field may need a survey and an exclusion zone", theme: "PS8", confidence: "medium", why: "Heritage and safety.", evidence: [{ name: "TROLDFOS (POSSIBLY)", distance_km: 2, dataset: "Worldwide wreck locations (UK Hydrographic Office)" }] },
   { risk: "Seabird colonies on Shetland may be in spill reach", theme: "PS6", confidence: "low", why: "Regional knowledge, not mapped data.", evidence: [{ name: "Foula seabird colony", distance_km: 40, dataset: "none (regional knowledge)" }] },
-], checked: [], data_gaps: ["Key Biodiversity Areas not checked", "Fishing effort not checked"] });
+], checked: [], data_gaps: ["Key Biodiversity Areas not checked", "Fishing effort not checked", "No Indigenous Peoples data in the catalogue here", "Stage assumed to be greenfield"] });
 const REASSESS = "Within 1 km only the field's own lines matter.\n\n" + json({ flags: [{ risk: "Existing flowlines on site", theme: "PS4", confidence: "high", why: "SIMOPS.", evidence: [{ name: "Rosebank 9 inch Production flowline 1", distance_km: 0, dataset: "UKCS pipelines (WGS84)" }] }], data_gaps: ["Key Biodiversity Areas not checked"] });
 
 const toolUse = (...u) => ({ id: "m", type: "message", role: "assistant", stop_reason: "tool_use", content: u.map(([name, input], i) => ({ type: "tool_use", id: `t${Date.now()}${i}`, name, input })), usage: { input_tokens: 100, output_tokens: 10 } });
@@ -139,6 +141,8 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     onMap: window.__ws.map.getSource("findings")._data.features.length,
     hl: window.__ws.map.getSource("hl")._data.features?.length ?? 0,
     checked: document.querySelector(".run .checked summary").textContent,
+    gaps: document.querySelector(".run .gaps summary").textContent,
+    gapHeads: [...document.querySelectorAll(".run .gaps .gap-head")].map((e) => e.textContent),
     dists: document.querySelector(".run .dists").textContent,
     scopeShown: !document.querySelector(".run .scope").hidden,
     insideChecked: document.querySelector('.run [data-scope="inside"]').getAttribute("aria-checked") === "true",
@@ -150,15 +154,21 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   }));
   let s = await st();
   check(s.flags.length === 3 && /pipelines/.test(s.flags[0]), `${label}: three flags, high first (${s.flags[0]})`);
-  check(s.out === "50 km" && s.onMap === 5, `${label}: slider at 50 km, 5 findings on the map (${s.out}, ${s.onMap})`);
+  check(s.out === "50 km" && s.onMap === 6, `${label}: slider at 50 km, 5 findings and the wide area on the map (${s.out}, ${s.onMap})`);
   check(/near 2 km · close 10 km · wider 50 km/.test(s.dists), `${label}: distances and reason shown`);
   await page.$eval(".run", (e) => e.scrollIntoView({ block: "start" }));
   await page.screenshot({ path: `/tmp/run-card-${label}-1.png` });
   await page.$eval(".run input[type=range]", (el) => { el.value = "1"; el.dispatchEvent(new Event("input", { bubbles: true })); });
   s = await st();
-  check(s.onMap === 1 && s.out === "1 km", `${label}: slider to 1 km leaves 1 finding on the map (${s.onMap})`);
+  check(s.onMap === 2 && s.out === "1 km", `${label}: slider to 1 km leaves 1 finding and the wide area on the map (${s.onMap})`);
   check(s.stale && s.beyond === 1, `${label}: re-assess offered, wreck flag dimmed as beyond (${s.beyond})`);
   check(/Nearest: community health and safety, Rosebank 9 inch Production flowline 1 \(on site\)/.test(s.nearest), `${label}: nearest-by-theme line (${s.nearest})`);
+  check(/lies within a wide area: North West European waters\./.test(s.nearest) && !/Nearest:[^.]*North West European/.test(s.nearest), `${label}: a wide area around the site is counted apart, not as on site (${s.nearest})`);
+  check(/^Gaps: 3 couldn't check, 1 no data, 1 caveat$/.test(s.gaps) && s.gapHeads.join("|") === "Couldn't check|No data|Caveats", `${label}: gaps grouped (${s.gaps}; ${s.gapHeads.join(", ")})`);
+  await page.evaluate(() => { document.querySelector(".run .gaps").open = true; document.querySelector(".run .nearest").scrollIntoView(); });
+  await page.locator(".run .reach").screenshot({ path: `/tmp/run-card-${label}-reach.png` });
+  await page.locator(".run .gaps").screenshot({ path: `/tmp/run-card-${label}-gaps.png` });
+  await page.evaluate(() => { document.querySelector(".run .gaps").open = false; });
   await page.screenshot({ path: `/tmp/run-card-${label}-2.png` });
   await page.click(".run [data-op=reassess]");
   await page.waitForFunction(() => document.querySelectorAll(".run .flag").length === 1, null, { timeout: 10000 });
@@ -166,7 +176,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   check(!s.stale && s.flags.length === 1, `${label}: re-assessed at 1 km: one flag, offer gone`);
   await page.$eval(".run input[type=range]", (el) => { el.value = "50"; el.dispatchEvent(new Event("input", { bubbles: true })); });
   s = await st();
-  check(s.onMap === 5 && s.stale, `${label}: slider back to 50 km shows all 5 again, offers re-assess (no refetch)`);
+  check(s.onMap === 6 && s.stale, `${label}: slider back to 50 km shows all 6 again, offers re-assess (no refetch)`);
   await page.click(".run .flag summary");
   await page.waitForTimeout(300);
   s = await st();
@@ -177,7 +187,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   await page.click('.run [data-scope="inside"]');
   await page.waitForTimeout(300);
   s = await st();
-  check(s.insideChecked && s.onMap === 1 && s.mask === 1 && s.rings === 0 && !s.sliderShown, `${label}: inside only: 1 finding, outside dimmed, no rings, slider hidden (${s.onMap}, mask ${s.mask}, rings ${s.rings})`);
+  check(s.insideChecked && s.onMap === 2 && s.mask === 1 && s.rings === 0 && !s.sliderShown, `${label}: inside only: 1 finding and the wide area, outside dimmed, no rings, slider hidden (${s.onMap}, mask ${s.mask}, rings ${s.rings})`);
   check(/inside the area or touching its edge/.test(s.nearest) && s.stale && s.staleText === "Re-assess inside the area", `${label}: inside wording and re-assess offer (${s.staleText})`);
   await page.screenshot({ path: `/tmp/run-card-${label}-4-inside.png` });
   await page.click(".run [data-op=reassess]");
@@ -187,7 +197,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   await page.click('.run [data-scope="around"]');
   await page.waitForTimeout(300);
   s = await st();
-  check(!s.insideChecked && s.onMap === 5 && s.mask === 0 && s.rings > 0 && s.out === "50 km", `${label}: back to area and surroundings at 50 km (${s.onMap}, ${s.out})`);
+  check(!s.insideChecked && s.onMap === 6 && s.mask === 0 && s.rings > 0 && s.out === "50 km", `${label}: back to area and surroundings at 50 km (${s.onMap}, ${s.out})`);
   // Settings: units, colour, licence switches.
   if (label === "phone") await page.evaluate(() => document.getElementById("panel").classList.remove("collapsed"));
   await page.click("#gear");
@@ -235,7 +245,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     rings: window.__ws.map.getSource("rings")._data.features.length,
   }));
   check(/inside the area only/.test(s.note) && !s.scope && /^Inside the area only/.test(s.dists), `inside screen: card says so, no switch (${s.note.slice(0, 50)})`);
-  check(s.onMap === 1 && s.mask === 1 && s.rings === 0, `inside screen: only the on-site finding, outside dimmed, no rings (${s.onMap}, ${s.mask}, ${s.rings})`);
+  check(s.onMap === 2 && s.mask === 1 && s.rings === 0, `inside screen: only the on-site finding and the wide area, outside dimmed, no rings (${s.onMap}, ${s.mask}, ${s.rings})`);
   await page.$eval(".run", (e) => e.scrollIntoView({ block: "start" }));
   await page.screenshot({ path: "/tmp/run-card-inside-screen.png" });
   check(errors.length === 0, `inside screen: no page errors${errors.length ? `: ${errors.slice(0, 3).join(" | ")}` : ""}`);

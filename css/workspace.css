@@ -287,6 +287,10 @@ a { color: var(--sea); }
 .run details summary { cursor: pointer; color: var(--sea); }
 .run details ul { margin: 4px 0 6px; padding-left: 18px; }
 .run details .nc { color: #9a3412; }
+.run details.gaps > ul { list-style: none; padding-left: 0; }
+.run .gap-group .gap-head { margin: 6px 0 0; font-weight: 600; color: var(--ink); }
+.run .gap-group.couldnt .gap-head { color: #9a3412; }
+.run .gap-group ul { margin: 2px 0 4px; padding-left: 18px; }
 .run .edit { margin-top: 8px; }
 .run .flag summary { color: var(--ink); }
 .shape .actions .card-delete:hover { color: var(--alert); }

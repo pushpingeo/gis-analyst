@@ -9,6 +9,11 @@ import { createPlaceTools, placeToolDefs } from "./placetools.js";
 import { bandFor, distancesLine, chooseDistances, ASSET_TYPES, MAX_KM } from "./distances.js";
 import { nearestBoundaries } from "./boundaries.js";
 import { DISCLAIMER } from "./disclaimer.js";
+import { aroundSiteKm2 } from "./datatools.js";
+
+// The band for a piece of evidence: a wide area the site lies within is "around the site", not "on site".
+export const AROUND = "around the site";
+const bandOf = (p, d) => (p.surrounds ? AROUND : bandFor(p.distance_km, d));
 
 export const RUN_SCHEMA = "tobler-run/1";
 export const SCREEN_TOOLS = ["get_place", "find_data", "get_data", "find_features_near"];
@@ -31,6 +36,7 @@ export function systemFor(skill) {
 - ${FENCE_RULE}
 - The site, its footprint, the asset type, the stage and the distances are fixed by this run and given in the first message. Use them as given; don't ask about them and don't change them. If the stage or asset type was assumed, say so in the summary.
 - The tools fetch every dataset out to the wider band and measure from the footprint edge. Never work out a distance yourself: use the distances the tools return.
+- Items marked around_site (or "around the site") are wide areas the site lies within: seas, regions, very large designations. They are not features on the site. Mention one only where being inside it matters for this project (for example a large protected area the site sits in, or a MARPOL special area for an offshore site); a sea area around an onshore site is not a finding.
 - Put independent searches in the same step: they run at the same time. Aim to finish within about ten steps.
 - Name features and datasets as the data names them. Ids (C3, D2) are for tool calls only.
 - Your last message is the result: the short summary, then the JSON block, exactly as the method's Output section says. Use the distances given (not the skill's table) in "distances_km".
@@ -89,7 +95,7 @@ export function traceFlags(flags, evidence, d) {
       const hit = named.find((x) => near(x.f) && ds && x.ds && (x.ds.includes(ds) || ds.includes(x.ds))) || named.find((x) => near(x.f)) || null;
       if (!hit) return { ...e, distance_km: round(e.distance_km), traced: false };
       const p = hit.f.properties;
-      return { ...e, name: p.name, distance_km: p.distance_km, band: bandFor(p.distance_km, d), dataset: p.dataset, publisher: p.publisher, licence: p.licence, checked: p.checked_at, fid: p.fid, traced: true };
+      return { ...e, name: p.name, distance_km: p.distance_km, band: bandOf(p, d), dataset: p.dataset, publisher: p.publisher, licence: p.licence, checked: p.checked_at, fid: p.fid, traced: true };
     });
     const traced = ev.filter((e) => e.traced);
     const dists = (traced.length ? traced : ev).map((e) => e.distance_km).filter((v) => v != null);
@@ -130,8 +136,10 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   const screenPlace = { name: site.name, feature: fp.feature, origin: site.origin, status: "accepted", edits: [] };
   const evidence = [];
   const seen = new Map();
+  const siteKm2 = isArea(fp.feature) ? turf.area(fp.feature) / 1e6 : 0;
   const capture = (list, meta = {}) => {
     for (const c of list) {
+      const around = c.around_site ? c.area_km2 : aroundSiteKm2(siteKm2, c.geometry, c.distance_km);
       const dataset = c.source?.title || meta.dataset || "";
       const key = `${norm(dataset)}|${norm(c.name)}|${round(c.distance_km, 2)}`;
       if (seen.has(key)) continue;
@@ -139,7 +147,8 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       seen.set(key, fid);
       evidence.push({ type: "Feature", geometry: c.geometry, properties: {
         role: "evidence", fid, run: runId, name: c.name || c.type || "Unnamed feature", type: c.type || "", theme: meta.theme || "context",
-        distance_km: round(c.distance_km, 2), band: bandFor(c.distance_km, distances), area_km2: c.area_km2 ?? null,
+        distance_km: round(c.distance_km, 2), band: around ? AROUND : bandFor(c.distance_km, distances), area_km2: c.area_km2 ?? (around ? Math.round(around) : null),
+        ...(around ? { surrounds: true } : {}),
         dataset, publisher: meta.publisher || c.source?.publisher || "", licence: c.source?.licence || "",
         checked_at: now(), ...(c.extra && Object.keys(c.extra).length ? { details: c.extra } : {}),
       } });
@@ -188,7 +197,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   const baselineLines = [];
   const summarise = (c) => {
     const near = evidence.filter((f) => f.properties.dataset === c.dataset).sort((a, b) => a.properties.distance_km - b.properties.distance_km).slice(0, 3)
-      .map((f) => `${f.properties.name}${f.properties.details?.sides ? ` [${f.properties.details.sides}${f.properties.details.line_type ? `, ${f.properties.details.line_type}` : ""}]` : ""} ${f.properties.distance_km} km`);
+      .map((f) => `${f.properties.name}${f.properties.details?.sides ? ` [${f.properties.details.sides}${f.properties.details.line_type ? `, ${f.properties.details.line_type}` : ""}]` : ""} ${f.properties.surrounds ? "(around the site: a wide area it lies within)" : `${f.properties.distance_km} km`}`);
     return `- ${c.dataset} (${c.publisher || "?"}): ${c.result === "features" ? `${c.count} ${inside ? "inside or touching the area" : `within ${reach} km`}; nearest ${near.join("; ")}` : c.result}${c.why ? ` (${c.why})` : ""}`;
   };
   try {
@@ -289,7 +298,7 @@ export function evidenceWithin(record, km) {
 // "First school at 1.3 km": the nearest finding of each theme within km.
 export function nearestByTheme(record, km) {
   const out = new Map();
-  for (const f of evidenceWithin(record, km)) if (!out.has(f.properties.theme)) out.set(f.properties.theme, f.properties);
+  for (const f of evidenceWithin(record, km)) if (!f.properties.surrounds && !out.has(f.properties.theme)) out.set(f.properties.theme, f.properties);
   return [...out.entries()].map(([theme, p]) => ({ theme, name: p.name, distance_km: p.distance_km }));
 }
 
@@ -306,7 +315,7 @@ export async function reassess({ record, km, skill, callClaude, now = () => new 
     reasons: [`re-assessed from the stored evidence within ${km} km (fetched to ${run.fetched_to_km} km)`, ...run.distances.reasons] };
   const ev = evidenceWithin(record, km).map((f) => {
     const p = f.properties;
-    return { name: p.name, type: p.type, theme: THEME_CODE[p.theme] || p.theme, distance_km: p.distance_km, band: bandFor(p.distance_km, d), dataset: p.dataset, publisher: p.publisher, licence: p.licence, checked: p.checked_at, ...(p.details ? { details: p.details } : {}) };
+    return { name: p.name, type: p.type, theme: THEME_CODE[p.theme] || p.theme, distance_km: p.distance_km, band: bandOf(p, d), dataset: p.dataset, publisher: p.publisher, licence: p.licence, checked: p.checked_at, ...(p.details ? { details: p.details } : {}) };
   });
   const insideOnly = km === 0 && isArea(record.features.find((f) => f.properties.role === "site"));
   const where = insideOnly ? "inside the area (inside it or touching its edge)" : `within ${km} km of the footprint edge`;
@@ -331,7 +340,7 @@ export async function reassess({ record, km, skill, callClaude, now = () => new 
   run.summary = parsed.summary;
   run.distances = d;
   run.assessed_within_km = km;
-  for (const f of evidenceOf(record)) f.properties.band = bandFor(f.properties.distance_km, d);
+  for (const f of evidenceOf(record)) f.properties.band = bandOf(f.properties, d);
   run.usage = { input_tokens: (run.usage?.input_tokens || 0) + (resp.usage?.input_tokens || 0), output_tokens: (run.usage?.output_tokens || 0) + (resp.usage?.output_tokens || 0) };
   return record;
 }

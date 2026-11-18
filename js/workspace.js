@@ -12,6 +12,7 @@ import { atlasViaWorker, firmsViaWorker } from "./atlasclient.js";
 import { CONFIG } from "./config.js";
 import { THEMES, themeFor, bandOf, BAND_OPACITY, BIG_AREA_KM2, chooseLabels, ringDistances } from "./findings.js";
 import { createScreening, evidenceOf, evidenceWithin, nearestByTheme, flagBeyond, reassess, isArea, THEME_CODE } from "./ntrrun.js";
+import { groupGaps, gapSummary, GAP_GROUPS } from "./gaps.js";
 import * as U from "./units.js";
 import { pickExamples } from "./examples.js";
 import { getUserKey, setUserKey } from "./claude.js";
@@ -366,7 +367,7 @@ function findingPopup(e) {
   box.className = "finding-pop";
   const name = document.createElement("b"); name.textContent = p.label || "Unnamed feature";
   const what = document.createElement("span");
-  const km = p.distance_km == null || p.distance_km === "null" ? "" : +p.distance_km === 0 ? "on site · " : `${U.dist(+p.distance_km)} from the site · `;
+  const km = p.surrounds ? "around the site (a wide area it lies within) · " : p.distance_km == null || p.distance_km === "null" ? "" : +p.distance_km === 0 ? "on site · " : `${U.dist(+p.distance_km)} from the site · `;
   what.textContent = `${THEMES[p.theme]?.label || ""} · ${km}${p.dataset}${p.publisher ? ` (${p.publisher})` : ""}`;
   box.append(name, what);
   new maplibregl.Popup({ closeButton: true, maxWidth: "280px" }).setLngLat(e.lngLat).setDOMContent(box).addTo(map);
@@ -800,7 +801,7 @@ function showRunOnMap(record, { fit = true } = {}) {
     const p = f.properties;
     const band = p.band === "on site" ? "near" : p.band === "beyond" || p.band === "unknown" ? "wider" : p.band;
     findings.set(`${r.id}:${p.fid}`, { type: "Feature", geometry: f.geometry, properties: {
-      id: `${r.id}:${p.fid}`, run: r.id, label: p.name, theme: p.theme, band, distance_km: p.distance_km, area_km2: p.area_km2 ?? null, dataset: p.dataset, publisher: p.publisher,
+      id: `${r.id}:${p.fid}`, run: r.id, label: p.name, theme: p.theme, band: p.surrounds ? "wider" : band, ...(p.surrounds ? { surrounds: true } : {}), distance_km: p.distance_km, area_km2: p.area_km2 ?? null, dataset: p.dataset, publisher: p.publisher,
     } });
   }
   shownRun = r.id;
@@ -938,7 +939,7 @@ function paintRun(entry) {
     const ev = el("ul", null, "ev");
     for (const e of f.evidence) {
       const item = el("li");
-      item.append(el("b", e.name || "Unnamed"), document.createTextNode(` · ${e.distance_km == null ? "distance not given" : `${fmtKm(e.distance_km)}${e.band && e.band !== "on site" ? ` (${e.band})` : ""}`} `));
+      item.append(el("b", e.name || "Unnamed"), document.createTextNode(` · ${e.band === "around the site" ? "around the site (a wide area it lies within)" : e.distance_km == null ? "distance not given" : `${fmtKm(e.distance_km)}${e.band && e.band !== "on site" ? ` (${e.band})` : ""}`} `));
       item.append(el("span", `· ${[e.dataset, e.publisher && `(${e.publisher})`].filter(Boolean).join(" ")}${e.licence ? `, ${e.licence}` : ""}${e.checked ? `, checked ${String(e.checked).slice(0, 10)}` : ""} `, "src"));
       item.append(e.traced ? el("span", "· traced to the data", "src") : el("span", "· not traced to fetched data", "untraced"));
       ev.append(item);
@@ -964,10 +965,18 @@ function paintRun(entry) {
     if (c.result === "not checked") li.className = "nc";
     return li;
   }));
+  // Gaps in three groups: couldn't check (tools and the analyst), no data, caveats.
   const gaps = card.querySelector(".gaps");
-  gaps.querySelector("summary").textContent = `Gaps: ${r.data_gaps.length}`;
-  gaps.querySelector("ul").replaceChildren(...r.data_gaps.map((g) => el("li", g)));
-  gaps.hidden = !r.data_gaps.length;
+  const groups = groupGaps(r.data_gaps, r.checked);
+  gaps.querySelector("summary").textContent = gapSummary(groups);
+  gaps.querySelector("ul").replaceChildren(...GAP_GROUPS.filter(([k]) => groups[k].length).map(([k, label]) => {
+    const li = el("li", null, `gap-group ${k}`);
+    const ul = el("ul");
+    ul.append(...groups[k].map((g) => el("li", g)));
+    li.append(el("p", label, "gap-head"), ul);
+    return li;
+  }));
+  gaps.hidden = !GAP_GROUPS.some(([k]) => groups[k].length);
   card.querySelector('input[type="range"]').value = String(entry.km);
   paintReach(entry);
 }
@@ -985,11 +994,15 @@ function paintReach(entry) {
   card.querySelector('.reach input[type="range"]').hidden = inside;
   card.querySelector(".reach output").textContent = km === 0 ? "on site" : U.dist(km);
   const near = nearestByTheme(record, km);
-  const n = evidenceWithin(record, km).length;
+  const within = evidenceWithin(record, km);
+  const n = within.filter((f) => !f.properties.surrounds).length;
+  // Wide areas the site lies within (seas, regions, very large designations) are counted apart from findings on it.
+  const wide = [...new Set(within.filter((f) => f.properties.surrounds).map((f) => f.properties.name))];
   const where = inside ? "inside the area or touching its edge" : `within ${U.dist(km)}`;
-  card.querySelector(".nearest").textContent = n
+  const wideLine = wide.length ? ` The site also lies within ${wide.length === 1 ? "a wide area" : `${wide.length} wide areas`}: ${wide.slice(0, 3).join("; ")}${wide.length > 3 ? ` and ${wide.length - 3} more` : ""}.` : "";
+  card.querySelector(".nearest").textContent = (n
     ? `${n} finding${n === 1 ? "" : "s"} ${where}. ${inside ? "Found" : "Nearest"}: ${near.map((x) => `${(THEMES[x.theme]?.label || x.theme).toLowerCase()}, ${x.name}${inside ? "" : ` (${fmtKm(x.distance_km)})`}`).join("; ")}.`
-    : `Nothing found ${where} in the sources checked.`;
+    : `Nothing found ${where} in the sources checked.`) + wideLine;
   card.querySelectorAll(".flag").forEach((li, i) => {
     const f = r.flags[i];
     if (!f) return;

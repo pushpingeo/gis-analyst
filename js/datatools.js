@@ -8,6 +8,17 @@ import { candidate } from "./gazetteer.js";
 import { classifyLicence, LICENCE_NOTE, licenceBlock } from "./licence.js";
 import { themeFor, THEME_IDS } from "./findings.js";
 
+// A wide area the site merely lies within (a sea, a region, a very large designation) isn't a feature "on site"
+// (Rob, 18 Nov: "North West European waters" and "Eastern Scotland" counted as on site for a box at Linlithgow).
+// It contains or touches the site and is at least 1,000 km² and 200 times the site's area. Returns its area, or 0.
+export const AROUND_MIN_KM2 = 1000;
+export const AROUND_NOTE = "Items marked around_site are wide areas the site lies within (seas, regions, very large designations), not features on the site. Mention one only where being inside it matters for this project.";
+export function aroundSiteKm2(siteKm2, geometry, distKm) {
+  if (distKm == null || distKm > 0 || !/Polygon/.test(geometry?.type || "")) return 0;
+  const a = turf.area({ type: "Feature", properties: {}, geometry }) / 1e6;
+  return a >= Math.max(AROUND_MIN_KM2, 200 * (siteKm2 || 0)) ? a : 0;
+}
+
 const round = (v, d = 2) => (v == null ? v : Math.round(v * 10 ** d) / 10 ** d);
 
 export const DATA_TOOL_DEFS = [
@@ -201,6 +212,7 @@ export function createDataTools(host) {
         }
       }
       const found = [];
+      const siteKm2 = /Polygon/.test(p.feature.geometry.type) ? turf.area(p.feature) / 1e6 : 0;
       for (const f of g.features || []) {
         if (!f.geometry) continue;
         const dist = geometryDistanceKm(p.feature.geometry, f.geometry);
@@ -212,6 +224,8 @@ export function createDataTools(host) {
             : atlasCandidate(f, d, pickName(f.properties || {}) || d.title);
         } catch { continue; }
         c.distance_km = round(dist, 2);
+        const around = aroundSiteKm2(siteKm2, f.geometry, dist);
+        if (around) { c.around_site = true; c.area_km2 = Math.round(around); }
         c.extra = keyAttributes(f.properties || {});
         found.push(c);
       }
@@ -221,13 +235,15 @@ export function createDataTools(host) {
       found.sort((x, y) => x.distance_km - y.distance_km || x._fromCentre - y._fromCentre);
       const kept = found.map((c) => ({ ...c, id: host.keep(c) }));
       if (kept.length) host.onCandidates?.(kept, { theme: themeFor({ theme: theme || d.service?.theme, concepts: d.concepts }), dataset: d.title, publisher: d.publisher, place: p.feature });
-      const inside = kept.filter((c) => c.distance_km === 0).length;
+      const inside = kept.filter((c) => c.distance_km === 0 && !c.around_site).length;
+      const around = kept.filter((c) => c.around_site).length;
       const returned = g.returned ?? (g.features || []).length;
       return {
         ...head, ...extra,
         returned_by_service: returned, inside_or_touching: inside, within_distance: kept.length,
+        ...(around ? { around_the_site: around, around_note: AROUND_NOTE } : {}),
         ...(returned === 0 ? { service_note: "The service returned no features at all for this box. If you expected some (e.g. a field's own pipelines), the layer may be the wrong one (check its title and publisher) or may not cover this area; look for another." } : {}),
-        nearest: kept.slice(0, 12).map((c) => ({ id: c.id, name: c.name, type: c.type, distance_km: c.distance_km, ...(Object.keys(c.extra).length ? { details: c.extra } : {}) })),
+        nearest: kept.slice(0, 12).map((c) => ({ id: c.id, name: c.name, type: c.type, distance_km: c.distance_km, ...(c.around_site ? { around_site: true, area_km2: c.area_km2 } : {}), ...(Object.keys(c.extra).length ? { details: c.extra } : {}) })),
         ...(kept.length > 12 ? { more: kept.length - 12 } : {}),
         ...(!d.service && returned >= 100 ? { capped: "The service returned its 100-feature limit for this box, so there may be more." } : {}),
         ...(d.service?.time_aware ? { time_note: `Detections from the last ${extra.days_checked} days only, not a long record. Say so when reporting.` } : (d.capabilities || []).includes("time") ? { time_note: "A live, time-aware layer: it shows recent detections only (often the last 24 hours to 7 days). Say so when reporting." } : {}),

@@ -53,6 +53,9 @@ async function atlas(tool, args) {
     { type: "Feature", geometry: { type: "LineString", coordinates: [[179, 65], [-179, 66]] }, properties: { line_name: "Russia - Alaska (United States)", line_type: "Treaty" } }] };
   if (tool === "fetch_features" && args.id === "154dfce48e32f9ee") return { returned: 1, features: [
     { type: "Feature", geometry: turf.circle(turf.destination(FIELD, 28, 0).geometry.coordinates, 3).geometry, properties: { name: "Faroe-Shetland Sponge Belt", desig_eng: "Nature Conservation Marine Protected Area" } }] };
+  // MARPOL's "North West European waters": a wide area the field lies within (around the site, not on it).
+  if (tool === "fetch_features" && args.id === "751ddc65885f897d") return { returned: 1, features: [
+    { type: "Feature", geometry: turf.bboxPolygon([-15, 48, 10, 64]).geometry, properties: { name: "North West European waters" } }] };
   if (tool === "fetch_features" && BASELINE_IDS.has(args.id)) return { returned: 0, features: [] };
   throw new Error(`unexpected ${tool} ${JSON.stringify(args)}`);
 }
@@ -160,9 +163,16 @@ await test("sealed run: fetches out to the wider band, records evidence with pro
   assert.equal(r.site.anchor_source.publisher, "North Sea Transition Authority");
   assert.equal(r.fetched_to_km, 50);
   // Evidence: 3 pipelines (inside, 1.5, 30 km) + 2 wrecks (2, 45 km), kept to 50 km for the slider, plus the baseline:
-  // the Faroe–UK boundary (12 km) and a protected area (20 km).
+  // the Faroe–UK boundary (12 km), a protected area (20 km) and MARPOL's North West European waters, which the field
+  // lies within: "around the site", not "on site".
   const ev = record.features.filter((f) => f.properties.role === "evidence");
-  assert.equal(ev.length, 7, ev.map((f) => `${f.properties.name} ${f.properties.distance_km}`).join("; "));
+  assert.equal(ev.length, 8, ev.map((f) => `${f.properties.name} ${f.properties.distance_km}`).join("; "));
+  const nwe = ev.find((f) => f.properties.name === "North West European waters").properties;
+  assert.equal(nwe.band, "around the site");
+  assert.equal(nwe.surrounds, true);
+  assert.ok(nwe.area_km2 > 1000);
+  assert.match(model.calls[0].messages[0].content, /North West European waters \(around the site/);
+  assert.match(model.calls[0].system, /around_site/);
   for (const f of ev) for (const k of ["fid", "dataset", "publisher", "licence", "checked_at", "theme", "band", "distance_km"]) assert.ok(f.properties[k] != null && f.properties[k] !== "", `${k} on ${f.properties.name}`);
   assert.equal(ev.find((f) => /TROLDFOS/.test(f.properties.name)).properties.theme, "heritage");
   assert.equal(ev.find((f) => /flowline/.test(f.properties.name)).properties.band, "on site");
@@ -189,9 +199,10 @@ await test("sealed run: fetches out to the wider band, records evidence with pro
 });
 
 await test("slider helpers: findings within a distance, nearest per theme, flags beyond the distance", () => {
-  assert.equal(evidenceWithin(record, 50).length, 7);
-  assert.equal(evidenceWithin(record, 40).length, 6);
-  assert.equal(evidenceWithin(record, 10).length, 3);
+  // Counts include the wide area around the site (at 0 km); "nearest per theme" leaves it out.
+  assert.equal(evidenceWithin(record, 50).length, 8);
+  assert.equal(evidenceWithin(record, 40).length, 7);
+  assert.equal(evidenceWithin(record, 10).length, 4);
   assert.deepEqual(nearestByTheme(record, 10).map((x) => `${x.theme} ${x.name} ${x.distance_km}`), ["community Rosebank 9 inch Production flowline 1 0", "heritage TROLDFOS (POSSIBLY) 2"]);
   const [pipes, wreck, birds] = record.tobler_run.flags;
   assert.equal(flagBeyond(pipes, 1), false);
