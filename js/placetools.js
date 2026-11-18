@@ -90,6 +90,7 @@ export function placeToolDefs(skills) {
           buffer_km: { type: "number" }, rotation_deg: { type: "number" },
           offset_km: { type: "number" }, bearing_deg: { type: "number", description: "Degrees clockwise from north for the offset" },
           words: { type: "string", description: "The person's own words that this place answers" },
+          name: { type: "string", description: "Optional short name for the place, as the person would say it (e.g. 'Jackdaw', 'Linlithgow Palace 4 km²', 'M9 corridor'). Leave out to name it after the anchor and the shape. Refer to the place by the name the tool returns." },
           match: { type: "string", enum: MATCHES, description: "How the anchor relates to what the person wants. named_place: they asked for this place itself (a palace, a town, a block, a field). name_and_type: the asset itself, matched by name and of the right type (a mine for a mine). type_near_clues: a feature of the right type found where the clues point, its name not confirmed. name_only: the name matches but the type is wrong or unknown. settlement_or_region: a town, village or region stands in for the site. none: nothing specific." },
           checks: { type: "array", description: "Every distance clue in the request that the place can be checked against, e.g. 'Nok Kundi lies about 80 km south-east of the mine' → { against: <Nok Kundi's candidate id>, expected_km: 80, direction: 'SE' }. Direction is the way you travel FROM the site TO that feature. Give all you have; they are measured, not trusted.", items: { type: "object", properties: { against: { type: "string", description: "Candidate id" }, expected_km: { type: "number" }, direction: { type: "string", description: "Compass point from the site to it: N, NE, ENE… (optional)" } }, required: ["against", "expected_km"] } },
           reason: { type: "string", description: "One line: the evidence for the location" },
@@ -119,7 +120,7 @@ export function placeToolDefs(skills) {
       input_schema: {
         type: "object",
         properties: {
-          place: { type: "string", description: "Place name, e.g. Area 1" },
+          place: { type: "string", description: "Place name, e.g. Jackdaw 3 km² or Area 1" },
           rotate_deg: { type: "number" }, resize_to: { type: "number" },
           move_km: { type: "number" }, move_bearing_deg: { type: "number" },
           rename: { type: "string" },
@@ -139,7 +140,7 @@ export function placeToolDefs(skills) {
       input_schema: {
         type: "object",
         properties: {
-          place: { type: "string", description: "Place name, e.g. Area 1" },
+          place: { type: "string", description: "Place name, e.g. Jackdaw 3 km² or Area 1" },
           asset_type: { type: "string", enum: ASSET_TYPES, description: "What would be built or done there. Use 'other' if unknown." },
           assumed: { type: "boolean", description: "True if the person didn't say the asset type and you inferred it (e.g. an oil field's name)." },
           stage: { type: "string", enum: ["greenfield", "expansion", "existing asset"], description: "Only if the person said; otherwise leave out (greenfield is assumed and said)." },
@@ -437,7 +438,7 @@ export function createPlaceTools(host) {
         anchor: a.cand ? { name: a.cand.name, type: a.cand.type, source: a.cand.source, lonlat: a.cand.lonlat, extra: a.cand.extra } : { place: a.label },
         at: new Date().toISOString(),
       };
-      const p = host.addPlace({ feature: f, origin, scale: i.scale });
+      const p = host.addPlace({ feature: f, origin, scale: i.scale, name: placeName(i, a, f) });
       return { ...(await placeSummary(p)), how: steps.join(", then "), confidence: rated.confidence, why: rated.rules,
         ...(checks.length ? { checks } : {}),
         next: rated.confidence === "low" && checks.some((c) => c.pass === false)
@@ -518,6 +519,29 @@ export function createPlaceTools(host) {
       return run[name](input || {});
     },
   };
+}
+
+// A place built from words is named after what it was built from, as the person would say it: "Jackdaw",
+// "Linlithgow Palace 4 km²", "M9 corridor" (Rob, 18 Nov: "Area 1" says nothing). Drawn shapes keep "Area 1".
+export function cleanName(raw) {
+  let n = String(raw || "").replace(/\s+/g, " ").trim();
+  // Tracker names carry the country and kind: "Bonga North Oil and Gas Field (Nigeria)" → "Bonga North".
+  n = n.replace(/\s*\([^)]*\)\s*$/, "").replace(/\s+(oil and gas|oil|gas|wind|solar)( and gas)? (field|farm|project|plant|mine)$/i, "").trim();
+  // Registers shout: "JACKDAW" → "Jackdaw" (short codes like "30/2" or "M9" stay as they are).
+  if (/[A-Z]{3,}/.test(n) && n === n.toUpperCase()) n = n.toLowerCase().replace(/(^|[\s\-/])([a-z])/g, (_, p, c) => p + c.toUpperCase());
+  return n.length > 40 ? `${n.slice(0, 39).trim()}…` : n;
+}
+export function placeName(i, a, f) {
+  if (i.name && String(i.name).trim()) return cleanName(i.name);
+  const base = cleanName(a.cand ? a.cand.name || a.cand.type : a.place?.name || a.label);
+  if (!base || /^C\d+$/i.test(base)) return null;
+  const km2 = turf.area(f) / 1e6;
+  const size = km2 >= 10 ? `${Math.round(km2)} km²` : km2 >= 0.1 ? `${Math.round(km2 * 10) / 10} km²` : null;
+  switch (i.shape) {
+    case "square": case "circle": case "rectangle": return size ? `${base} ${size}` : base;
+    case "buffer": return `${base} corridor`;
+    default: return base; // point, feature (the publisher's own outline)
+  }
 }
 
 const pickD = (d) => ({ scale: d.scale, area_km2: d.area_km2, length_km: d.length_km, extent_km: d.extent_km, countries: d.countries, offshore: d.offshore, coast_km: d.coast_km, centre: { lat: round(d.centroid[1], 4), lon: round(d.centroid[0], 4) } });

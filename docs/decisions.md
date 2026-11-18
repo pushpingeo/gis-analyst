@@ -2,6 +2,16 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (21:30): places named after what they were built from (Rob)
+- Rob expected names, not "Area 1". The 17 Nov fix had put feature names on the map labels for findings; places
+  themselves were still counted ("Area 1", "Point 2"). Now `make_place` names a place after its anchor and shape:
+  a square, circle or rectangle as "Jackdaw 3 km²", a published outline by its own name ("Linlithgow Loch"), a
+  corridor as "M9 corridor", a point by the anchor's name. The analyst can pass a shorter `name` in the person's
+  words. Names are tidied (register capitals to title case, tracker suffixes like "Oil and Gas Field (Nigeria)"
+  dropped, 40 characters at most) and kept unique ("(2)"). A shape the person draws keeps "Area 1" until renamed.
+  Every place still answers to its counted name too, so "Area 1" in a tool call or the Screen chip still works.
+- Tested: unit test of the naming rules; all suites; browser regression.
+
 ## 18 Nov 2026 (21:00): UX pass: screening progress, globe, tools by the input, hint placement (Rob)
 - **A screen says it takes time, with an estimate.** When `screen_site` starts, the reply shows a progress block
   at once: "Screening Area 1. This usually takes about 70 seconds (typical for an offshore site)…", a bar and

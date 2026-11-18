@@ -99,7 +99,17 @@ let selectedId = null;
 let focusName = null;
 
 const kindOf = (geom) => (geom.type === "Point" ? "Point" : /LineString/.test(geom.type) ? "Line" : "Area");
-const placeByName = (name) => [...places.values()].find((p) => p.name.toLowerCase() === String(name).trim().toLowerCase());
+// A place answers to its name and to the "Area 1" it was counted as, so either works in tool calls.
+const placeByName = (name) => {
+  const n = String(name).trim().toLowerCase();
+  return [...places.values()].find((p) => p.name.toLowerCase() === n) || [...places.values()].find((p) => p.alias?.toLowerCase() === n);
+};
+// Names stay unique: a second "Jackdaw 3 km²" becomes "Jackdaw 3 km² (2)".
+function uniqueName(name) {
+  let out = name, k = 2;
+  while ([...places.values()].some((p) => p.name.toLowerCase() === out.toLowerCase())) out = `${name} (${k++})`;
+  return out;
+}
 const featureOf = (id) => { const f = draw.getSnapshotFeature(id); return f && { type: "Feature", properties: {}, geometry: f.geometry }; };
 
 // Multi-part outlines (a field or protected area published in pieces, e.g. Bonga Main, 18 Nov): the drawing tool
@@ -118,9 +128,10 @@ const withExtras = (p, geometry) => (p?.extraParts?.length && geometry.type === 
 
 // Scale is worked out, never asked: from the request if it says, else the shape's size; a point has no size,
 // so a drawn point takes its scale from the zoom level when it was dropped. The person can change it on the card.
-function newPlace(id, feature, { status = "drawn", origin = { method: "drawn", at: new Date().toISOString() }, scale = null, extraParts = [] } = {}) {
+function newPlace(id, feature, { status = "drawn", origin = { method: "drawn", at: new Date().toISOString() }, scale = null, extraParts = [], name = null } = {}) {
   const kind = kindOf(feature.geometry);
-  const p = { id, kind, name: `${kind} ${++counts[kind]}`, feature, status, origin, edits: [], scaleFrom: "size", extraParts };
+  const alias = `${kind} ${++counts[kind]}`;
+  const p = { id, kind, name: name ? uniqueName(name) : alias, alias, feature, status, origin, edits: [], scaleFrom: "size", extraParts };
   if (scale && R.SCALES[scale]) { p.scale = scale; p.scaleFrom = "request"; }
   else if (kind === "Point" && origin.method === "drawn") { p.scale = R.scaleForKm(R.viewKm(viewBounds())); p.scaleFrom = "zoom"; }
   places.set(id, p);
@@ -492,13 +503,13 @@ const host = {
   showFindings,
   clearFindings,
   offerChoices: (o) => makeChoiceCard(o),
-  addPlace({ feature, origin, scale }) {
+  addPlace({ feature, origin, scale, name }) {
     const id = crypto.randomUUID();
     const mode = feature.geometry.type === "Point" ? "point" : /LineString/.test(feature.geometry.type) ? "linestring" : "polygon";
     const { main, extra } = splitParts(feature.geometry);
     const bad = draw.addFeatures([{ id, type: "Feature", geometry: main, properties: { mode } }]).find((v) => !v.valid);
     if (bad) throw new Error(`The shape couldn't be drawn: ${bad.reason}`);
-    const p = newPlace(id, feature, { status: "proposed", origin, scale, extraParts: extra });
+    const p = newPlace(id, feature, { status: "proposed", origin, scale, extraParts: extra, name });
     if (extra.length) logEdit(p, `Published in ${extra.length + 1} parts; the map's edit handles move the largest part only.`);
     zoomTo(p);
     return p;

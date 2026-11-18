@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as turf from "../js/vendor/turf.js";
 import * as R from "../js/reference.js";
-import { createPlaceTools, placeToolDefs, projectSummary } from "../js/placetools.js";
+import { createPlaceTools, placeToolDefs, projectSummary, cleanName, placeName } from "../js/placetools.js";
 import { buildMessages, runTurn, parseSkill } from "../js/converse.js";
 import { BLOCK_REF, findFeaturesNear } from "../js/gazetteer.js";
 import { rateConfidence, runCheck } from "../js/confidence.js";
@@ -411,6 +411,20 @@ await test("pieces of one road in one layer are joined, so a corridor follows th
   assert.equal(c.details.pieces_joined, 3);
   const built = await t.exec("make_place", { anchor: c.id, shape: "buffer", buffer_km: 0.5, words: "corridor", match: "named_place", reason: "x" });
   assert.ok(built.area_km2 > 5, `corridor covers all three pieces (${built.area_km2} km²)`);
+});
+
+await test("places are named after what they were built from, not 'Area 1'", () => {
+  const sq = turf.polygon([[[1.9, 57], [1.93, 57], [1.93, 57.016], [1.9, 57.016], [1.9, 57]]]);
+  const cand = (name) => ({ cand: { name }, label: name });
+  assert.equal(cleanName("JACKDAW"), "Jackdaw");
+  assert.equal(cleanName("Bonga North Oil and Gas Field (Nigeria)"), "Bonga North");
+  assert.equal(cleanName("30/2"), "30/2");
+  assert.equal(cleanName("M9"), "M9");
+  assert.match(placeName({ shape: "square" }, cand("JACKDAW"), sq), /^Jackdaw \d(\.\d)? km²$/);
+  assert.equal(placeName({ shape: "feature" }, cand("Linlithgow Loch"), sq), "Linlithgow Loch");
+  assert.equal(placeName({ shape: "buffer" }, cand("M9"), sq), "M9 corridor");
+  assert.equal(placeName({ shape: "square", name: "the Jackdaw box" }, cand("JACKDAW"), sq), "the Jackdaw box");
+  assert.equal(placeName({ shape: "point" }, { cand: { name: "" }, label: "C4" }, sq), null, "no name, no made-up one");
 });
 
 console.log(`${passed} place tests passed`);
