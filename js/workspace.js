@@ -471,6 +471,8 @@ function makeCard(p) {
   paintStatus(p, card);
 
   card.querySelector('[data-op="zoom"]').addEventListener("click", () => zoomTo(p));
+  // Delete from the card, without going to the map's tools (handy for shapes the analyst made).
+  card.querySelector('[data-op="delete"]').addEventListener("click", () => { if (places.has(p.id)) removePlace(p.id); });
   card.querySelectorAll('[data-op="rotate"]').forEach((b) => b.addEventListener("click", () => {
     const deg = +b.dataset.deg;
     applyGeometry(p, G.rotate(p.feature, deg), `rotated ${Math.abs(deg)}° ${deg > 0 ? "clockwise" : "anticlockwise"}`);
@@ -947,7 +949,9 @@ document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", ()
     if (innerWidth <= 720) setSheet(false);
     return;
   }
-  say.value = c.dataset.prompt; grow(); say.focus();
+  // "Screen for risks" names the place in focus, if there is one; otherwise the person says where.
+  const focus = c.dataset.screen !== undefined && focusName && placeByName(focusName);
+  say.value = focus ? `Screen ${focus.name} for risks` : c.dataset.prompt; grow(); say.focus();
   say.setSelectionRange(say.value.length, say.value.length);
 }));
 

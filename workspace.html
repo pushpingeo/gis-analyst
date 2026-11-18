@@ -9,7 +9,7 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=13b61175">
+<link rel="stylesheet" href="css/workspace.css?v=d3f7fd49">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
@@ -34,7 +34,7 @@
   "./js/tools.js": "./js/tools.js?v=084a3bd7",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=06501a21",
+  "./js/workspace.js": "./js/workspace.js?v=e82cda79",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -93,7 +93,7 @@
   <button class="handle" id="handle" aria-expanded="true" aria-controls="conversation"><span class="sr">Show or hide the conversation</span></button>
   <header class="brand">
     <h1><img class="mark" src="img/tobler.svg" alt="" width="30" height="30">Hi, I'm Tobler</h1>
-    <p>Your GIS analyst, on call.</p>
+    <p>Your geospatial screening analyst.</p>
   </header>
 
   <div class="conversation" id="conversation" aria-live="polite">
@@ -113,7 +113,7 @@
     <div class="chips" role="group" aria-label="What to do">
       <button class="chip" data-prompt="Find ">Find a place</button>
       <button class="chip" data-draw="polygon">Draw an area</button>
-      <button class="chip soon" data-soon aria-describedby="soon-note">Screen for risks <span>· soon</span></button>
+      <button class="chip" data-prompt="Screen " data-screen>Screen for risks</button>
       <button class="chip soon" data-soon aria-describedby="soon-note">Net area <span>· soon</span></button>
       <button class="chip soon" data-soon aria-describedby="soon-note">Constraints <span>· soon</span></button>
       <span id="soon-note" class="sr">Coming soon</span>
@@ -140,6 +140,8 @@
         <button role="radio" data-scale="regional">Regional</button>
         <button role="radio" data-scale="global">Global</button>
       </div>
+      <button type="button" class="card-delete" data-op="delete" title="Delete this shape" aria-label="Delete this shape">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>
     </header>
     <p class="summary"></p>
     <details class="origin"><summary></summary><div></div></details>
@@ -206,6 +208,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=06501a21"></script>
+<script type="module" src="js/workspace.js?v=e82cda79"></script>
 </body>
 </html>
