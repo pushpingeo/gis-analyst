@@ -2,6 +2,20 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (19:00): NTR skill 3.4-draft live (Rob approved)
+- Changes: start from the baseline; named biodiversity sources (national protected areas, EEA/Natura 2000, WDPA
+  only when switched on, IMMAs, coral, MARPOL, national critical habitat; search for IBAs and EBSAs); KBAs "not
+  available under licence" once, with what was checked instead; a cross-border (transboundary) flag under context
+  with confidence rules and the "indicative, no legal standing" line; weak evidence (unnamed, attribute-less or
+  whole-sea scoring layers) at low confidence unless the score shows the risk; non-commercial and boundary data rules.
+- Smoke tests (Haiku, real atlas): Rosebank 88 s, 6 flags incl. the UK–Faroe boundary at 10.7 km (medium, traced);
+  Bonga: the carousel offered the candidates (GEM answered this time), then the screen found Bonga Southwest Aparo
+  at 7.7 km and Bonga North at 24.8 km as neighbours, FIRMS hotspots at 21 km, and the ProtectedSeas layer now low;
+  Linlithgow solar 89 s, 6 flags (loch on site, Bo'mains Meadow 1.1 km, Firth of Forth SPA/Ramsar 3 km, cumulative
+  solar, schools). Seen: Linlithgow Loch also used as "land" evidence; the analyst said the CDDA licence wasn't
+  recorded; HES heritage still failing in the atlas.
+- The disclaimer wording stays as drafted (live since late morning) until Rob changes it.
+
 ## 18 Nov 2026 (evening): non-commercial data switch; place finding keeps namesakes (Rob)
 - **Non-commercial data off by default, like Esri's.** New licence class rule (`licenceBlock` in `js/licence.js`):
   "No commercial use" and similar now classify as non-commercial; such layers are left out of `find_data`,
