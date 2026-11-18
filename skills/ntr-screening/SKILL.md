@@ -1,6 +1,6 @@
 ---
 name: ntr-screening
-version: 3.3-draft
+version: 3.4-draft
 description: Screen a site, onshore or offshore, for non-technical risk (NTR) from published spatial data. Flags anything that could become a risk, concern or delay (land and livelihoods, biodiversity, Indigenous Peoples, cultural heritage, community health and safety, and the operating context), with traced evidence and what wasn't checked. Use when someone asks what risks, sensitivities or constraints a site, block, field, route or area might raise.
 ---
 
@@ -30,6 +30,7 @@ Distances are measured from the footprint edge. When the screen runs as its own 
 State the distances used at the top of the result, and offer to change them.
 
 ## Steps
+0. **Start from the baseline.** When the run has already checked boundaries and the must-check layers before you start, use those results as evidence and don't fetch them again; spend your searches on what's specific to this site.
 1. **Confirm the site:** location, onshore/offshore, asset type, stage, footprint and distances used.
 2. **Plan the evidence.** For each theme below, decide which kinds of evidence apply to this site (onshore, offshore or both).
 3. **Find the data.** For each kind of evidence, search for datasets with short, distinctive words (the "search words" below), two or three wordings at a time. Choose, in this order: trusted services and national or intergovernmental publishers; open licences; datasets whose features can be fetched; the most specific coverage (a national layer beats a global one where both exist). Use the everyday feature search for settlements, schools, hospitals, places of worship and cemeteries.
@@ -50,10 +51,11 @@ Search words are starting points; adapt them to the place and language (e.g. "Na
 - *PS5 covers physical displacement (homes) and economic displacement (farming, grazing, fishing, forest use, business). Most new land and sea has someone using it.*
 
 **Biodiversity (PS6)**
-- Both: protected areas, national and international (Ramsar, World Heritage natural sites, marine protected areas, Natura 2000); important bird areas.
+- Check first (the run does this where it can): protected areas (national layers such as NatureScot, JNCC or a national cadastre; the EEA's designated areas and Natura 2000 in the EU; Ramsar and natural World Heritage sites; WDPA only where the person has switched on non-commercial data), IUCN Important Marine Mammal Areas, warm-water coral reefs, MARPOL special areas, and critical habitat where a national list exists (e.g. NOAA in the US).
+- Search for Important Bird Areas and ecologically significant marine areas (EBSAs): they exist only as regional copies.
 - Onshore: natural habitat in the footprint (forest, wetland, grassland, rivers, coast); threatened species records.
 - Offshore: sensitive seabed habitats (coral, seagrass, sponge grounds, chemosynthetic communities); essential fish habitat and spawning or nursery grounds; marine mammal areas; seabird colonies on nearby coasts. *Search words:* protected, marine protected, Ramsar, coral, seagrass, sensitive, habitat, fish habitat, spawning, marine mammal, seabird.
-- Always list "Key Biodiversity Areas not checked" in the gaps. *KBA boundaries are licensed through IBAT, which Tobler doesn't hold.*
+- Key Biodiversity Areas aren't available under licence (IBAT). Say so once in the gaps, and name what was checked instead.
 
 **Indigenous Peoples (PS7)**
 - Mapped Indigenous, tribal or community land and waters (reserves, native title, customary marine tenure). *Search words:* indigenous, tribal, native title, reserve, community land.
@@ -67,7 +69,12 @@ Search words are starting points; adapt them to the place and language (e.g. "Na
 **Community health, safety and security (PS4)**
 - Onshore: schools, hospitals and clinics within the near band or by the likely access road; settlements in the close band; no main road within 10 km (new access needed).
 - Offshore: shipping lanes and traffic density; ports and anchorages; other installations, pipelines and cables (simultaneous operations); military practice areas; unexploded ordnance; coastal communities in the wider band (spill reach).
-- Both: existing industry nearby (cumulative effects); **thermal hotspots and gas flaring** from satellite detections as a sign of existing operations and emissions; international or disputed boundaries (land or maritime) within the wider band. *Search words:* shipping, AIS, vessel density, port, platform, pipeline, cable, military, ordnance, thermal, flaring, boundary.
+- Both: existing industry nearby (cumulative effects); **thermal hotspots and gas flaring** from satellite detections as a sign of existing operations and emissions. *Search words:* shipping, AIS, vessel density, port, platform, pipeline, cable, military, ordnance, thermal, flaring.
+
+**Cross-border (transboundary; context).** A land border, a maritime boundary or another country's coast within the wider band is a flag.
+- Why it matters: effects can cross it (spills, emissions, noise, sediment, river flows, migratory species); a second government and regulator may be involved; the neighbouring country may need to be notified or consulted (the Espoo Convention in Europe and North America, UNCLOS duties at sea); IFC Performance Standard 1 expects cross-border impacts to be considered.
+- Confidence: high within the close band, medium in the wider band. A disputed, unsettled or joint-regime boundary is at least medium anywhere in range.
+- Always add: boundaries are indicative and have no legal standing.
 
 **Context (no PS):** country risk only with a dated source; who lives and works around the site, especially sharp contrasts in wealth or land and sea use (*a common cause of conflict over jobs and compensation*).
 
@@ -77,11 +84,14 @@ Each flag says: **the risk** in plain words; **the evidence** (feature name as t
 Confidence: **high** = a mapped feature on site or in the near band, from a trusted or national source; **medium** = mapped but in the close or wider band, or several weak signals, or a source of unknown licence or quality; **low** = regional knowledge, or a gap in a place where the risk is common.
 
 - **Industrial use on or near site is not a reason to lower the risk on its own.** Today's data may show the planned project itself, or a neighbour of the same kind, already built. *Hindsight is everywhere in screening data: say so when it matters.*
+- **Weak evidence.** A feature with no name and no attributes, or a layer that scores whole seas or regions (a fishing-protection level, a sensitivity index), is weak evidence. Read its score before flagging, never flag from its presence alone, and keep it at low confidence unless the score itself shows the risk.
 - **Satellite detections are recent only** (days, not years): say "none detected in the last N days", never "none".
 - A theme with no flags and no gaps is rare; if it happens, say what was checked.
 
 ## Data rules
 - Prefer trusted services, national and intergovernmental publishers, and open licences. Data under Esri's Master License Agreement is not used unless the person holds an Esri licence; if the only source is one of those, say so as a gap.
+- Data under non-commercial terms (e.g. WDPA) is left out unless the person has switched it on; if it would matter, say so as a gap.
+- Boundary data is indicative: Marine Regions' data isn't for legal, resource-exploration or navigation use. Say so whenever a boundary is part of a flag.
 - Every feature used keeps its dataset, publisher, licence (as stated) and date checked. "Licence not stated" stays not stated.
 - A source that fails, times out or can't be fetched is **not checked**, never "nothing found". A dataset that answers with nothing means nothing *in that dataset*, not nothing at all.
 - Never invent a feature, name, distance or dataset. Never say data doesn't exist unless you searched for it, and then say what words and area you searched.
