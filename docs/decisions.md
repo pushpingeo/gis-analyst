@@ -2,6 +2,22 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 18 Nov 2026 (evening): non-commercial data switch; place finding keeps namesakes (Rob)
+- **Non-commercial data off by default, like Esri's.** New licence class rule (`licenceBlock` in `js/licence.js`):
+  "No commercial use" and similar now classify as non-commercial; such layers are left out of `find_data`,
+  `get_data`, `find_features_near` and `find_place` unless the browser setting `tobler.nonCommercial` is "yes"
+  (the settings gear will carry it, beside the Esri switch). Each search says what it left out and why. The licence
+  rule now applies to the near-feature and named searches too; before, only `find_data`/`get_data` applied it, so
+  Esri-licensed layers could come through `find_features_near`. The WDPA baseline layer shows as "not checked
+  (non-commercial licence)" unless switched on. `NON_COMMERCIAL=yes` for `try-requests`.
+- **Place finding keeps namesakes.** Bonga: the field search accepted outlines only, so Global Energy Monitor's
+  field points were skipped and only the ministry's Bonga Main came back. Now fields (and wind farms) prefer
+  outlines but accept points, outlines sorted first; for kinds global trackers hold (fields, plants, mines, wind)
+  the search asks a second batch when only one layer matched. Live: Bonga 4.4–6.2 s with four candidates when the
+  GEM layer answers; Jackdaw 2.1 s, unchanged; Linlithgow Loch 4.8 s (stops at the first match). The carousel
+  (`offer_choices`) already exists; the skill offers it when several candidates fit. Not yet seen end to end: the GEM
+  layer failed in the atlas on two of three tries ("tile 0_0 unreadable"; request filed).
+
 ## 18 Nov 2026 (17:00): fixes from Rob's Bonga log
 - **Multi-part outlines.** Bonga Main (Nigeria's ministry layer) is a MultiPolygon; the drawing tool takes single
   shapes only, so `make_place` failed and the analyst fell back to a pin (a 77 km² field screened as a 5 km circle).
