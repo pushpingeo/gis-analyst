@@ -71,6 +71,9 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     if (out.content?.[0]?.text === RESULT) await new Promise((ok) => setTimeout(ok, 3000));
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(out) });
   });
+  // Water depth (NOAA) and vessel traffic (EMODnet), read in code for sites at sea.
+  await page.route(/gis\.ngdc\.noaa\.gov/, (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ samples: [-110, -120, -130].map((v) => ({ value: String(v), resolution: 0.004 })) }) }));
+  await page.route(/emodnet-humanactivities/, (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ features: [{ properties: { GRAY_INDEX: /allavg/.test(r.request().url()) ? 0.3 : 0.1 } }] }) }));
   await page.route(/tobler-api.*\/atlas/, async (r) => { const b = JSON.parse(r.request().postData()); r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: { structuredContent: atlas(b.params.name, b.params.arguments) } }) }); });
   await page.goto("http://localhost:8000/");
   await page.waitForFunction(() => window.__ws?.draw, null, { timeout: 40000 });
@@ -144,6 +147,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     gaps: document.querySelector(".run .gaps summary").textContent,
     gapHeads: [...document.querySelectorAll(".run .gaps .gap-head")].map((e) => e.textContent),
     dists: document.querySelector(".run .dists").textContent,
+    sea: document.querySelector(".run .sea").hidden ? "" : document.querySelector(".run .sea").textContent,
     scopeShown: !document.querySelector(".run .scope").hidden,
     insideChecked: document.querySelector('.run [data-scope="inside"]').getAttribute("aria-checked") === "true",
     sliderShown: !document.querySelector(".run input[type=range]").hidden,
@@ -156,6 +160,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   check(s.flags.length === 3 && /pipelines/.test(s.flags[0]), `${label}: three flags, high first (${s.flags[0]})`);
   check(s.out === "50 km" && s.onMap === 6, `${label}: slider at 50 km, 5 findings and the wide area on the map (${s.out}, ${s.onMap})`);
   check(/near 2 km · close 10 km · wider 50 km/.test(s.dists), `${label}: distances and reason shown`);
+  check(s.sea === "Water depth about 120 m, 110–130 m across the site (NOAA). Vessel traffic: light on the site (0.3 h/km² a month) (AIS 2023, EMODnet).", `${label}: water depth and vessel traffic on the card (${s.sea.slice(0, 80)})`);
   await page.$eval(".run", (e) => e.scrollIntoView({ block: "start" }));
   await page.screenshot({ path: `/tmp/run-card-${label}-1.png` });
   await page.$eval(".run input[type=range]", (el) => { el.value = "1"; el.dispatchEvent(new Event("input", { bubbles: true })); });

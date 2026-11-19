@@ -18,6 +18,7 @@ import { pickExamples } from "./examples.js";
 import { getUserKey, setUserKey } from "./claude.js";
 import { distancesLine, bandFor } from "./distances.js";
 import { DISCLAIMER } from "./disclaimer.js";
+import { seaShort } from "./seavalues.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
@@ -583,7 +584,7 @@ host.screening = createScreening({
   onRun: (record) => {
     const r = record.tobler_run;
     // The log keeps what the card shows, so a downloaded log explains the card on its own.
-    runLog?.events.push({ screen_result: { run: r.id, distances: r.distances, baseline: r.baseline, flags: r.flags.map((f) => ({ risk: f.risk, theme: f.theme, confidence: f.confidence, nearest_km: f.nearest_km, evidence: f.evidence.map((e) => `${e.name} ${e.distance_km} km${e.traced ? "" : " (not traced)"}`) })),
+    runLog?.events.push({ screen_result: { run: r.id, distances: r.distances, baseline: r.baseline, sea: r.sea, flags: r.flags.map((f) => ({ risk: f.risk, theme: f.theme, confidence: f.confidence, nearest_km: f.nearest_km, evidence: f.evidence.map((e) => `${e.name} ${e.distance_km} km${e.traced ? "" : " (not traced)"}`) })),
       checked: r.checked.map((c) => `${c.dataset}: ${c.result}${c.count ? ` ${c.count}` : ""}${c.why ? ` (${c.why})` : ""}`), gaps: r.data_gaps, ...(r.parse_error ? { problem: r.parse_error } : {}) } });
     stopProgress(record);
     showRun(record);
@@ -853,6 +854,9 @@ function showRun(record) {
     `${r.site.asset_label[0].toUpperCase()}${r.site.asset_label.slice(1)}${r.site.asset_assumed ? " (assumed)" : ""}`, r.site.stage, r.site.setting, r.site.footprint,
   ].filter(Boolean).join(" · ");
   card.querySelector(".disclaimer").textContent = DISCLAIMER;
+  // Water depth and vessel traffic, read in code for sites at sea (js/seavalues.js).
+  const seaText = seaShort(r.sea, { units: (km) => U.dist(km) });
+  if (seaText) { const p = card.querySelector(".sea"); p.hidden = false; p.textContent = seaText; }
   if (r.parse_error) { const pr = card.querySelector(".problem"); pr.hidden = false; pr.textContent = r.parse_error; }
   const slider = card.querySelector('input[type="range"]');
   slider.max = String(r.fetched_to_km);
@@ -1237,6 +1241,7 @@ function traceLine(ev) {
     case "get_data": return o.not_checked ? `Fetched ${o.dataset || i.dataset}: not checked (${String(o.not_checked).slice(0, 80)})` : `Fetched ${o.dataset} (${o.publisher}): ${o.within_distance} within ${o.within_km} km`;
     case "screen_site": return o.run ? `Screened ${o.site} (${o.run}): ${o.flags} flags; ${o.distances}` : `Screening: ${o.not_available || "no result"}`;
     case "get_run": return `Read the screen ${o.run || ""}`;
+    case "sea_values": return [...(o.lines || []), ...(o.not_found || [])].join(" ") || "Read water depth and vessel traffic: nothing returned";
     default: return ev.name;
   }
 }

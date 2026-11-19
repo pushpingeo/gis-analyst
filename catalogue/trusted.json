@@ -55,5 +55,33 @@
     {"atlas_id": "26712d28f51a6645", "title": "Global Distribution of Coral Reefs (2003)", "publisher": "UN Environment Programme World Conservation Monitoring Centre", "theme": "biodiversity", "setting": "sea", "where": [-180, -35, 180, 35], "licence": "UNEP-WCMC (2003): check terms before commercial use", "for": "warm-water coral reefs (tropics)"},
     {"atlas_id": "751ddc65885f897d", "title": "Special Areas under MARPOL", "publisher": "UN Environment Programme World Conservation Monitoring Centre (data: IMO)", "theme": "biodiversity", "setting": "sea", "where": [-180, -90, 180, 90], "licence": "International Maritime Organization: check terms before commercial use", "for": "MARPOL special areas (stricter discharge rules)"},
     {"atlas_id": "06ab03dddac3cdd2", "title": "Critical Habitat Areas by NMFS", "publisher": "NOAA (National Marine Fisheries Service)", "theme": "biodiversity", "setting": "any", "where": [-180, 15, -60, 72], "licence": "US federal government work: public domain", "for": "ESA critical habitat in US waters and coasts"}
-  ]
+  ],
+  "values_about": "Raster services the screening baseline reads values from (js/seavalues.js): water depth and AIS vessel traffic. Called directly from the page (both send CORS headers). Added 19 Nov 2026; to be swapped for atlas records once the atlas tags value-returning services (request in docs/atlas-requests.md).",
+  "values": {
+    "depth": {
+      "title": "DEM Global Mosaic (bathymetry and topography)",
+      "publisher": "NOAA National Centers for Environmental Information (NCEI)",
+      "url": "https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer",
+      "licence": "US federal government data (NOAA NCEI): public domain in the US (inferred; not stated on the service). Built from GEBCO and other sources, which keep their own attribution",
+      "licence_class": "open",
+      "licence_source": "inferred: US federal work (17 U.S.C. §105); the service description gives no licence",
+      "attribution": "NOAA NCEI DEM Global Mosaic (includes GEBCO Compilation Group data)",
+      "coverage": "global",
+      "note": "Pixel values in metres relative to sea level (negative below). Cell size varies by source: about 460 m (GEBCO) in open ocean, finer where NOAA holds surveys."
+    },
+    "traffic": {
+      "title": "Vessel Density, annual averages (EMODnet Human Activities)",
+      "publisher": "EMODnet Human Activities (Cogea Srl), from AIS by CLS, ORBCOMM and vesseltracker.com",
+      "url": "https://ows.emodnet-humanactivities.eu/wms",
+      "year": 2023,
+      "layers": {"all": "vesseldensity_allavg", "types": {"fishing": "vesseldensity_01avg", "passenger": "vesseldensity_08avg", "cargo": "vesseldensity_09avg", "tanker": "vesseldensity_10avg"}},
+      "licence": "CC-BY 4.0 (EMODnet; data originator Cogea Srl)",
+      "licence_class": "open",
+      "licence_source": "atlas record 870fd6f7e0661d13 (as stated by EMODnet)",
+      "attribution": "EMODnet Human Activities, Vessel Density (Cogea Srl), AIS data from CLS, ORBCOMM and vesseltracker.com",
+      "coverage": "EU waters and neighbouring seas",
+      "coverage_note": "EMODnet's vessel density covers EU waters and neighbouring seas only",
+      "note": "Hours spent by vessels per km² a month, 1 km cells. 2023 is used: EMODnet notes 2024 lost satellite AIS data from June."
+    }
+  }
 }

@@ -26,6 +26,14 @@ geodesic and measured from the footprint edge.
   parks, power lines and pipelines near the site, from the catalogue and OpenStreetMap, with distance and bearing.
 - **Tobler:** `find_features_near`.
 
+## Read values at the site (at sea)
+- **Does:** reads numbers off published rasters over the footprint: water depth (metres below sea level: typical,
+  shallowest and deepest of the points sampled), and vessel traffic from AIS (hours per km² a month, by vessel type,
+  on the site and at points out to the close band). A service that fails is *not checked*; a place outside a
+  raster's coverage has *no data*, never zero.
+- **Tobler:** done in code before the analyst starts (`js/seavalues.js`; NOAA NCEI's DEM Global Mosaic for depth,
+  EMODnet's vessel density for traffic, both in `catalogue/trusted.json` "values"), and given in the baseline.
+
 ## Failures, in any setting
 A source that fails or isn't reached is reported as *not checked*, never as *nothing found*. Say which.
 

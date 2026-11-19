@@ -72,6 +72,7 @@ for (const conv of convs) {
     onRun: (rec) => {
       const r = rec.tobler_run;
       console.log(`   [RUN CARD ${r.id}: ${r.site.name}; ${r.site.asset_label}${r.site.asset_assumed ? " (assumed)" : ""}; ${r.site.footprint}; ${r.distances.near}/${r.distances.close}/${r.distances.wider} km (${r.distances.reasons[0]})]`);
+      if (r.sea) console.log(`     SEA ${JSON.stringify(r.sea).slice(0, 900)}`);
       for (const f of r.flags) console.log(`     ${f.confidence.toUpperCase()} [${f.theme}] ${f.risk} | nearest ${f.nearest_km} km | evidence ${f.traced} traced, ${f.untraced} not traced: ${f.evidence.map((e) => `${e.name} ${e.distance_km} km${e.traced ? "" : " (untraced)"}`).join("; ").slice(0, 400)}`);
       console.log(`     checked: ${r.checked.map((c) => `${c.dataset} → ${c.result}${c.count ? ` ${c.count}` : ""}`).join("; ").slice(0, 900)}`);
       console.log(`     gaps: ${r.data_gaps.join(" | ").slice(0, 600)}`);

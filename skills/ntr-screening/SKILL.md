@@ -1,6 +1,6 @@
 ---
 name: ntr-screening
-version: 3.4-draft
+version: 3.5-draft
 description: Screen a site, onshore or offshore, for non-technical risk (NTR) from published spatial data. Flags anything that could become a risk, concern or delay (land and livelihoods, biodiversity, Indigenous Peoples, cultural heritage, community health and safety, and the operating context), with traced evidence and what wasn't checked. Use when someone asks what risks, sensitivities or constraints a site, block, field, route or area might raise.
 ---
 
@@ -30,7 +30,7 @@ Distances are measured from the footprint edge. When the screen runs as its own 
 State the distances used at the top of the result, and offer to change them.
 
 ## Steps
-0. **Start from the baseline.** When the run has already checked boundaries and the must-check layers before you start, use those results as evidence and don't fetch them again; spend your searches on what's specific to this site.
+0. **Start from the baseline.** When the run has already checked boundaries and the must-check layers before you start, use those results as evidence and don't fetch them again; spend your searches on what's specific to this site. At sea the baseline also gives the water depth over the site and, in European waters, AIS vessel traffic at and around it.
 1. **Confirm the site:** location, onshore/offshore, asset type, stage, footprint and distances used.
 2. **Plan the evidence.** For each theme below, decide which kinds of evidence apply to this site (onshore, offshore or both).
 3. **Find the data.** For each kind of evidence, search for datasets with short, distinctive words (the "search words" below), two or three wordings at a time. Choose, in this order: trusted services and national or intergovernmental publishers; open licences; datasets whose features can be fetched; the most specific coverage (a national layer beats a global one where both exist). Use the everyday feature search for settlements, schools, hospitals, places of worship and cemeteries.
@@ -68,13 +68,17 @@ Search words are starting points; adapt them to the place and language (e.g. "Na
 
 **Community health, safety and security (PS4)**
 - Onshore: schools, hospitals and clinics within the near band or by the likely access road; settlements in the close band; no main road within 10 km (new access needed).
-- Offshore: shipping lanes and traffic density; ports and anchorages; other installations, pipelines and cables (simultaneous operations); military practice areas; unexploded ordnance; coastal communities in the wider band (spill reach).
-- Both: existing industry nearby (cumulative effects); **thermal hotspots and gas flaring** from satellite detections as a sign of existing operations and emissions. *Search words:* shipping, AIS, vessel density, port, platform, pipeline, cable, military, ordnance, thermal, flaring.
+- Offshore: vessel traffic from AIS (density by vessel type: the run reads it in European waters; elsewhere search for it); shipping lanes, traffic separation schemes and fairways; ports and anchorages; other installations, pipelines and cables (simultaneous operations); military practice areas; unexploded ordnance; coastal communities in the wider band (spill reach).
+- Both: existing industry nearby (cumulative effects); **thermal hotspots and gas flaring** from satellite detections as a sign of existing operations and emissions. *Search words:* shipping, AIS, vessel density, traffic separation, fairway, shipping lane, port, platform, pipeline, cable, military, ordnance, thermal, flaring.
 
 **Cross-border (transboundary; context).** A land border, a maritime boundary or another country's coast within the wider band is a flag.
 - Why it matters: effects can cross it (spills, emissions, noise, sediment, river flows, migratory species); a second government and regulator may be involved; the neighbouring country may need to be notified or consulted (the Espoo Convention in Europe and North America, UNCLOS duties at sea); IFC Performance Standard 1 expects cross-border impacts to be considered.
 - Confidence: high within the close band, medium in the wider band. A disputed, unsettled or joint-regime boundary is at least medium anywhere in range.
 - Always add: boundaries are indicative and have no legal standing.
+
+**Vessel traffic (offshore; PS4).** Busy traffic on the site or in the close band is a flag: collision risk, simultaneous operations, and the site's safety zones pushing ships into new routes. Confidence from distance and the source, as for any mapped feature. Say what the figure is: hours vessels spend per km² a month, sampled at a few points (not the busiest cell nearby), from AIS, which misses small vessels without transponders (many fishing boats). Light traffic is a line in the summary, not a flag.
+
+**Water depth (offshore; context).** Depth decides what's possible and what it costs, so say what the depth over the site means for this asset. Rough guides (rules of thumb, say so): fixed-bottom offshore wind to about 60 m, floating beyond; jack-up rigs to about 120–150 m, floating rigs beyond; diver work to about 50 m, remotely operated vehicles beyond; deepwater (over about 500 m) and ultra-deep (over about 1,500 m) change the whole development. Raise a context flag only where the depth makes the asset as described impractical or unusually costly; otherwise give the depth in one line of the summary. Depth from a global grid is approximate (cells of a few hundred metres): say so on steep slopes or for very small footprints.
 
 **Context (no PS):** country risk only with a dated source; who lives and works around the site, especially sharp contrasts in wealth or land and sea use (*a common cause of conflict over jobs and compensation*).
 

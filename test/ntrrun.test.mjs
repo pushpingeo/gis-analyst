@@ -338,6 +338,44 @@ await test("baseline before the analyst: boundaries and the must-check layers, a
   assert.ok(model.calls[1].messages.at(-1).content.some((b) => /"id":"D1"/.test(b.content)));
 });
 
+await test("offshore baseline also reads water depth and AIS vessel traffic, in the record, the first message and the evidence", async () => {
+  atlasCalls.length = 0;
+  const model = standardScript();
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const asked = [];
+  const fetchFn = async (url) => {
+    asked.push(url);
+    if (/getSamples/.test(url)) return { ok: true, json: async () => ({ samples: [-140, -150, -160].map((v) => ({ value: String(v), resolution: 0.004 })) }) };
+    if (/emodnet-humanactivities/.test(url)) { const v = /allavg/.test(url) ? 0.8 : 0.1; const o = { features: [{ properties: { GRAY_INDEX: v } }] }; return { ok: true, text: async () => JSON.stringify(o) }; }
+    return { ok: true, json: async () => [] };
+  };
+  const rec = await runScreening({ host: { ...host(), fetchFn }, site, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
+  const r = rec.tobler_run;
+  assert.equal(r.sea.depth.typical_m, 150);
+  assert.equal(r.sea.traffic.at_site, 0.8);
+  assert.equal(r.checked.find((c) => c.evidence === "water depth").result, "features");
+  assert.equal(r.checked.find((c) => c.evidence === "vessel traffic (AIS)").result, "features");
+  const first = model.calls[0].messages[0].content;
+  assert.match(first, /Water depth about 150 m \(140–160 m/);
+  assert.match(first, /Vessel traffic \(AIS, 2023 annual average\): 0\.8 hours per km² a month on the site \(moderate\)/);
+  const vt = rec.features.find((f) => f.properties.type === "vessel traffic density (AIS)");
+  assert.ok(vt, "busiest traffic point kept as evidence");
+  assert.equal(vt.properties.theme, "community");
+  assert.match(vt.properties.licence, /CC-BY 4\.0/);
+});
+
+await test("offshore depth and traffic services down: not checked, and the analyst is told", async () => {
+  const model = standardScript();
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const fetchFn = async (url) => { if (/getSamples|emodnet/.test(url)) throw new Error("network down"); return { ok: true, json: async () => [] }; };
+  const rec = await runScreening({ host: { ...host(), fetchFn }, site, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
+  const r = rec.tobler_run;
+  assert.equal(r.sea, undefined);
+  assert.equal(r.checked.find((c) => c.evidence === "water depth").result, "not checked");
+  assert.equal(r.checked.find((c) => c.evidence === "vessel traffic (AIS)").result, "not checked");
+  assert.match(model.calls[0].messages[0].content, /DEM Global Mosaic.*: not checked \(network down\)/);
+});
+
 await test("onshore far from the sea: no maritime call, a neighbouring country is measured from the reference", async () => {
   atlasCalls.length = 0;
   const { nearestBoundaries } = await import("../js/boundaries.js");

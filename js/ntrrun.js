@@ -10,6 +10,7 @@ import { bandFor, distancesLine, chooseDistances, ASSET_TYPES, MAX_KM } from "./
 import { nearestBoundaries } from "./boundaries.js";
 import { DISCLAIMER } from "./disclaimer.js";
 import { aroundSiteKm2 } from "./datatools.js";
+import { waterDepth, vesselTraffic, seaLines } from "./seavalues.js";
 
 // The band for a piece of evidence: a wide area the site lies within is "around the site", not "on site".
 export const AROUND = "around the site";
@@ -211,7 +212,27 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   const sb = turf.bbox(fp.feature);
   const layers = (host.trusted?.baseline || []).filter((b) => (b.setting !== "sea" || sea) && !(sb[2] < b.where[0] || sb[0] > b.where[2] || sb[3] < b.where[1] || sb[1] > b.where[3]));
   const before = checked.length;
-  onEvent({ type: "baseline", layers: layers.length });
+  // Values read off rasters at sea (catalogue/trusted.json "values"): water depth on an offshore site; AIS vessel
+  // traffic when the sea is within the close band. Alongside the baseline layers, in parallel.
+  const vals = host.trusted?.values || {};
+  const wantDepth = offshore && !!vals.depth;
+  const wantTraffic = !inside && !!vals.traffic && (offshore || (describe.coast_km != null && describe.coast_km <= distances.close));
+  const fetchFn = host.fetchFn || globalThis.fetch;
+  const seaVals = {};
+  const seaJob = (wantDepth || wantTraffic) ? (async () => {
+    const t0 = Date.now();
+    const [d, t] = await Promise.all([
+      wantDepth ? waterDepth({ site: fp.feature, source: vals.depth, fetchFn, now }) : null,
+      wantTraffic ? vesselTraffic({ site: fp.feature, closeKm: distances.close, source: vals.traffic, fetchFn, now }) : null,
+    ]);
+    if (d) { checked.push(d.checked); if (d.depth) seaVals.depth = d.depth; }
+    if (t) { checked.push(t.checked); if (t.traffic) seaVals.traffic = t.traffic; capture(t.evidence, { theme: "community" }); }
+    const lines = seaLines(seaVals);
+    const notChecked = [d, t].filter((x) => x && x.checked.result !== "features").map((x) => `${x.checked.dataset}: ${x.checked.result}${x.checked.why ? ` (${x.checked.why})` : ""}`);
+    onEvent({ type: "tool", name: "sea_values", input: { depth: wantDepth, traffic: wantTraffic }, ms: Date.now() - t0, baseline: true, output: { lines, not_found: notChecked } });
+    return { lines, notChecked };
+  })() : null;
+  onEvent({ type: "baseline", layers: layers.length + (seaJob ? 1 : 0) });
   await Promise.allSettled(layers.map(async (b) => {
     const id = tools.useDataset({ id: b.atlas_id, title: b.title, publisher: b.publisher, licence: b.licence, capabilities: ["query"], concepts: [] }, "B");
     const input = { dataset: id, place: site.name, theme: b.theme };
@@ -220,7 +241,9 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     try { const output = await exec("get_data", input); onEvent({ type: "tool", name: "get_data", input, output, ms: Date.now() - t0, baseline: true }); }
     catch (e) { onEvent({ type: "tool", name: "get_data", input, error: String(e.message || e), ms: Date.now() - t0, baseline: true }); }
   }));
-  for (const c of checked.slice(before)) baselineLines.push(summarise(c));
+  const seaRes = seaJob ? await seaJob.catch((e) => ({ lines: [], notChecked: [`water depth and vessel traffic: not checked (${String(e.message || e).slice(0, 120)})`] })) : null;
+  for (const c of checked.slice(before)) if (!/^(water depth|vessel traffic)/.test(c.evidence)) baselineLines.push(summarise(c));
+  if (seaRes) for (const l of [...seaRes.lines, ...seaRes.notChecked.map((x) => `${x}.`)]) baselineLines.push(`- ${l}`);
   const baselineCalls = calls.length;
   const origin = site.origin?.method === "words"
     ? `from the words "${site.origin.words}", anchored on ${site.origin.anchor?.name || site.origin.anchor?.place || "a found feature"}${site.origin.anchor?.source?.publisher ? ` (${site.origin.anchor.source.publisher})` : ""}, ${site.origin.confidence} confidence`
@@ -273,6 +296,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
         asset_type: inputs.asset_type, asset_label: inputs.asset_label, asset_assumed: !!inputs.asset_assumed,
         stage: inputs.stage || "greenfield (assumed)", capacity_mw: inputs.capacity_mw ?? null, tip_height_m: inputs.tip_height_m ?? null,
       },
+      ...(Object.keys(seaVals).length ? { sea: seaVals } : {}),
       extent: inside ? "inside" : "around", distances, fetched_to_km: reach, assessed_within_km: reach,
       method: inside
         ? "Inside the area only, at the person's request: features inside the area or touching its edge (distance 0), geodesic on WGS84; the surroundings weren't fetched. Coordinates WGS84 (EPSG:4326)."
@@ -403,6 +427,7 @@ export function createScreening({ host, table, skill, callClaude, model = "", on
           evidence: f.evidence.map((e) => ({ name: e.name, distance_km: e.distance_km, band: e.band, dataset: e.dataset, publisher: e.publisher, traced: e.traced })) })),
         checked: r.checked.map((c) => ({ dataset: c.dataset, publisher: c.publisher, result: c.result, ...(c.count ? { count: c.count } : {}), ...(c.why ? { why: c.why.slice(0, 160) } : {}) })),
         data_gaps: r.data_gaps,
+        ...(r.sea ? { sea: seaLines(r.sea) } : {}),
       };
     },
   };
