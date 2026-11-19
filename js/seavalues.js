@@ -123,9 +123,10 @@ export async function vesselTraffic({ site, closeKm = 10, source, fetchFn = glob
   const sitePts = samplePoints(site, 9);
   const centre = turf.pointOnFeature(site).geometry.coordinates;
   const ring = [];
-  // Rings out from the site's edge (roughly: its furthest corner from the centre), half the close band and the close band.
+  // Rings out from the site's edge (roughly: the centre's distance to the nearest side of its bounding box), at half the
+  // close band and the close band, so every ring point is within the close band of the edge.
   const [w, s, e, n] = turf.bbox(site);
-  const reach = Math.min(50, Math.max(...[[w, s], [w, n], [e, s], [e, n]].map((c) => turf.distance(centre, c))));
+  const reach = Math.min(50, ...[[w, centre[1]], [e, centre[1]], [centre[0], s], [centre[0], n]].map((c) => turf.distance(centre, c)));
   const edge = site.geometry.type === "Point" ? 0 : reach;
   for (const km of [closeKm / 2, closeKm]) for (let b = 0; b < 360; b += 30) ring.push(turf.destination(centre, edge + km, b).geometry.coordinates);
   const pts = [...sitePts, ...ring];

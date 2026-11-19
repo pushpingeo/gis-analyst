@@ -362,6 +362,15 @@ await test("offshore baseline also reads water depth and AIS vessel traffic, in 
   assert.ok(vt, "busiest traffic point kept as evidence");
   assert.equal(vt.properties.theme, "community");
   assert.match(vt.properties.licence, /CC-BY 4\.0/);
+  // A flag on depth or traffic traces to the values the run read (there's no feature for depth).
+  const t = traceFlags([{ risk: "Deepwater", theme: "context", confidence: "medium", evidence: [{ name: "Water depth about 150 m (140–160 m)", distance_km: 0, dataset: "" }, { name: "AIS vessel density, busiest sampled point", distance_km: 9, dataset: "EMODnet" }, { name: "Something made up", distance_km: 3, dataset: "" }] }], rec.features.filter((f) => f.properties.role === "evidence"), d, r.sea);
+  assert.equal(t[0].traced, 2);
+  assert.equal(t[0].evidence[0].from_values, "water depth");
+  assert.equal(t[0].evidence[0].publisher, r.sea.depth.publisher);
+  assert.equal(t[0].evidence[1].from_values, "vessel traffic");
+  assert.equal(t[0].evidence[1].distance_km, r.sea.traffic.busiest.distance_km);
+  assert.equal(t[0].evidence[2].traced, false);
+  assert.ok(r.sea.traffic.busiest.distance_km <= d.close + 0.2, `ring within the close band of the edge (${r.sea.traffic.busiest.distance_km} km)`);
 });
 
 await test("offshore depth and traffic services down: not checked, and the analyst is told", async () => {

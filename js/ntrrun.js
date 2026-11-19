@@ -85,7 +85,19 @@ export function parseResult(text) {
 }
 
 // Match each evidence item the model gave to a feature the tools actually returned in this run.
-export function traceFlags(flags, evidence, d) {
+// Evidence the analyst takes from the values the run read at sea (water depth, AIS traffic) has no feature to match:
+// it traces to those values instead, when the run has them.
+const DEPTH_WORDS = /water depth|\bdepth\b|bathymetr|DEM Global Mosaic/i;
+const TRAFFIC_WORDS = /vessel|\bAIS\b|traffic|Vessel Density/i;
+function traceToSea(e, sea, d) {
+  const text = `${e.name || ""} ${e.dataset || ""}`;
+  const v = sea?.depth && DEPTH_WORDS.test(text) ? { src: sea.depth, km: 0, value: "water depth" }
+    : sea?.traffic && TRAFFIC_WORDS.test(text) ? { src: sea.traffic, km: e.distance_km > 0 ? sea.traffic.busiest.distance_km : 0, value: "vessel traffic" } : null;
+  if (!v) return null;
+  return { ...e, distance_km: v.km, band: v.km === 0 ? "on site" : bandFor(v.km, d), dataset: v.src.dataset, publisher: v.src.publisher, licence: v.src.licence, checked: v.src.checked_at, from_values: v.value, traced: true };
+}
+
+export function traceFlags(flags, evidence, d, sea = null) {
   // A feature can go by more than one name: a maritime boundary by its line name or by the territories either side.
   const feats = evidence.flatMap((f) => [f.properties.name, f.properties.details?.sides].filter(Boolean).map((nm) => ({ f, n: norm(nm), ds: norm(f.properties.dataset) })));
   return (flags || []).map((flag) => {
@@ -94,7 +106,7 @@ export function traceFlags(flags, evidence, d) {
       const near = (f) => e.distance_km == null || f.properties.distance_km == null || Math.abs(f.properties.distance_km - e.distance_km) <= Math.max(0.5, 0.15 * f.properties.distance_km);
       const named = feats.filter((x) => n && x.n && (x.n === n || (n.length >= 4 && (x.n.includes(n) || n.includes(x.n)))));
       const hit = named.find((x) => near(x.f) && ds && x.ds && (x.ds.includes(ds) || ds.includes(x.ds))) || named.find((x) => near(x.f)) || null;
-      if (!hit) return { ...e, distance_km: round(e.distance_km), traced: false };
+      if (!hit) return traceToSea(e, sea, d) || { ...e, distance_km: round(e.distance_km), traced: false };
       const p = hit.f.properties;
       return { ...e, name: p.name, distance_km: p.distance_km, band: bandOf(p, d), dataset: p.dataset, publisher: p.publisher, licence: p.licence, checked: p.checked_at, fid: p.fid, traced: true };
     });
@@ -281,7 +293,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     } catch (e) { debug.repair_error = String(e.message || e).slice(0, 300); }
     debug.raw_tail = String(res.text || "").slice(-1500);
   }
-  const flags = traceFlags(parsed.json?.flags, evidence, distances);
+  const flags = traceFlags(parsed.json?.flags, evidence, distances, seaVals);
   const siteFeature = { type: "Feature", geometry: fp.feature.geometry, properties: { role: "site", name: site.name, run: runId } };
   return {
     type: "FeatureCollection",
@@ -359,7 +371,7 @@ export async function reassess({ record, km, skill, callClaude, now = () => new 
   const parsed = parseResult(text);
   if (!parsed.json) throw new Error("The re-assessment came back without a readable result. The earlier flags are unchanged.");
   run.assessments.push({ at: now(), within_km: run.assessed_within_km, flags: run.flags, summary: run.summary, distances: run.distances });
-  run.flags = traceFlags(parsed.json.flags, evidenceOf(record), d);
+  run.flags = traceFlags(parsed.json.flags, evidenceOf(record), d, run.sea);
   run.data_gaps = Array.isArray(parsed.json.data_gaps) ? parsed.json.data_gaps.map(String) : run.data_gaps;
   run.summary = parsed.summary;
   run.distances = d;

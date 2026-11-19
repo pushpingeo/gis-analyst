@@ -433,3 +433,38 @@ Judgement calls made while building, newest first. Bigger product decisions live
 ## 19 Nov: Local / Regional / Global buttons removed from shape cards (Rob)
 - They spilled out of the panel, and they did little: scale only goes into the analyst's project summary; screening distances come from the asset type and size. Scale is still worked out (from the request, the shape's size, or the zoom for a drawn point) and passed to the analyst; `make_place` can still set it when the request says so ("screen the whole country"). It's no longer shown or set on the card.
 - Tested: `npm test`, `browser-run-card.mjs` 77/77, `browser-choice.mjs`; screenshots at desktop and phone sizes.
+
+## 19 Nov (evening): water depth and AIS vessel traffic in screens at sea (Rob)
+- **Rob reviewed the offshore part of the NTR skill:** working well; add water depth (what's possible and what it
+  costs changes with depth) and shipping lanes from historic AIS. Review item closed.
+- **Read in code as part of the baseline**, like boundaries (`js/seavalues.js`), not left to the analyst's searches:
+  - **Water depth** on offshore sites: up to 25 points over the footprint in one `getSamples` call to NOAA NCEI's
+    **DEM Global Mosaic** ImageServer (global; GEBCO-based in deep water, finer surveys where NOAA has them; US federal,
+    public domain inferred, GEBCO attributed). Typical (median), shallowest and deepest; points above sea level counted.
+  - **Vessel traffic (AIS)** when the sea is within the close band: EMODnet Human Activities' vessel density
+    (hours per km² a month, 1 km cells, EU waters and neighbours, CC-BY 4.0), by WMS GetFeatureInfo at up to 9 points on
+    the site and 24 on two rings (half the close band and the close band, from the site's edge); then fishing,
+    passenger, cargo and tanker at the busiest point. **2023 asked for explicitly**: EMODnet's default year, 2024, lost
+    satellite AIS from June (its own note). Outside coverage the service returns nothing: "no data here", never zero.
+  - Why not through the atlas: GEBCO is there only as pictures (no values) or Esri ImageServers with vertical
+    exaggeration; EMODnet's bathymetry record shows "licence not stated". Request in `docs/atlas-requests.md`; the
+    sources sit in `catalogue/trusted.json` "values" until the atlas tags value-returning services.
+  - Both services send CORS headers (checked from GitHub's runner with Origin asktobler.com), so the page calls them
+    directly; no Worker change.
+- **On the card:** one short line under the setup ("Water depth about 120 m, 110–130 m across the site (NOAA). Vessel
+  traffic: light on the site (0.3 h/km² a month) (AIS 2023, EMODnet)."); the full lines, with sources, go to the
+  analyst's baseline, `get_run` and the run record (`tobler_run.sea`); each source is in "What was checked".
+  The busiest point sampled becomes a finding (community health and safety) only when traffic is at least moderate,
+  so light traffic doesn't clutter "nearest per theme".
+- **Words for density, a judgement for Rob to correct** (`trafficWord`): under 0.5 light, under 5 moderate, under 20
+  busy, otherwise very busy. From sampled places: Rosebank 0.005, central North Sea 0.07, southern North Sea 2.6,
+  Dover Strait 4.6, Aberdeen approaches 24.9.
+- **NTR skill 3.5-draft:** the baseline gives depth and traffic; busy traffic on site or close is a PS4 flag (collision,
+  simultaneous operations, safety zones displacing shipping), with what the figure is and that AIS misses small boats;
+  depth is context, a flag only where it makes the asset as described impractical or unusually costly, with rough
+  guides labelled as rules of thumb (fixed-bottom wind to ~60 m; jack-ups to ~120–150 m; divers to ~50 m; deepwater
+  over ~500 m, ultra-deep over ~1,500 m). **For Rob to check.** Shipping lanes, traffic separation schemes and fairways
+  stay catalogue searches (more search words). `operations.md` has the new operation.
+- Tested: `npm test` (new `test/seavalues.test.mjs`; two new ntrrun tests: values in the record, the first message and
+  the evidence; services down → not checked and the analyst told), `browser-run-card.mjs` 79/79 with depth and traffic
+  faked (card line checked at desktop and phone sizes).

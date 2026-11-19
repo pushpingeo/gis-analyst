@@ -4,6 +4,24 @@ Tobler and the atlas are worked on in separate chats (decided 17 Nov). Tobler do
 What Tobler can rely on is written down in the atlas repo's `docs/mcp-tools.md`. When Tobler needs something
 new from the atlas, add it here (newest first), tell Rob, and he passes it to the atlas chat.
 
+- **19 Nov (evening): water depth and AIS traffic as values, GEBCO first.** Rob asked for water depth (what's possible
+  and what it costs changes with depth) and shipping lanes from historic AIS in offshore screens. What the atlas holds,
+  checked from Tobler on 19 Nov: GEBCO only as WMS pictures (`5a361dd45cf15884`, `ed24a2a84f7c4236`, the GEBCO_2020
+  copies; GetFeatureInfo on wms.gebco.net returns a service exception) and as Esri ImageServers with vertical
+  exaggeration (`fc84255ab64d3aba`, `8cf2d150b94d0e0f`…); EMODnet Bathymetry mean depth 2022 (`ce9289d1701224ed`)
+  as WMS with feature-info but **licence "not stated"**; EMODnet vessel density (`870fd6f7e0661d13` and per-type
+  layers, CC-BY 4.0) in EU waters; nothing global for AIS density. NOAA NCEI's DEM Global Mosaic ImageServer
+  (`gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer`) returns depth values anywhere
+  but isn't in the atlas. Asks: (1) a GEBCO record that returns depth **values** (its grid through a WCS or an
+  un-exaggerated ImageServer), terms and attribution verbatim; add NOAA's DEM Global Mosaic too; (2) tag
+  value-returning rasters with a capability such as `sample` (ImageServer identify/getSamples, WCS, WMS whose
+  feature-info returns numbers), concept `bathymetry`, and leave it off picture-only and exaggerated services;
+  (3) check EMODnet Bathymetry's licence (CC BY 4.0, as EMODnet publishes it) and record the attribution line;
+  (4) a global AIS density layer if an openly licensed one exists (World Bank/IMF Global Shipping Traffic Density),
+  licence checked. Note new fields in `docs/mcp-tools.md` before shipping. **Meanwhile** Tobler reads depth from
+  NOAA's mosaic and traffic from EMODnet directly (`catalogue/trusted.json` "values", `js/seavalues.js`) and will
+  switch to atlas records once they exist. Sent to Rob as a prompt for the atlas chat, 19 Nov.
+
 - **18 Nov (evening): Global Energy Monitor oil and gas tracker fails intermittently.** `fetch_features` on "Global Oil
   and Gas Extraction Tracker (fields: extraction areas, development and discoveries)" (GEM) answered well at 17:20
   (3 Bonga fields near 4.5 N, 4.6 E) but failed twice at 17:35 with "geojson: tile 0_0 unreadable", in a named search
