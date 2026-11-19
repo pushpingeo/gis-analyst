@@ -644,12 +644,6 @@ function makeCard(p) {
     const before = p.kind === "Area" ? turf.area(p.feature) / 1e6 : turf.length(p.feature);
     applyGeometry(p, G.resizeTo(p.feature, v), `resized from ${R.fmtNum(before)} to ${R.fmtNum(v)} ${p.kind === "Area" ? "km²" : "km"}`);
   });
-  card.querySelectorAll(".scale button").forEach((b) => b.addEventListener("click", () => {
-    if (p.scale === b.dataset.scale) return;
-    p.scale = b.dataset.scale; p.scaleFrom = "you";
-    logEdit(p, `scale set to ${R.SCALES[p.scale].label.toLowerCase()}`);
-    paintScale(p);
-  }));
   // The answer buttons count as a reply in the conversation.
   card.querySelector('[data-op="accept"]').addEventListener("click", () => {
     if (busy) return;
@@ -1050,13 +1044,6 @@ function paintOrigin(p, card = p.card) {
   if (a.extra?.CRS_NAME && /ED50/i.test(a.extra.CRS_NAME)) body.append(el("p", `The source position was surveyed in ${a.extra.CRS_NAME}; the publisher supplies it in WGS84.`, "quiet"));
 }
 
-function paintScale(p) {
-  p.card.querySelectorAll(".scale button").forEach((b) => {
-    b.setAttribute("aria-checked", String(b.dataset.scale === p.scale));
-    b.title = b.dataset.scale === p.scale && p.scaleFrom !== "you" ? `${R.SCALE_FROM[p.scaleFrom]}: ${R.SCALES[p.scale].hint}` : R.SCALES[b.dataset.scale].hint;
-  });
-}
-
 let refreshSeq = 0;
 async function refreshCard(p) {
   const seq = ++refreshSeq; p.seq = seq;
@@ -1067,8 +1054,9 @@ async function refreshCard(p) {
     const d = await R.describe(ref, p.feature);
     if (p.seq !== seq) return; // a newer edit overtook this one
     p.described = d;
+    // Scale is worked out (from the request, the size or the zoom) and goes to the analyst; it isn't shown or
+    // set on the card (Rob, 19 Nov: the Local/Regional/Global buttons spilled out of the panel and did little).
     if (p.scaleFrom === "size") p.scale = d.scale;
-    paintScale(p);
     sum.textContent = U.localise(R.summaryLine(d));
     sum.classList.remove("loading");
     const [lon, lat] = d.centroid;
