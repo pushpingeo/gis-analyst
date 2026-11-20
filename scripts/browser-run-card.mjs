@@ -111,10 +111,14 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     accept: !c.querySelector('[data-op="accept"]').hidden, delInRow: !!c.querySelector('.actions [data-op="delete"]'), adjustOpen: !c.querySelector(".adjust").hidden,
     help: c.querySelector(".adjust-help").textContent, hint: !document.getElementById("hint").hidden, active: c.classList.contains("active"),
     selected: ws.draw.getSnapshot().some((f) => f.properties?.selected) }; });
+  // The chip asks what's planned there first (no model call): quick picks for the setting, More…, a general screen.
   await page.click(".chip[data-screen]");
-  const chip = await page.evaluate(() => ({ shown: !document.querySelector(".chips").hidden, text: document.querySelector(".chip[data-screen]").textContent, say: document.getElementById("say").value }));
-  check(chip.shown && chip.text === "Screen this location for risks" && chip.say === "Screen Area 1 for risks", `${label}: one chip once there's a place; it fills the place in (${chip.say})`);
-  await page.fill("#say", "");
+  await page.waitForSelector(".asset-pick");
+  const chip = await page.evaluate(() => ({ shown: !document.querySelector(".chips").hidden, text: document.querySelector(".chip[data-screen]").textContent,
+    picks: [...document.querySelectorAll(".asset-pick .picks button")].map((b) => b.textContent) }));
+  check(chip.shown && chip.text === "Screen this location for risks" && chip.picks[0] === "Offshore wind" && chip.picks.length === 8 && chip.picks.includes("More…") && chip.picks.at(-1) === "Just a general screen",
+    `${label}: one chip once there's a place; it asks what's planned, with picks for the sea (${chip.picks.join(", ")})`);
+  await page.evaluate(() => document.querySelector(".asset-pick").remove());
   let c = await card();
   check(c.accept && c.delInRow && !c.adjustOpen && !c.hint, `${label}: card: Use this area, Adjust and delete in one row; no banner`);
   await page.evaluate(() => { const id = [...window.__ws.places.keys()][0]; window.__ws.draw.selectFeature(id); });

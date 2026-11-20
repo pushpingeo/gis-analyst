@@ -351,3 +351,11 @@ a { color: var(--sea); }
 
 .settings .about { margin: 0 0 6px; font-size: 13px; color: var(--ink-2); }
 .settings .links { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+/* Renaming a place: tap its name on the card. */
+.shape h2 .name { cursor: text; border-bottom: 1px dashed transparent; overflow: hidden; text-overflow: ellipsis; }
+.shape h2 .name:hover, .shape h2 .name:focus-visible { border-bottom-color: var(--ink-2); outline: none; }
+.shape h2 input.rename { font: inherit; min-width: 0; flex: 1; border: 1px solid var(--sea); border-radius: 6px; padding: 1px 6px; }
+/* What's planned at a place: quick picks before a screen. */
+.asset-pick .picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.asset-pick .chip.general { border-style: dashed; }
+.asset-pick.done { opacity: .6; }

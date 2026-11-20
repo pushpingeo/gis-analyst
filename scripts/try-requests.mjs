@@ -47,6 +47,8 @@ for (const conv of convs) {
     addFindings(l, g) { this.findings = (this.findings || 0) + l.length; },
     showFindings(ids) { return { shown: ids?.length || this.findings || 0 }; },
     clearFindings() { this.findings = 0; },
+    // As in the page, a pick from the asset buttons comes back as the person's next message (write it as the next turn).
+    askAssetType(name) { console.log(`   [asset type buttons shown for ${name}]`); return { place: name }; },
     offerChoices(o) { console.log(`   [choices offered: ${o.question || ""} ${(o.options || []).map((x) => x.label || x).join(" / ")}]`); },
     fetchFn: (url, opts = {}) => fetch(url, { ...opts, headers: { ...UA, ...(opts.headers || {}) } }),
     atlas: process.env.ATLAS_MCP_KEY ? (tool, args) => atlasCall(tool, args) : null,

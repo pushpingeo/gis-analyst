@@ -21,6 +21,8 @@ import { DISCLAIMER } from "./disclaimer.js";
 import { seaShort } from "./seavalues.js";
 import { elevationShort } from "./elevation.js";
 import { createLogSharer } from "./sharelog.js";
+import { settlementNear } from "./gazetteer.js";
+import { picksFor, pickMessage } from "./assetpicks.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
@@ -108,13 +110,38 @@ const kindOf = (geom) => (geom.type === "Point" ? "Point" : /LineString/.test(ge
 // A place answers to its name and to the "Area 1" it was counted as, so either works in tool calls.
 const placeByName = (name) => {
   const n = String(name).trim().toLowerCase();
-  return [...places.values()].find((p) => p.name.toLowerCase() === n) || [...places.values()].find((p) => p.alias?.toLowerCase() === n || p.given?.toLowerCase() === n);
+  return [...places.values()].find((p) => p.name.toLowerCase() === n)
+    || [...places.values()].find((p) => p.alias?.toLowerCase() === n || p.given?.toLowerCase() === n || p.former?.some((f) => f.toLowerCase() === n));
 };
 // Names stay unique: a second "Jackdaw 3 km²" becomes "Jackdaw 3 km² (2)".
-function uniqueName(name) {
+function uniqueName(name, self = null) {
   let out = name, k = 2;
-  while ([...places.values()].some((p) => p.name.toLowerCase() === out.toLowerCase())) out = `${name} (${k++})`;
+  while ([...places.values()].some((p) => p !== self && p.name.toLowerCase() === out.toLowerCase())) out = `${name} (${k++})`;
   return out;
+}
+
+// Renaming keeps the old names as aliases, so the analyst and earlier messages still find the place.
+function renameTo(p, to, by) {
+  const clean = String(to || "").replace(/\s+/g, " ").trim().slice(0, 60);
+  if (!clean || clean === p.name) return false;
+  const was = p.name;
+  p.former = [...new Set([...(p.former || []), was])];
+  p.name = uniqueName(clean, p);
+  if (focusName === was) focusName = p.name;
+  p.card.querySelector("h2 .name").textContent = p.name;
+  logEdit(p, `renamed from ${was} to ${p.name}${by ? ` (${by})` : ""}`);
+  scheduleRefresh();
+  return true;
+}
+
+// A drawn shape is named after the settlement it's in or near ("Point near Linlithgow"), once that's known; until
+// then, and at sea or when nothing is named nearby, it stays "Point 1". Never overrides a name someone gave.
+async function nameFromSettlement(p) {
+  try {
+    const at = p.kind === "Point" ? p.feature.geometry.coordinates : turf.centroid(p.feature).geometry.coordinates;
+    const town = await settlementNear(at, { headers: host.headers });
+    if (town && places.has(p.id) && p.name === p.alias) renameTo(p, `${p.kind} near ${town}`);
+  } catch { /* no name to give: keep the counted one */ }
 }
 const featureOf = (id) => { const f = draw.getSnapshotFeature(id); return f && { type: "Feature", properties: {}, geometry: f.geometry }; };
 
@@ -461,6 +488,7 @@ function onFinish(id, ctx) {
     const p = newPlace(id, feature);
     setMode("select");
     focusPlace(p);
+    nameFromSettlement(p);
     return;
   }
   const p = places.get(id);
@@ -578,15 +606,13 @@ const host = {
   lastPersonText: () => said.at(-1) || "",
   renamePlace(name, to) {
     const p = placeByName(name);
-    if (!p) return;
-    logEdit(p, `renamed from ${p.name} to ${to}`);
-    p.name = to;
-    p.card.querySelector("h2 .name").textContent = to;
-    scheduleRefresh();
+    if (p) renameTo(p, to);
   },
+  askAssetType: (name, question) => askAssetType(name, question),
 };
 // Screening runs: sealed NTR runs with their own tools; the conversation gets the headline, the card the detail.
 let distTable = null;
+let assetPicks = null;
 let runLog = null, runSteps = null; // the turn a run belongs to, for the log and "How I worked this out"
 host.screening = createScreening({
   host, table: () => distTable, skill: () => skills["ntr-screening"], callClaude, model: CONFIG.model,
@@ -596,6 +622,8 @@ host.screening = createScreening({
     runLog?.events.push({ screen_result: { run: r.id, distances: r.distances, baseline: r.baseline, sea: r.sea, flags: r.flags.map((f) => ({ risk: f.risk, theme: f.theme, confidence: f.confidence, nearest_km: f.nearest_km, evidence: f.evidence.map((e) => `${e.name} ${e.distance_km} km${e.traced ? "" : " (not traced)"}`) })),
       checked: r.checked.map((c) => `${c.dataset}: ${c.result}${c.count ? ` ${c.count}` : ""}${c.why ? ` (${c.why})` : ""}`), gaps: r.data_gaps, ...(r.parse_error ? { problem: r.parse_error } : {}) } });
     stopProgress(record);
+    const site = placeByName(r.site?.name || "");
+    if (site && r.site.asset_type) site.assetType = r.site.asset_type;
     showRun(record);
   },
   onEvent: (ev) => {
@@ -617,6 +645,7 @@ Promise.all([
   fetch(asset("catalogue/anchors.json")).then((r) => r.json()).then((j) => { anchors = j.sources; }),
   fetch(asset("catalogue/trusted.json")).then((r) => r.json()).then((j) => { trusted = j; }),
   fetch(asset("catalogue/distances.json")).then((r) => r.json()).then((j) => { distTable = j; }),
+  fetch(asset("catalogue/asset-picks.json")).then((r) => r.json()).then((j) => { assetPicks = j; }),
 ]).catch((e) => note(`Something the analyst needs didn't load: ${e.message}`));
 
 // ---- cards ----------------------------------------------------------------------------
@@ -626,7 +655,25 @@ function makeCard(p) {
   const sw = document.createElement("span");
   sw.className = `swatch ${p.kind === "Line" ? "line" : p.kind === "Point" ? "point" : ""}`;
   const nm = el("span", p.name, "name");
+  nm.title = "Rename"; nm.tabIndex = 0; nm.setAttribute("role", "button");
   card.querySelector("h2").append(sw, nm);
+  // Tap the name to rename it in place: Enter or leaving the box saves, Escape cancels.
+  const startRename = () => {
+    if (card.querySelector("h2 input.rename")) return;
+    const box = Object.assign(document.createElement("input"), { className: "rename", value: p.name, maxLength: 60 });
+    box.setAttribute("aria-label", "Name");
+    nm.hidden = true; nm.after(box); box.focus(); box.select();
+    let done = false;
+    const finish = (save) => {
+      if (done) return; done = true;
+      if (save) renameTo(p, box.value, "by you");
+      box.remove(); nm.hidden = false;
+    };
+    box.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); finish(true); } if (e.key === "Escape") { e.preventDefault(); finish(false); } });
+    box.addEventListener("blur", () => finish(true));
+  };
+  nm.addEventListener("click", startRename);
+  nm.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); startRename(); } });
   if (p.kind === "Point") card.querySelectorAll('[data-op="rotate"], .resize').forEach((e) => e.remove());
   else card.querySelector(".unit").textContent = p.kind === "Area" ? U.areaUnit() : U.distUnit();
   paintOrigin(p, card);
@@ -1182,7 +1229,8 @@ async function send(text, forModel = text) {
   busy = true;
   said.push(text);
   $("ask").classList.add("busy");
-  $("conversation").append(el("div", text, "msg user"));
+  const asked = el("div", text, "msg user");
+  $("conversation").append(asked);
   say.value = ""; grow();
   const reply = el("div", null, "msg analyst");
   const trace = el("details", null, "trace"); trace.append(el("summary", "How I worked this out"), el("ol"));
@@ -1244,8 +1292,19 @@ async function send(text, forModel = text) {
     pendingReply = null;
     runLog = null; runSteps = null;
     $("ask").classList.remove("busy");
-    reply.scrollIntoView({ block: "end", behavior: "smooth" });
+    showTurnTop(asked);
   }
+}
+
+// At the end of a turn, the first thing it produced (a shape card, a run card, the reply) goes to the top of the
+// conversation, so results can be read from the start without scrolling back up. Short turns that fit stay put.
+function showTurnTop(asked) {
+  const conv = $("conversation");
+  const first = asked?.nextElementSibling;
+  if (!first) return;
+  const top = first.getBoundingClientRect().top - conv.getBoundingClientRect().top + conv.scrollTop - 8;
+  const fits = conv.scrollHeight - top <= conv.clientHeight;
+  conv.scrollTo({ top: fits ? conv.scrollHeight : top, behavior: "smooth" });
 }
 
 function traceLine(ev) {
@@ -1264,6 +1323,7 @@ function traceLine(ev) {
     case "screen_site": return o.run ? `Screened ${o.site} (${o.run}): ${o.flags} flags; ${o.distances}` : `Screening: ${o.not_available || "no result"}`;
     case "get_run": return `Read the screen ${o.run || ""}`;
     case "remove_place": return `Removed ${o.removed}`;
+    case "ask_asset_type": return `Asked what's planned at ${o.place}`;
     case "get_elevation": return o.not_checked ? `Elevation: not checked (${String(o.not_checked).slice(0, 80)})` : o.water_depth_m?.typical != null ? `Water depth about ${o.water_depth_m.typical} m (${o.dataset})` : `Elevation about ${o.elevation_m?.typical} m (${o.dataset})`;
     case "sea_values": return [...(o.lines || []), ...(o.not_found || [])].join(" ") || "Read water depth and vessel traffic: nothing returned";
     default: return ev.name;
@@ -1276,12 +1336,49 @@ function focusedOrLatest() {
   return (focusName && placeByName(focusName)) || [...places.values()].at(-1) || null;
 }
 function paintChips() { document.querySelector(".chips").hidden = !places.size; }
+// When what's planned there isn't known yet, the chip asks with quick picks first (no model call); once a place
+// has been screened, it fills the input as before.
 document.querySelector(".chip[data-screen]").addEventListener("click", () => {
   const p = focusedOrLatest();
-  if (!p) return;
+  if (!p || busy) return;
+  if (!p.assetType) { askAssetType(p.name); return; }
   say.value = `Screen ${p.name} for risks`; grow(); say.focus();
   say.setSelectionRange(say.value.length, say.value.length);
 });
+
+// "What's planned at <place>?": a few buttons, More… for the rest, and a general screen. A tap screens at once.
+async function askAssetType(name, question) {
+  const p = placeByName(name);
+  if (!p) throw new Error(`No place called "${name}".`);
+  let offshore = false;
+  try { offshore = !!(await R.describe(ref, p.feature)).offshore; } catch { /* reference not loaded: on land */ }
+  const { shown, more } = picksFor(assetPicks, offshore);
+  const card = el("div", null, "msg analyst asset-pick");
+  card.append(el("p", question || `What's planned at ${p.name}? It sets how far the screen looks.`));
+  const row = el("div", null, "picks");
+  const go = (pick) => {
+    if (busy) return;
+    card.classList.add("done");
+    card.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+    const m = pickMessage(p.name, pick);
+    send(m.text, m.forModel);
+  };
+  const button = (pick, cls = "chip") => { const b = el("button", pick ? pick.label : "Just a general screen", cls); b.type = "button"; b.addEventListener("click", () => go(pick)); return b; };
+  shown.forEach((k) => row.append(button(k)));
+  if (more.length) {
+    const m = el("button", "More…", "chip more"); m.type = "button";
+    m.addEventListener("click", () => { m.remove(); more.forEach((k) => row.insertBefore(button(k), general)); });
+    row.append(m);
+  }
+  const general = button(null, "chip general");
+  row.append(general);
+  card.append(row);
+  if (pendingReply?.isConnected) $("conversation").insertBefore(card, pendingReply);
+  else $("conversation").append(card);
+  card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  expandSheet();
+  return { place: p.name, setting: offshore ? "offshore" : "onshore", options: [...shown, ...more].map((k) => k.type) };
+}
 
 // Speech: the browser's own recognition where it exists (Chrome, Edge, Safari). Typing always works.
 const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;

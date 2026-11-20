@@ -144,6 +144,20 @@ export async function searchNominatim(term, { near = null, country = null, fetch
 }
 
 // ---- Natural Earth towns (already loaded for the reference layer) ------------------------------
+// The settlement a point lies in or near, for naming a drawn shape ("Point near Linlithgow"). Nominatim's reverse
+// lookup at village level, queued like every Nominatim call; null at sea or when nothing is named nearby.
+export async function settlementNear(lonlat, { fetchFn = fetch, headers = {} } = {}) {
+  const q = new URLSearchParams({ lat: lonlat[1].toFixed(5), lon: lonlat[0].toFixed(5), format: "jsonv2", zoom: "14", addressdetails: "1" });
+  const j = await remembered(`nominatim-reverse:${q}`, async () => {
+    await nominatimSlot();
+    const r = await fetchFn(`https://nominatim.openstreetmap.org/reverse?${q}`, { headers });
+    if (!r.ok) throw new Error(`Nominatim ${r.status}`);
+    return r.json();
+  });
+  const a = j?.address || {};
+  return a.village || a.town || a.city || a.hamlet || a.suburb || a.municipality || null;
+}
+
 export function searchNaturalEarth(places, term, limit = 5) {
   const t = term.toLowerCase().trim();
   return places

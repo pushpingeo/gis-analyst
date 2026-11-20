@@ -166,6 +166,11 @@ export function placeToolDefs(skills) {
       },
     },
     {
+      name: "ask_asset_type",
+      description: "Before screening, when the person hasn't said what's planned at the place and it isn't clear from the place itself (a named oil field, a wind lease, their earlier words), show quick-pick buttons of asset types, with a general-screen option, instead of asking in words. Then end your turn with nothing more than a short line; their pick comes back as their next message and you screen then.",
+      input_schema: { type: "object", properties: { place: { type: "string", description: "Place name" }, question: { type: "string", description: "Optional: the question above the buttons, if the default (\"What's planned at <place>?\") doesn't fit" } }, required: ["place"] },
+    },
+    {
       name: "get_run",
       description: "Details of a screening run (R1, R2…; leave out for the latest): flags with their evidence, what was checked and the gaps. For follow-up questions about a screen; don't re-run to answer them.",
       input_schema: { type: "object", properties: { run: { type: "string" } } },
@@ -498,6 +503,13 @@ export function createPlaceTools(host) {
       if (!own && !asked) throw new Error(`"${p.name}" was drawn or accepted by the person; remove it only when they ask in their latest message.`);
       host.removePlace(p.name, { by: "analyst", reason });
       return { removed: p.name, places_left: host.places().map((x) => x.name) };
+    },
+
+    async ask_asset_type({ place, question }) {
+      if (!host.findPlace(place)) throw new Error(`No place called "${place}".`);
+      if (!host.askAssetType) return { not_available: "Ask in words which asset type, or offer a general screen (asset_type other)." };
+      const shown = await host.askAssetType(host.findPlace(place).name, question);
+      return { ...shown, next: "Buttons shown. End your turn with one short line at most; don't screen until they pick." };
     },
 
     async offer_choices({ candidates, recommended, reason, question }) {
