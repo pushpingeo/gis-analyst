@@ -593,3 +593,26 @@ Judgement calls made while building, newest first. Bigger product decisions live
   updated); `browser-choice.mjs`; replays with Haiku on branch `ux-picks`: a drawn square → "screen it" showed the
   picks; "screen a 1 km² solar farm site 5 km west of Évora" screened straight away; "find Rosebank → screen it"
   inferred oil and gas and screened. Live page checked in Rob's browser.
+
+## 20 Nov (midday): screens at scale, from Rob's housing log (Wirral, 2.3 ha)
+- **What went wrong:** a drawn 2.3 ha "housing development" got a general screen (no energy pick fitted), so the general
+  onshore distances (1/5/20 km, written for a site about 1 km across). The run fetches to the wider band once (for the
+  slider), and in a busy area that was ~400 features (around 200 each of schools, main roads and settlements, 123
+  protected areas, 109 heritage sites). The final write-up read ~34k tokens, hit the 8,000-token cap after 35 s, and
+  the one repair failed too (why wasn't in the page log), so the card had 0 flags. The analyst said so honestly.
+- **General screens of an area now follow its size** (`fallback_by_size` in `catalogue/distances.json`, DRAFT for
+  Rob): under 10 ha 0.25/1/5 km; under 1 km² 0.5/2/10 km; offshore under 1 km² 1/5/25 km; bigger keeps the general
+  default. Asset types keep their own rows; the person's own distances still win.
+- **Volume guard** (`forAnalyst` in `js/ntrrun.js`): when a search returns over 25, the analyst sees the count and the
+  nearest 6, with a line asking it to report the count and nearest and not list more; details that only repeat the
+  name are dropped everywhere. Everything found still goes on the map and in the run record.
+- **Repair of a cut-off result:** first from a compact summary (the site, distances, and one line per source with the
+  count and nearest three), with no tools; then, if that fails, from the full history as before. Each attempt (how, stop
+  reason, tokens, whether JSON came back) and the final stop reason go into the run's `debug` and the page log, with
+  the run's usage.
+- Tested: ntrrun 28/28 (size rules, both repair paths, the guard), all suites; browser-run-card 87/87, browser-ux
+  26/26, browser-choice 8/8; Haiku replays on branch `screen-scale`: a 2.3 ha square east of Heswall (0.25/1/5 km,
+  136 evidence features, 5 flags, 140 s), 2 ha at Piccadilly Gardens, Manchester (190 features, 6 flags including
+  listed buildings and schools at the edge, 66 s), Rosebank unchanged (2/10/50 km, 7 flags, 60 s). No repair needed.
+- Seen, not changed: Heswall still ran the marine baseline (the Dee estuary is within 5 km; fair). The housing frame is
+  still energy's (themes, wording): that's the construction profile's job.
