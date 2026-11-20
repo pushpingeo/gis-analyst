@@ -90,6 +90,7 @@ for (const conv of convs) {
       console.log(`     evidence features: ${evidenceOf(rec).length}; tokens ${r.usage.input_tokens} in / ${r.usage.output_tokens} out${r.parse_error ? `; PROBLEM ${r.parse_error}` : ""}`);
       console.log(`     summary: ${r.summary.replace(/\s+/g, " ").slice(0, 700)}`);
       if (r.debug) console.log(`     DEBUG ${JSON.stringify(r.debug).slice(0, 4000)}`);
+      if (r.debug?.repairs?.length) console.log(`     RAW END (why the result needed a repair): ${JSON.stringify(String(r.debug.raw_tail || "").slice(-900))}`);
     },
   });
   const tools = createPlaceTools(host);
