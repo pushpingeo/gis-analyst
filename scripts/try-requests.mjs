@@ -21,9 +21,17 @@ const industries = JSON.parse(readFileSync("catalogue/industries/index.json", "u
 const profile = JSON.parse(readFileSync(industries.industries.find((i) => i.id === chooseIndustry(industries, process.env.INDUSTRY)).file, "utf8"));
 const skill = parseSkill(readFileSync("skills/place-finding/SKILL.md", "utf8"));
 const ntr = parseSkill(readFileSync("skills/ntr-screening/SKILL.md", "utf8"));
-const allSkills = [skill, ntr];
+const crs = parseSkill(readFileSync("skills/coordinate-reference/SKILL.md", "utf8"));
+const allSkills = [skill, ntr, crs];
+// EPSG registry through the live Worker, as the page does (the Worker serves Tobler's origin only).
+const epsgCall = async ({ path, query }) => {
+  const r = await fetch("https://tobler-api.robdunfey.workers.dev/epsg", { method: "POST", headers: { "content-type": "application/json", origin: "https://asktobler.com" }, body: JSON.stringify({ path, query }) });
+  const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = null; }
+  if (!r.ok) throw new Error(j?.message || `EPSG answered ${r.status}`);
+  return j ?? t;
+};
 // The conversation doesn't load the NTR method itself: screen_site runs it as a sealed run (as in the page).
-const convSkills = [skill];
+const convSkills = [skill, crs];
 const distTable = JSON.parse(readFileSync("catalogue/distances.json", "utf8"));
 let spend = { input: 0, output: 0 };
 
@@ -47,6 +55,8 @@ for (const conv of convs) {
   const host = {
     ref, anchors, headers: UA, list, trusted, profile: () => profile,
     firms: process.env.FIRMS_MAP_KEY ? firmsCall : null,
+    epsg: epsgCall,
+    transformationChoice: () => (process.env.TRANSFORMATION_CHOICE === "ask" ? "ask" : "choose"),
     esriLicence: () => process.env.ESRI_LICENCE === "yes",
     nonCommercial: () => process.env.NON_COMMERCIAL === "yes",
     addFindings(l, g) { this.findings = (this.findings || 0) + l.length; },
@@ -122,6 +132,7 @@ for (const conv of convs) {
             : ev.name === "find_place" ? `${(o.candidates || []).length} found: ${(o.candidates || []).slice(0, 5).map((c) => `${c.id} ${c.name} [${c.type}] ${c.source}`).join("; ")}`
             : ev.name === "find_data" ? `${o.matches ?? 0} matches: ${(o.datasets || []).map((d) => `${d.id} ${d.title} (${d.publisher}${d.can_fetch ? "" : ", picture only"})`).join("; ")}${o.not_checked ? ` NOT CHECKED: ${o.not_checked}` : ""}`
             : ev.name === "get_data" ? (o.not_checked ? `NOT CHECKED: ${o.not_checked}` : `${o.dataset}: ${o.inside_or_touching} inside, ${o.within_distance} within ${o.within_km} km; nearest: ${(o.nearest || []).slice(0, 4).map((c) => `${c.name} ${c.distance_km} km ${JSON.stringify(c.details || {})}`).join("; ")}`)
+            : ev.name === "transformation_options" ? (o.error ? `ERROR ${o.error}` : `at ${JSON.stringify(o.at)}; ${o.setting}: chosen ${o.chosen}, recommended ${o.recommended}, ask ${o.ask}; options ${(o.options || []).map((x) => `${x.code} ${x.accuracy_m} m ${x.area}${x.can_apply ? "" : " (grid)"}`).join("; ")}; ${o.why}`)
             : ev.name === "make_place" ? `${o.summary} | ${o.how} | ${o.confidence}: ${(o.why || []).join("; ")}`
             : JSON.stringify(o).slice(0, 200);
           console.log(`   · ${ev.name} (${(ev.ms / 1000).toFixed(1)} s) ${JSON.stringify(ev.input).slice(0, 160)}\n     → ${brief.slice(0, 700)}`);

@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       requests: { description: 'One conversation per line; " >> " between turns', required: true }
+      transformation_choice: { description: 'Datum transformations: choose or ask', required: false, default: 'choose' }
 jobs:
   try:
     runs-on: ubuntu-latest
@@ -20,3 +21,4 @@ jobs:
           ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}"
           FIRMS_MAP_KEY: "${{ secrets.FIRMS_MAP_KEY }}"
           REQUESTS: "${{ inputs.requests }}"
+          TRANSFORMATION_CHOICE: "${{ inputs.transformation_choice }}"
