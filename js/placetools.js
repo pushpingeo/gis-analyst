@@ -8,6 +8,7 @@ import * as R from "./reference.js";
 import { rateConfidence, runCheck, MATCHES } from "./confidence.js";
 import { atlasFindNamed, NAMED_KINDS, describeChecked } from "./atlasfeatures.js";
 import { DATA_TOOL_DEFS, createDataTools, geometryDistanceKm } from "./datatools.js";
+import { EPSG_TOOL_DEFS, createEpsgTools } from "./epsgtools.js";
 import { elevationFrom, elevationSignificance } from "./elevation.js";
 import { themeFor, THEME_IDS } from "./findings.js";
 import { ASSET_TYPES } from "./distances.js";
@@ -143,6 +144,7 @@ export function placeToolDefs(skills) {
       input_schema: { type: "object", properties: { place: { type: "string" } }, required: ["place"] },
     },
     ...DATA_TOOL_DEFS,
+    ...EPSG_TOOL_DEFS,
     {
       name: "get_elevation",
       description: "Elevation over a place or candidate, on land or at sea: typical, lowest and highest of up to 25 points sampled over it, in metres, positive up (land above sea level is positive, the seabed negative), from published elevation models. At sea it also gives the water depth (depth = -elevation). Use it when height or depth matters to the question (flooding, altitude, what can be built in that depth of water). Cells are a few hundred metres on land and in open ocean, so it's for screening, not design.",
@@ -643,6 +645,8 @@ export function createPlaceTools(host) {
     if (!p) throw new Error(`No place called "${i.place}". Find or build the site first.`);
     return host.screening.screen(i, p);
   };
+  // Coordinate reference (EPSG registry via the Worker): js/epsgtools.js.
+  Object.assign(run, createEpsgTools(host, (ref) => resolve(ref).lonlat));
   run.get_run = async ({ run: id }) => {
     if (!host.screening) return { not_available: "Screening isn't connected here." };
     return host.screening.getRun(id);

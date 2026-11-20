@@ -19,6 +19,7 @@ How you work:
 - When you need several searches that don't depend on each other (a name in a few spellings, the asset and the town it's described from), ask for them in the same step: they run at the same time.
 - Use skills for methods. Load the relevant skill with load_skill before doing that kind of work, then follow it.
 - Coordinates the person types or pastes (decimal degrees, degrees-minutes-seconds, a British National Grid reference, eastings and northings) are a place: pass them to find_place as the query, which reads them in code and returns them as an anchor. A message that is only coordinates means "put a point here": build it with make_place (shape point, match named_place), say in a few words where it is, and ask what's planned there. Never tell the person to drop a pin themselves when they've given coordinates.
+- When a datum or coordinate system comes up (coordinates said to be in ED50, OSGB36, a UTM zone or an EPSG code; "which transformation"; data in different datums), load the coordinate-reference skill and use crs_lookup and transformation_options. Never pick a transformation or quote its accuracy from memory.
 - Never work out coordinates, areas or distances in your head. Tools find places and build shapes; you choose the tool and the numbers and explain why.
 - For data about a topic (thermal hotspots, fish habitat, flood zones, wrecks, anything not in find_features_near's types): find_data with short words that would appear in a dataset title, two or three wordings in one step; then get_data on the best fetchable dataset (prefer national and intergovernmental publishers) for the place. Report the dataset, publisher and date checked with the result.
 - Keep the map tidy: to rebuild or correct a place you proposed, call make_place with replaces (the old one goes and the new one takes its name); never leave a duplicate, and don't remove a place to get around its checks. remove_place removes a place when the person asks, or clears a proposal of yours that's no longer wanted. Distance checks only come from clues the person gave, each with the quote it comes from; never invent one.
@@ -65,6 +66,13 @@ export function buildMessages({ recent = [], summary, userText }) {
 
 // One turn. Throws on failure so the caller can roll back and leave no half exchange behind.
 // Tools that only look things up, so several can run at once.
+// A skill is Tobler's own written method, not outside data, so it goes to the model whole. Through the fence it was
+// cut to 200 characters, and the analyst worked from a skill's first lines on the turn it loaded it (found 20 Nov).
+export function resultFor(name, out) {
+  if (name === "load_skill" && typeof out?.method === "string") return `Skill ${out.skill}. Follow this method:\n\n${out.method.replace(/^---[\s\S]*?---\n/, "")}`;
+  return toolResultText(out);
+}
+
 export const READ_ONLY = new Set(["load_skill", "find_place", "find_features_near", "get_place", "find_data", "get_data", "get_elevation", "get_run"]);
 
 export async function runTurn({ system, messages, tools, exec, callClaude, onEvent = () => {}, maxRounds = 10 }) {
@@ -91,7 +99,7 @@ export async function runTurn({ system, messages, tools, exec, callClaude, onEve
       try {
         const out = await exec(u.name, u.input || {});
         onEvent({ type: "tool", name: u.name, input: u.input, output: out, ms: Date.now() - t1 });
-        return { type: "tool_result", tool_use_id: u.id, content: toolResultText(out) };
+        return { type: "tool_result", tool_use_id: u.id, content: resultFor(u.name, out) };
       } catch (e) {
         onEvent({ type: "tool", name: u.name, input: u.input, error: e.message, ms: Date.now() - t1 });
         return { type: "tool_result", tool_use_id: u.id, is_error: true, content: clean(String(e.message)) };

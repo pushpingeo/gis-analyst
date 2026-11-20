@@ -59,3 +59,21 @@ export async function firmsViaWorker(args) {
   p.catch(() => memory.delete(key));
   return p;
 }
+
+// EPSG registry lookups through the Worker (read-only; the Worker caches a week). Remembered for the session.
+export async function epsgViaWorker({ path, query }) {
+  const key = `epsg|${path}|${JSON.stringify(query || {})}`;
+  if (memory.has(key)) return memory.get(key);
+  const p = (async () => {
+    const r = await fetch(CONFIG.proxyUrl.replace(/\/$/, "") + "/epsg", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path, query }), signal: AbortSignal.timeout(30000),
+    });
+    const text = await r.text();
+    let j; try { j = JSON.parse(text); } catch { j = null; }
+    if (!r.ok) throw new Error(j?.message || `EPSG answered ${r.status}`);
+    return j ?? text;
+  })();
+  memory.set(key, p);
+  p.catch(() => memory.delete(key));
+  return p;
+}

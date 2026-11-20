@@ -16,7 +16,7 @@ const mf = new Miniflare({
     ALLOWED_ORIGINS: "https://asktobler.com,https://pushpingeo.github.io,http://localhost:8000",
     // Small limits so they can be reached in a test.
     PER_VISITOR_DAILY: "5", TOTAL_DAILY: "8", ATLAS_PER_VISITOR_DAILY: "25",
-    ANTHROPIC_API_KEY: "sk-test", ATLAS_MCP_KEY: "atlas-test", FIRMS_MAP_KEY: "firmskey123", FIRMS_PER_VISITOR_DAILY: "3",
+    ANTHROPIC_API_KEY: "sk-test", ATLAS_MCP_KEY: "atlas-test", FIRMS_MAP_KEY: "firmskey123", FIRMS_PER_VISITOR_DAILY: "3", EPSG_PER_VISITOR_DAILY: "6",
     LOGS_ENABLED: "yes", LOGS_PER_VISITOR_DAILY: "4", LOG_RETENTION_DAYS: "90",
   },
   // Fake atlas, behind the service binding.
@@ -30,6 +30,12 @@ const mf = new Miniflare({
   },
   // Fake Anthropic: every outbound fetch lands here.
   outboundService: async (req) => {
+    if (req.url.includes("apps.epsg.org")) {
+      upstreamCalls.epsg = [...(upstreamCalls.epsg || []), req.url];
+      if (req.url.includes("/Transformation/999999/")) return new Response("", { status: 404 });
+      if (req.url.includes("/export/")) return new Response('GEOGCRS["OSGB36"]', { status: 200 });
+      return new Response(JSON.stringify({ Code: 1314, Accuracy: 2 }), { status: 200, headers: { "content-type": "application/json" } });
+    }
     if (req.url.includes("firms")) {
       upstreamCalls.firms = [...(upstreamCalls.firms || []), req.url];
       if (req.url.includes("/MODIS_NRT/")) return new Response("Invalid MAP_KEY firmskey123.", { status: 400 });
@@ -175,6 +181,26 @@ try {
   const today = new Date().toISOString().slice(0, 10);
   const getLogs = (q, key = readKey) => mf.dispatchFetch(`https://tobler-api.example/logs?${q}`, { headers: key ? { authorization: `Bearer ${key}` } : {} });
   const turn = (seq, extra = {}) => ({ session: "abc12345-0001", seq, page: "/", log: { user: `turn ${seq}`, events: [] }, ...extra });
+
+  await t("EPSG: allowed paths only, query sorted, 404 passed on, own limit (6)", async () => {
+    const ok = await post("/epsg", { path: "Transformation/crs", query: { targetCRSCode: 4326, sourceCRSCode: 4277 } }, { ip: "9.9.9.1" });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), { Code: 1314, Accuracy: 2 });
+    assert.match(ok.headers.get("x-epsg-source"), /IOGP/);
+    assert.equal(upstreamCalls.epsg.at(-1), "https://apps.epsg.org/api/v1/Transformation/crs/?sourceCRSCode=4277&targetCRSCode=4326");
+    const wkt = await post("/epsg", { path: "/CoordRefSystem/4277/export", query: { format: "wkt", formatVersion: 2 } }, { ip: "9.9.9.1" });
+    assert.equal(await wkt.text(), 'GEOGCRS["OSGB36"]');
+    assert.equal((await post("/epsg", { path: "Transformation/999999" }, { ip: "9.9.9.1" })).status, 404);
+    assert.equal((await post("/epsg", { path: "Account/login" }, { ip: "9.9.9.1" })).status, 400);
+    assert.equal((await post("/epsg", { path: "../admin" }, { ip: "9.9.9.1" })).status, 400);
+    assert.equal((await post("/epsg", { path: "Extent/2397", query: { evil: 1 } }, { ip: "9.9.9.1" })).status, 400);
+    const before = upstreamCalls.epsg.length;
+    const codes = [];
+    for (let i = 0; i < 4; i++) codes.push((await post("/epsg", { path: "Extent/2397/polygon" }, { ip: "9.9.9.1" })).status);
+    assert.deepEqual(codes, [200, 200, 200, 429]); // 3 earlier allowed calls + 3 = 6
+    assert.ok(upstreamCalls.epsg.length >= before + 1);
+    assert.equal((await post("/epsg", { path: "Extent/2397" }, { ip: "9.9.9.1", origin: "https://evil.example" })).status, 403);
+  });
 
   await t("Logs: stored from Tobler's pages only, with checks on the shape", async () => {
     assert.equal((await post("/logs", turn(0), { origin: "https://evil.example" })).status, 403);

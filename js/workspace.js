@@ -8,7 +8,7 @@ import * as R from "./reference.js";
 import { placeToolDefs, createPlaceTools, projectSummary } from "./placetools.js";
 import { parseSkill, systemPrompt, buildMessages, runTurn, activityFor } from "./converse.js";
 import { callClaude, LimitReached } from "./claude.js";
-import { atlasViaWorker, firmsViaWorker } from "./atlasclient.js";
+import { atlasViaWorker, firmsViaWorker, epsgViaWorker } from "./atlasclient.js";
 import { CONFIG } from "./config.js";
 import { THEMES, themeFor, bandOf, BAND_OPACITY, BIG_AREA_KM2, chooseLabels, ringDistances } from "./findings.js";
 import { createScreening, evidenceOf, evidenceWithin, nearestByTheme, flagBeyond, reassess, isArea, THEME_CODE } from "./ntrrun.js";
@@ -572,6 +572,9 @@ const host = {
   fetchFn: (...a) => fetch(...a),
   atlas: atlasViaWorker,
   firms: firmsViaWorker,
+  epsg: epsgViaWorker,
+  // Settings (the gear): pick datum transformations for the person ("choose", default) or offer them ("ask").
+  transformationChoice: () => (store.get("transformationChoice") === "ask" ? "ask" : "choose"),
   get trusted() { return trusted; },
   // Settings (the gear): whether the person holds an Esri licence, so Esri-licensed layers can be used.
   esriLicence: () => store.get("esriLicence") === "yes",
@@ -672,7 +675,7 @@ async function loadIndustry(stored) {
 }
 
 Promise.all([
-  ...["skills/place-finding/SKILL.md", "skills/ntr-screening/SKILL.md"].map((f) => fetch(asset(f)).then((r) => r.text()).then((t) => { const s = parseSkill(t); skills[s.name] = s; })),
+  ...["skills/place-finding/SKILL.md", "skills/ntr-screening/SKILL.md", "skills/coordinate-reference/SKILL.md"].map((f) => fetch(asset(f)).then((r) => r.text()).then((t) => { const s = parseSkill(t); skills[s.name] = s; })),
   fetch(asset("catalogue/anchors.json")).then((r) => r.json()).then((j) => { anchors = j.sources; }),
   fetch(asset("catalogue/trusted.json")).then((r) => r.json()).then((j) => { trusted = j; }),
   fetch(asset("catalogue/distances.json")).then((r) => r.json()).then((j) => { distTable = j; }),
@@ -1533,6 +1536,7 @@ function paintSettings() {
   form.nonCommercial.checked = host.nonCommercial();
   form.shareSessions.checked = store.get("shareSessions") !== "no";
   form.querySelectorAll('input[name="units"]').forEach((r) => { r.checked = r.value === U.getUnits(); });
+  form.querySelectorAll('input[name="tfm"]').forEach((r) => { r.checked = r.value === host.transformationChoice(); });
   const preset = [...form.querySelectorAll("[data-colour]")].find((b) => b.dataset.colour.toLowerCase() === C.pole.toLowerCase());
   form.querySelectorAll("[data-colour]").forEach((b) => b.setAttribute("aria-checked", String(b === preset)));
   form.colour.value = C.pole;
@@ -1550,6 +1554,7 @@ dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
 form.esri.addEventListener("change", () => store.set("esriLicence", form.esri.checked ? "yes" : null));
 form.nonCommercial.addEventListener("change", () => store.set("nonCommercial", form.nonCommercial.checked ? "yes" : null));
 form.shareSessions.addEventListener("change", () => store.set("shareSessions", form.shareSessions.checked ? null : "no"));
+form.querySelectorAll('input[name="tfm"]').forEach((r) => r.addEventListener("change", () => { if (r.checked) store.set("transformationChoice", r.value === "ask" ? "ask" : null); }));
 // "settings" in the welcome card's note opens the dialog at the sharing switch.
 document.querySelectorAll("[data-open-settings]").forEach((b) => b.addEventListener("click", () => {
   paintSettings(); dlg.showModal();

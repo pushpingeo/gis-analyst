@@ -24,6 +24,16 @@ const MAX_BODY = 120_000;
 // FIRMS sources Tobler may ask for (near real-time; the archive "_SP" ones too, for a date).
 const FIRMS_SOURCES = new Set(["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT", "MODIS_NRT", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "MODIS_SP", "LANDSAT_NRT"]);
 const FIRMS_MAX_DEG2 = 400; // keeps one call to a few FIRMS transactions
+// EPSG registry (apps.epsg.org/api/v1): read-only paths the coordinate tools need, and their query fields.
+const EPSG_PATHS = [
+  /^(CoordRefSystem|GeodeticCoordRefSystem|ProjectedCoordRefSystem|Transformation|ConcatenatedOperation|CoordOperation|CoordOperationMethod|Extent)\/\d{1,6}$/,
+  /^(CoordRefSystem|Transformation|ConcatenatedOperation|Extent)\/\d{1,6}\/export$/,
+  /^Extent\/\d{1,6}\/polygon$/,
+  /^(CoordRefSystem|Transformation|Extent)$/,
+  /^Transformation\/crs$/,
+];
+const EPSG_QUERY = new Set(["keywords", "page", "pageSize", "includeDeprecated", "includeWorld", "sourceCRSCode", "targetCRSCode", "format", "formatVersion"]);
+const EPSG_MAX_BYTES = 3_000_000;
 
 // FIRMS CSV → GeoJSON points. Numbers stay numbers; acq_date + acq_time become one ISO time.
 export function firmsCsvToGeoJSON(csv) {
@@ -141,7 +151,7 @@ export default {
       return reply(200, { day, entries, more: entries.length === limit });
     }
 
-    const route = request.method === "POST" && ["/v1/messages", "/atlas", "/firms", "/logs"].includes(url.pathname) ? url.pathname : null;
+    const route = request.method === "POST" && ["/v1/messages", "/atlas", "/firms", "/epsg", "/logs"].includes(url.pathname) ? url.pathname : null;
     if (!route) return reply(404, { message: "Not found" });
     if (!okOrigin) return reply(403, { message: "This endpoint only serves Tobler." });
 
@@ -194,6 +204,30 @@ export default {
         return reply(502, { message: `NASA FIRMS answered: ${text.replaceAll(env.FIRMS_MAP_KEY, "…").slice(0, 160)}` });
       }
       return reply(200, { ...firmsCsvToGeoJSON(text), source, days: d, ...(date ? { date } : {}) });
+    }
+
+    if (route === "/epsg") {
+      const path = String(body?.path || "").replace(/^\/+|\/+$/g, "");
+      if (!EPSG_PATHS.some((re) => re.test(path))) return reply(400, { message: "That EPSG path isn't served here." });
+      const q = new URLSearchParams();
+      for (const [k, v] of Object.entries(body?.query || {})) {
+        if (!EPSG_QUERY.has(k)) return reply(400, { message: `Unknown EPSG query field: ${k}` });
+        const val = String(v);
+        if (val.length > 100 || /[\r\n]/.test(val)) return reply(400, { message: `Bad value for ${k}` });
+        q.set(k, val);
+      }
+      q.sort(); // one cache entry per question
+      const used = await visitor.hit("epsg", +env.EPSG_PER_VISITOR_DAILY || 1000);
+      if (!used.ok) return reply(429, { message: "You've reached today's limit for coordinate registry lookups." });
+      const epsgUrl = `${env.EPSG_URL || "https://apps.epsg.org/api/v1"}/${path}/${q.size ? `?${q}` : ""}`;
+      let r;
+      try { r = await fetch(epsgUrl, { headers: { accept: "application/json" }, cf: { cacheTtl: 7 * 86400, cacheEverything: true } }); }
+      catch (err) { return reply(502, { message: `The EPSG registry didn't answer: ${String(err.message || err).slice(0, 120)}` }); }
+      const text = await r.text();
+      if (text.length > EPSG_MAX_BYTES) return reply(502, { message: "The EPSG answer was too large to pass on." });
+      if (!r.ok) return reply(r.status === 404 ? 404 : 502, { message: `The EPSG registry answered ${r.status}${r.status === 404 ? " (no such record)" : ""}.` });
+      const type = /^\s*[[{]/.test(text) ? "application/json" : "text/plain; charset=utf-8";
+      return new Response(text, { status: 200, headers: { ...cors, "content-type": type, "x-epsg-source": "EPSG Geodetic Parameter Dataset (IOGP), apps.epsg.org" } });
     }
 
     if (route === "/atlas") {
