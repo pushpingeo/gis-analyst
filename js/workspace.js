@@ -991,14 +991,10 @@ function showRun(record) {
   // The report and the share link are the same page: the run, slimmed and compressed into the link (js/share.js).
   // Nothing is stored. The report opens in a new tab, where "Save as PDF" prints it.
   const shareNote = card.querySelector(".share-note");
-  const reportUrl = async () => {
-    const s = await shareCode(record);
-    return { url: new URL(`report.html#${s.code}`, location.href).href, ...s };
-  };
   card.querySelector('[data-op="report"]').addEventListener("click", async () => {
     const w = window.open("about:blank", "_blank"); // opened now, while it's still a click, so it isn't blocked
     try {
-      const s = await reportUrl();
+      const s = entry.shareReady || await entry.share;
       if (w) w.location.href = s.url; else location.assign(s.url);
       sessionLog.push({ at: new Date().toISOString(), report: r.id, chars: s.chars });
     } catch (e) { w?.close(); shareNote.hidden = false; shareNote.textContent = `The report couldn't be made: ${e.message}`; }
@@ -1006,11 +1002,14 @@ function showRun(record) {
   card.querySelector('[data-op="share"]').addEventListener("click", async () => {
     shareNote.hidden = false;
     try {
-      const s = await reportUrl();
+      // The link is made when the card is drawn, so copying happens inside the click: browsers (and the desktop
+      // app's) refuse the clipboard once a click has turned into a wait (Rob, 20 Nov).
+      const s = entry.shareReady || await entry.share;
       if (s.tooLong) { shareNote.textContent = "This run is too big to share as a link. Use Report and save it as a PDF instead."; return; }
-      await navigator.clipboard.writeText(s.url);
+      const how = await copyText(s.url);
+      if (how === "shown") { showLinkToCopy(shareNote, s.url); return; }
       shareNote.textContent = `Link copied. It opens this run's report and holds the run itself, so nothing is stored online.${s.long ? " It's a long link: email is safer than some chat apps, which cut long links." : ""}`;
-    } catch (e) { shareNote.textContent = `The link couldn't be copied (${e.message}). Open the report and copy its address instead.`; }
+    } catch (e) { shareNote.textContent = `The link couldn't be made: ${e.message}`; }
   });
   card.querySelector('[data-op="download"]').addEventListener("click", () => {
     // The disclaimer travels with the data: first in the file, as well as in the run's record.
@@ -1028,8 +1027,34 @@ function showRun(record) {
   expandSheet();
 }
 
+// The run's report link (js/share.js), made as soon as the card is drawn and again after a re-assessment, so the
+// Report and Copy share link buttons don't have to wait inside the click.
+function prepShare(entry) {
+  entry.shareReady = null;
+  const p = shareCode(entry.record).then((s) => ({ url: new URL(`report.html#${s.code}`, location.href).href, ...s }));
+  entry.share = p;
+  p.then((s) => { if (entry.share === p) entry.shareReady = s; }).catch(() => {});
+}
+// Copy text: the clipboard API, then the older copy command, else the caller shows the text to copy by hand.
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return "copied"; } catch { /* refused: try the older way */ }
+  const box = Object.assign(document.createElement("textarea"), { value: text, readOnly: true });
+  box.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+  document.body.append(box); box.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch { ok = false; }
+  box.remove();
+  return ok ? "copied" : "shown";
+}
+function showLinkToCopy(where, url) {
+  const input = Object.assign(document.createElement("input"), { value: url, readOnly: true, className: "share-link" });
+  input.setAttribute("aria-label", "Report link");
+  where.replaceChildren(document.createTextNode("This browser won't let Tobler copy for you. The link is selected here: copy it with Ctrl+C (Cmd+C on a Mac)."), input);
+  input.focus(); input.select();
+}
 function paintRun(entry) {
   const { record, card } = entry;
+  prepShare(entry);
   const r = record.tobler_run;
   const list = card.querySelector(".flags");
   list.replaceChildren(...r.flags.map((f) => {

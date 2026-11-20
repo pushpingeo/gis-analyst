@@ -271,6 +271,7 @@ a { color: var(--sea); }
 .run .flag .fid { font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-right: 6px; }
 .run .flag .next { margin: 4px 0 0; }
 .run .share-note { margin: 6px 0 0; font-size: 13px; color: var(--ink-2); }
+.run .share-note .share-link { display: block; width: 100%; margin-top: 4px; font: 12px/1.4 ui-monospace, monospace; padding: 4px 6px; border: 1px solid var(--rule); border-radius: 6px; }
 .run .decision { margin: 0 0 8px; padding: 6px 10px; border-left: 3px solid var(--ink); background: var(--paper); font-size: 14px; }
 .run .decision b { font-weight: 600; }
 .run .flag .dist { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }

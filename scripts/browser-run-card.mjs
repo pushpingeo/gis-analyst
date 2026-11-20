@@ -196,7 +196,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     failed: document.querySelectorAll(".checked tr.failed").length, sources: document.querySelectorAll(".sources li").length,
     disclaimer: document.querySelector(".disclaimer")?.textContent || "",
   }));
-  check(!rep.error && rep.h1 === "Area 1" && /^Progress with targeted investigation\./.test(rep.decision), `${label}: report opens from the link with the site and decision (${rep.error || rep.h1}; ${rep.url} chars)`);
+  check(!rep.error && rep.h1 === "Geospatial AssessmentArea 1" && /^Progress with targeted investigation\./.test(rep.decision), `${label}: report opens from the link with the site and decision (${rep.error || rep.h1}; ${rep.url} chars)`);
   check(rep.rows.join(",") === "F-01,F-02,F-03" && /^Next step: Agree crossing/.test(rep.next), `${label}: report has one row per finding with its next step (${rep.rows.join(",")})`);
   check(rep.imgs.length === 2 && rep.imgs.every((n) => n > 5000), `${label}: both maps drawn and copied as pictures for print (${rep.imgs.join(", ")})`);
   check(rep.sources > 0 && /Indicative desk screening/.test(rep.disclaimer), `${label}: sources and disclaimer in the report (${rep.sources} sources)`);
@@ -204,6 +204,12 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   await rp.screenshot({ path: `/tmp/report-${label}.png`, fullPage: true });
   if (label === "desktop") { await rp.emulateMedia({ media: "print" }); await rp.pdf({ path: "/tmp/report.pdf", format: "A4", printBackground: true, preferCSSPageSize: true }); }
   await rp.close();
+  // Without clipboard permission (Rob's desktop app refused it, 20 Nov): the older copy command, or the link shown selected.
+  await page.context().clearPermissions();
+  await page.click('.run [data-op="share"]');
+  await page.waitForFunction(() => /Link copied|won't let Tobler copy|couldn't/.test(document.querySelector(".run .share-note")?.textContent || ""), null, { timeout: 10000 }).catch(() => {});
+  const denied = await page.evaluate(() => ({ note: document.querySelector(".run .share-note").textContent, shown: document.querySelector(".run .share-note .share-link")?.value || "" }));
+  check(/^Link copied/.test(denied.note) || (/won't let Tobler copy/.test(denied.note) && /\/report\.html#v1\./.test(denied.shown)), `${label}: with the clipboard refused, the link is still copied or shown to copy (${denied.note.slice(0, 50)})`);
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:8000" });
   await page.click('.run [data-op="share"]');
   await page.waitForFunction(() => /Link copied|couldn't/.test(document.querySelector(".run .share-note")?.textContent || ""), null, { timeout: 10000 }).catch(() => {});

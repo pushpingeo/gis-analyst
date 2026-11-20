@@ -696,3 +696,9 @@ Judgement calls made while building, newest first. Bigger product decisions live
   test link load on asktobler.com in Rob's built-in browser, but the pane was hidden to the page, so the maps didn't
   draw there; added a capture just before printing for that case. **Not tested:** the report with the real basemap
   drawn; printing from a real phone.
+- **Fixes (Rob, 20 Nov, 15:35):** the report's title is now "Geospatial Assessment" with the site name under it (and
+  in the tab title). Copy share link failed in Rob's desktop-app browser ("not allowed by the user agent"): the link
+  was built after the click, so the click no longer counted. Now the link is made when the run card is drawn (and
+  again after a re-assessment), copying happens inside the click, and if the clipboard is still refused it falls back
+  to the older copy command, then to showing the link selected for Ctrl+C. The report page's Copy link does the same.
+  Browser check 109/109 (new: copying with the clipboard permission cleared). Not tested: Rob's desktop app itself.

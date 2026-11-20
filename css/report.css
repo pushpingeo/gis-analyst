@@ -27,6 +27,7 @@ main { max-width: 860px; margin: 22px auto 60px; padding: 34px 40px; background:
 
 .kicker { margin: 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
 h1 { margin: 2px 0 4px; font-size: 26px; line-height: 1.2; }
+h1 .site-name { display: block; font-size: 20px; font-weight: 600; color: var(--ink-2); margin-top: 2px; }
 .meta { margin: 0 0 18px; color: var(--ink-2); font-size: 14px; }
 h2 { margin: 28px 0 8px; font-size: 17px; break-after: avoid; }
 h3 { margin: 16px 0 6px; font-size: 14px; }
@@ -97,6 +98,7 @@ tr { break-inside: avoid; }
   .screen-only { display: none !important; }
   main { max-width: none; margin: 0; padding: 0; box-shadow: none; border-radius: 0; }
   h1 { font-size: 18pt; }
+  h1 .site-name { font-size: 14pt; }
   h2 { font-size: 12.5pt; margin-top: 16pt; }
   .decision { font-size: 11.5pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .map { display: none; }

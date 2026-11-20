@@ -33,8 +33,16 @@ const captureMissing = () => captures.forEach((c) => { if (!c.img.src && c.map.l
 $("print").addEventListener("click", async () => { await Promise.allSettled(pending); captureMissing(); await new Promise((ok) => setTimeout(ok, 150)); window.print(); });
 addEventListener("beforeprint", captureMissing);
 $("copy").addEventListener("click", async () => {
-  try { await navigator.clipboard.writeText(location.href); $("copy").textContent = "Link copied"; }
-  catch { $("copy").textContent = "Copy from the address bar"; }
+  let ok = false;
+  try { await navigator.clipboard.writeText(location.href); ok = true; } catch { /* refused: try the older way */ }
+  if (!ok) {
+    const box = Object.assign(document.createElement("textarea"), { value: location.href, readOnly: true });
+    box.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+    document.body.append(box); box.select();
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    box.remove();
+  }
+  $("copy").textContent = ok ? "Link copied" : "Copy from the address bar";
   setTimeout(() => { $("copy").textContent = "Copy link"; }, 2500);
 });
 
@@ -51,8 +59,10 @@ try {
 function render(record) {
   const r = record.tobler_run;
   const s = r.site;
-  document.title = `${s.name} · screening report · Tobler`;
-  const head = [el("p", "Tobler screening report", "kicker"), el("h1", s.name),
+  document.title = `Geospatial Assessment: ${s.name} · Tobler`;
+  const title = el("h1", "Geospatial Assessment");
+  title.append(el("span", s.name, "site-name"));
+  const head = [el("p", "Tobler", "kicker"), title,
     el("p", [cap(s.asset_label) + (s.asset_assumed ? " (assumed)" : ""), s.setting, `screened ${when(r.finished_at)}`, `run ${r.id}`].filter(Boolean).join(" · "), "meta")];
 
   // 1. Decision and summary.
