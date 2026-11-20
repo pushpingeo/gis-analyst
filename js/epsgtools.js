@@ -112,7 +112,7 @@ export function decide(ranked, setting) {
   if (!best) return { ...out, chosen: null, ask: true, why: `The best option (${top.name}) needs a grid file this page can't apply. Say so and ask before falling back to a less accurate one.` };
   if (best.accuracy_m == null || best.accuracy_m > ASK_ABOVE_M) return { ...out, chosen: null, ask: true, why: `The best option that can be applied here is only ${best.accuracy_m == null ? "of unknown accuracy" : `good to about ${best.accuracy_m} m`}, worse than the ${ASK_ABOVE_M} m accepted without asking. Ask.` };
   const note = best.code !== top.code ? ` (${top.name}, ${top.accuracy_m ?? "?"} m, is better but needs a grid file this page can't apply)` : "";
-  return { ...out, chosen: best.code, ask: false, why: `Chosen for the person, as their setting allows: ${best.name}, good to about ${best.accuracy_m} m here${note}. It is chosen, not yet applied: to move coordinates, call transform with operation ${best.code}, and only then say it was applied.` };
+  return { ...out, chosen: best.code, ask: false, why: `Chosen for the person: ${best.name}, good to about ${best.accuracy_m} m here${note}. It is chosen, not yet applied: to move coordinates, call transform with operation ${best.code}, and only then say it was applied.` };
 }
 
 // typedAt(ref) → [lon, lat] only for coordinates the person typed (their numbers, before any datum is assumed).
