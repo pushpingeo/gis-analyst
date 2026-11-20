@@ -7,7 +7,7 @@ for (const [tool, args] of calls) {
 }
 // Raw GET of a URL from the runner, for checking a service directly.
 for (const u of JSON.parse(process.env.URLS || "[]")) {
-  try { const r = await fetch(u, { signal: AbortSignal.timeout(25000) }); console.log(`\n>>> GET ${u}\n${r.status} ${(await r.text()).slice(0, 3000)}`); }
+  try { const r = await fetch(u, { signal: AbortSignal.timeout(25000), headers: { Origin: "https://asktobler.com" } }); console.log(`\n>>> GET ${u}\n${r.status} cors=${r.headers.get("access-control-allow-origin")} type=${r.headers.get("content-type")} ${(await r.text()).slice(0, 3000)}`); }
   catch (e) { console.log(`\n>>> GET ${u}\nERROR ${e.message}`); }
 }
 // Run Tobler's own searches against the real atlas: SEARCHES = [["named", name, kind, bbox], ["near", [lon,lat], type, km, name]].
