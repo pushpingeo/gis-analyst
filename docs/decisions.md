@@ -639,3 +639,31 @@ Judgement calls made while building, newest first. Bigger product decisions live
   link to the share link. Residual ratings, owners and commitments registers are after design, so not for a screen.
 - Four shared run-record fields join the plumbing, for energy too: finding ID, severity apart from confidence, next
   step per finding, one overall decision.
+
+## 20 Nov (afternoon): industry profiles, plumbing only; shared run fields (Rob: "get back to it")
+- **Profiles:** `catalogue/industries/index.json` (Energy ready; Construction and property, Retail and site selection
+  "coming soon") and `energy.json`: its skill, themes with IFC codes, wording (the screen chip), the four decisions,
+  what to do with other industries' requests, and the quick picks and welcome examples, moved in from
+  `catalogue/asset-picks.json` (removed) and `js/examples.js` (now only the pick). Distances and baseline layers stay in
+  their own files, named by the profile; a profile may list its own baseline layers in trusted.json's shape
+  (`baselineFor`). Per-country layers use the existing `where` box for now; nothing finer until construction needs it.
+- **Page:** Settings → Industry (first section), only ready profiles selectable (`tobler.industry`); the profile's
+  skill runs `screen_site`; the analyst's project summary carries an industry line, and the system prompt the
+  profile's rule for other requests. `js/industry.js` holds the pure parts. `try-requests` does the same.
+- **Run record, for energy too (from the construction research and the ESIA read):** `industry`, `decision`
+  ({value, why}; only the four words, anything else dropped), and per flag `id` (F-01… in the order shown),
+  `severity` (high/medium/low or null; never guessed) and `next_step`. Order is now severity, then confidence, then
+  distance. A re-assessment writes a new decision or none; an old one isn't carried over. The headline and `get_run`
+  carry them.
+- **NTR skill 3.8-draft:** severity defined apart from confidence; a one-line next step per flag (the kind of check,
+  not a firm or a cost); the decision rule, including "if the themes that matter most couldn't be checked,
+  insufficient evidence". Evaluated method text otherwise unchanged.
+- **Card:** the decision first, in a quiet box, with a tooltip saying it's a screen, not a decision to build; IDs
+  before each risk; severity and confidence in the flag's text; "Next step:" under the why. The badge is still
+  confidence. Severity isn't a badge yet (my call: one badge reads better; worth Rob's eye).
+- Tested: `npm test` (new `test/industry.test.mjs`: choice, profile validity, analyst line; new ntrrun test: IDs,
+  order, next step, decision); browser checks 95/95 (new: decision line, F-01–F-03, next step, Settings → Industry),
+  26/26, 8/8; Haiku replays on branch `industry-profile`: Évora solar (5 flags, all rated, next steps sensible;
+  decision "insufficient evidence" because the bird-protection and habitat-species layers failed), Rosebank (6 flags;
+  "progress with targeted investigation"), a 2 ha Heswall housing site (the analyst said the method is built for
+  energy, offered a general screen and said construction is coming, without screening unasked).
