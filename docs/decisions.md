@@ -563,3 +563,33 @@ Judgement calls made while building, newest first. Bigger product decisions live
   numbers and transcript); Worker tests 15/15 (new: origin and shape checks, read key, paging, no IP stored, own daily
   limit); `browser-run-card.mjs` 87/87 (new: the welcome note and its link to the switch, the screening turn's log sent
   trimmed with no raw coordinates, nothing sent once switched off); `browser-choice.mjs`.
+
+## 20 Nov (morning, later): results stay in view; drawn shapes named and renamable; quick picks for what's planned (Rob)
+- **Results stay in view.** At the end of a turn the first thing it produced (a shape card, a run card, a choice or
+  pick card, or the reply) goes to the top of the conversation (`showTurnTop`), so a long result reads from its
+  start. A turn that fits on screen still ends at the bottom, as before. Mid-turn scrolling (progress, new cards) is
+  unchanged.
+- **Drawn shapes are named after the settlement they're in or near:** "Point near Linlithgow", "Area near Évora"
+  (`settlementNear` in `js/gazetteer.js`: Nominatim's reverse lookup at village level, in the same one-a-second queue).
+  Natural Earth wasn't enough (a point by Linlithgow gets "nearest town Edinburgh, 24 km"). At sea or with nothing
+  named nearby, it stays "Point 1". Never overrides a name someone gave. Live check: a point at Linlithgow gave
+  "Linlithgow Bridge" (the village it's actually in).
+- **Rename on the card:** tap the name; Enter or leaving the box saves, Escape cancels. Old names stay as aliases
+  (`former`), so the analyst and earlier messages still find the place; the rename is in the card's history and the
+  analyst's place summary. The analyst's own `edit_place` rename uses the same path.
+- **What's planned there: quick picks, not a question in words.** The screen chip, on a place with no known asset
+  type, shows the picks straight away (no model call); a new tool, `ask_asset_type`, shows the same picks when someone
+  types "screen it" and the type isn't clear. A tap sends "Screen X as a solar farm site." (the analyst is told the
+  asset type, assumed false) and screens at once. "Just a general screen" uses asset_type other (the general distances).
+  Once a place has been screened its type is remembered and the chip fills the input as before.
+- **Picks are energy-led (Rob) and follow the setting:** on land solar, onshore wind, oil and gas, mine, pipeline or
+  cable, substation; at sea offshore wind, oil and gas, pipeline or cable, platform, port or terminal, exploration
+  block; the rest under More…. Showing offshore wind for a point in Linlithgow would be silly, so each pick can be
+  limited to a setting. Kept in `catalogue/asset-picks.json` so a broader customer base is an edit there (each type
+  must be in `catalogue/distances.json`).
+- Tested: `test/assetpicks.test.mjs`; new `scripts/browser-ux.mjs` 26/26 (desktop and phone: settlement name, rename
+  and Escape, picks by setting, More…, a tap's message and what the analyst is told, results at the top for a long
+  turn and at the bottom for a short one, `ask_asset_type`, general screen); `browser-run-card.mjs` 87/87 (chip check
+  updated); `browser-choice.mjs`; replays with Haiku on branch `ux-picks`: a drawn square → "screen it" showed the
+  picks; "screen a 1 km² solar farm site 5 km west of Évora" screened straight away; "find Rosebank → screen it"
+  inferred oil and gas and screened. Live page checked in Rob's browser.
