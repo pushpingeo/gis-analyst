@@ -496,6 +496,11 @@ await test("distance checks must quote the person; a rebuild replaces its propos
   const e = await t.exec("make_place", { anchor: "C1", shape: "point", words: "the summit", match: "name_and_type", reason: "x", replaces: "Ben Nevis", checks: [{ against: "C4", expected_km: 6, direction: "NW", quote: "about 6 km south-east of the distillery" }] });
   assert.equal(e.checks[0].pass, true, "6 km SE of the distillery, as the site is");
   assert.equal(e.failed_checks_left_out, undefined, "the earlier failed clue came from a previous rebuild, not this one");
+  // A rebuild given the same name keeps it, rather than becoming "Ben Nevis (2)" (Cnoc Buidhe replay, 20 Nov).
+  const same = await t.exec("make_place", { anchor: "C1", shape: "point", words: "the summit", match: "name_and_type", reason: "x", replaces: "Ben Nevis", name: "Ben Nevis" });
+  assert.equal(same.place, "Ben Nevis");
+  assert.equal(host.list.length, 1);
+  assert.equal(host.list[0].name, "Ben Nevis");
   // Only the analyst's own proposals can be replaced or removed unasked.
   host.list[0].status = "accepted";
   await assert.rejects(() => t.exec("make_place", { anchor: "C1", shape: "point", words: "x", match: "name_and_type", reason: "x", replaces: "Ben Nevis" }), /isn't a proposal of yours/);

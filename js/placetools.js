@@ -489,7 +489,8 @@ export function createPlaceTools(host) {
       if (old && host.removePlace) {
         const oldName = old.name;
         host.removePlace(oldName, { by: "analyst", reason: "replaced by a rebuilt place" });
-        if (!i.name && p.name !== oldName) host.renamePlace?.(p.name, oldName);
+        // It takes the old name back unless it was given a different one (giving the same name made "X (2)": Cnoc Buidhe, 20 Nov).
+        if ((!i.name || norm(i.name) === norm(oldName)) && p.name !== oldName) host.renamePlace?.(p.name, oldName);
       }
       return { ...(await placeSummary(p)), ...(old ? { replaced: old.name } : {}), how: steps.join(", then "), confidence: rated.confidence, why: rated.rules,
         ...(origin.role === "search_area" ? { what_it_is: `A search area (${origin.role_why}), standing in for an outline that wasn't found. Say so when you show it, and that a screen of it reports findings by how much of the area they cover, not as "on site". If the person has the real outline, they can draw it.` } : {}),
