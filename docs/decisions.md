@@ -631,3 +631,11 @@ Judgement calls made while building, newest first. Bigger product decisions live
   layers, not just distances; baseline per country; run record ready for results per theme, severity beside
   confidence and a next step per finding. Energy keeps its flags-first card.
 - **Order unchanged:** plumbing, then finish energy, then construction.
+
+## 20 Nov (afternoon): report layout from an AI read of six ESIAs (thinking only)
+- Rob had an AI read six of his downloaded ESIAs (Reko Diq, Amunet ESIA and CHA, Riau, GAC dam, Tafila; a random
+  set, not best in class) for how results are presented. Outcome in the plan's "Outputs" (PDF outline): 4–6 pages,
+  decision first, at most three maps (site, numbered findings, a gaps map), one row per finding, an evidence panel,
+  link to the share link. Residual ratings, owners and commitments registers are after design, so not for a screen.
+- Four shared run-record fields join the plumbing, for energy too: finding ID, severity apart from confidence, next
+  step per finding, one overall decision.
