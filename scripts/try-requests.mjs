@@ -27,6 +27,15 @@ const allSkills = [skill, ntr, crs];
 const epsgCall = async ({ path, query }) => {
   const r = await fetch("https://tobler-api.robdunfey.workers.dev/epsg", { method: "POST", headers: { "content-type": "application/json", origin: "https://asktobler.com" }, body: JSON.stringify({ path, query }) });
   const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = null; }
+  // A path the deployed Worker doesn't serve yet (a branch ahead of the Worker): read the registry directly instead,
+  // so a replay can test new tools before the Worker is deployed. Printed, so the log says which route was used.
+  if (r.status === 400 && /isn't served here/.test(j?.message || "")) {
+    console.log(`   (EPSG ${path}: not on the deployed Worker yet; read from apps.epsg.org directly)`);
+    const q = new URLSearchParams(Object.entries(query || {}).map(([k, v]) => [k, String(v)]));
+    const d = await fetch(`https://apps.epsg.org/api/v1/${path}/${q.size ? `?${q}` : ""}`, { headers: { accept: "application/json" } });
+    if (!d.ok) throw new Error(`EPSG answered ${d.status}`);
+    return d.json();
+  }
   if (!r.ok) throw new Error(j?.message || `EPSG answered ${r.status}`);
   return j ?? t;
 };
