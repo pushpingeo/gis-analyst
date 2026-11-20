@@ -1,6 +1,6 @@
 ---
 name: place-finding
-version: 4.12
+version: 4.13
 description: Turn words into a place on the map. Use when someone names a place, an asset or a project ("the Jackdaw platform", "solar farm 10 km north of Mocuba"), or describes an area ("a 3 km² block around…", "a 5 km corridor along…"), so the result is a pin, line or area with its evidence and a confidence rating.
 ---
 
@@ -26,7 +26,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
    - **Once the asset itself is found, distances in the description are checks, not moves.** "Village X lies 25 km east of the mine" tells you where the village is relative to the mine; it doesn't mean the mine is 25 km from where you found it. Use offsets to *place* something only when the asset can't be found and you're working out where it is from a named reference.
    - **Large features need their outline, not a point.** A salt flat, reservoir, lake, concession or district can be tens of kilometres across, and a gazetteer point is just somewhere in it, often the middle. Use the feature's outline (`shape: "feature"`) where the source has one; if the description says which part ("the south-eastern sector of the salar"), find that part. A point for a large feature can't be better than medium confidence.
    - **Gazetteer points can be rough.** A Wikidata or OpenStreetMap point for a mine, a salt flat, a reservoir or a port is sometimes the centre of a much larger feature, or a town's position reused. Check it against the other clues (distances to named villages, rivers, "the south-eastern part of the salar"). If it disagrees with them by more than about 5 km, look for a feature that fits all the clues (`find_features_near`), prefer that, and say why; if nothing better turns up, keep the point with low confidence.
-4. **Build the shape** with `make_place`, using the anchor's id. Say how the anchor matched (`match`): when the person named the place itself and that's what you found ("5 km round Linlithgow Palace" → the palace; "block 30/2"; "Fife"), it's `named_place`, even if the source is Wikidata or OpenStreetMap, and pass **every distance clue** in the request as a `check` against the feature it names (find that feature first). The tool measures them from the place it builds and works out the confidence; you don't choose it. Choose the shape from the words:
+4. **Build the shape** with `make_place`, using the anchor's id. Say how the anchor matched (`match`): when the person named the place itself and that's what you found ("5 km round Linlithgow Palace" → the palace; "block 30/2"; "Fife"), it's `named_place`, even if the source is Wikidata or OpenStreetMap, and pass **every distance clue** in the request as a `check` against the feature it names (find that feature first), with the person's own words it comes from (`quote`). Only clues the person gave: never make a check up from what you know (a landmark you think is nearby); one without the person's words is left out. The tool measures them from the place it builds and works out the confidence; you don't choose it. Choose the shape from the words:
    - "around", "centred on" with an area or size → square, circle or rectangle centred on the anchor. "Block" or "box" means a square unless the context says otherwise; "radius" or "within X km" means a circle.
    - A named area (a field, a licence block, a park) → the feature's own outline (`shape: "feature"`).
    - "X km north of" → offset from the anchor by distance and bearing.
@@ -35,6 +35,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
    - **Scale is worked out, never asked.** The shape's size decides it (up to ~50 km across is local, up to ~1,000 km regional). Pass `scale` only when the request itself says the scale of the work and the shape doesn't show it, e.g. "screen the whole country" around a capital's pin. The project summary also gives the map view's width, which tells you the scale the person is looking at when there's no place yet.
 5. **Show it and ask** whether it's what they meant. One short question, only about what's genuinely uncertain.
 6. **Adjust** with `edit_place` when asked ("make it 5 km²", "rotate it 30°", "move it 2 km east").
+7. **Keep the map tidy.** To rebuild or correct a place you proposed, call `make_place` with `replaces` set to its name: the old one is removed, the new one takes its name, and its checks carry over. Never leave a duplicate for the person to delete. `remove_place` removes a place when the person asks, or a proposal of yours that's no longer wanted.
 
 ## Corridors along roads, rivers and lines
 "A 1 km corridor along the M9 between Linlithgow and Falkirk": find both towns, then `find_features_near` with feature type `main road` (or `river`, `railway`, `pipeline`, `power line`) around a point between them, a radius that reaches both, and `name` set to the road number or river name. Roads and rivers come back in pieces: build one `buffer` with the nearest piece as the anchor and the others in `also`. Say which pieces were used and that the ends follow the pieces found, not the town boundaries exactly. When the words set a limit ("within 5 km of Linlithgow", "only inside Fife"), add `clip` to the same `make_place` call: `{ to: <the town's or area's id>, within_km: 5 }`, or `{ to: <the area's id> }` to cut to its outline. If no line is found, don't draw a straight line in its place: offer that the person draws it.
@@ -52,7 +53,7 @@ You never do geometry in your head. Tools find anchors and build shapes; you cho
 - **Checks move it:** any failed check makes it low. Only tight checks (clues within about 14 km) raise it: a distance with a direction pins the site, a distance alone only puts it on a ring. A name-and-type match rises to high with one tight directional check or two tight ones. So pass the direction whenever the words give one.
 - **Caps:** placed by an offset from a reference, or a point for a large feature, is at most medium.
 - **When a check fails,** don't argue it away. Say which clue doesn't fit, look for a feature that fits all the clues (`find_features_near`), and rebuild if you find one. If nothing better turns up, keep the place at low confidence and say so.
-- Pass all the clues, including ones you expect to fail. A check that isn't passed can't help, and one that's hidden makes the rating dishonest.
+- Pass all the clues, including ones you expect to fail. A check that isn't passed can't help, and one that's hidden makes the rating dishonest. Rebuilding without a failed check doesn't remove it: with `replaces`, the old place's checks carry over.
 
 ## Reporting
 - Name the anchor the way the source names it, with its source and licence ("JACKDAW, platform, NSTA").

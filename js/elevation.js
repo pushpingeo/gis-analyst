@@ -130,8 +130,10 @@ export function depthFrom(e) {
 // When elevation matters for a site on land (Rob, 20 Nov: show it only when it's significant, or the results get
 // crowded). Thresholds are rough and for Rob to correct:
 // - low-lying: typical elevation 10 m or less (flooding, storm surge, sea-level rise); below sea level if under 0;
+// - upland: typical or highest 1,000 m or more (Rob, 20 Nov): exposed weather, snow and ice, harder access, shorter
+//   working seasons;
 // - high altitude: typical or highest 2,500 m or more (less oxygen, cold, workforce health); very high from 3,500 m.
-export const ELEVATION_RULES = { lowLyingM: 10, highM: 2500, veryHighM: 3500 };
+export const ELEVATION_RULES = { lowLyingM: 10, uplandM: 1000, highM: 2500, veryHighM: 3500 };
 export function elevationSignificance(e, rules = ELEVATION_RULES) {
   if (!e) return null;
   if (e.typical_m < 0) return { kind: "below sea level", why: "parts of the site lie below sea level: flooding and drainage" };
@@ -139,6 +141,7 @@ export function elevationSignificance(e, rules = ELEVATION_RULES) {
   const top = Math.max(e.typical_m, e.max_m);
   if (top >= rules.veryHighM) return { kind: "very high altitude", why: "very high altitude: much less oxygen, cold, workforce health and equipment derating" };
   if (top >= rules.highM) return { kind: "high altitude", why: "high altitude: less oxygen, cold, workforce health" };
+  if (top >= rules.uplandM) return { kind: "upland", why: "upland: exposed weather, snow and ice, harder access and shorter working seasons" };
   return null;
 }
 

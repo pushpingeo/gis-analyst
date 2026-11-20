@@ -62,7 +62,11 @@ for (const conv of convs) {
     },
     updatePlace(name, feature, words) { const p = this.findPlace(name); p.feature = feature; p.edits.push({ change: words }); },
     renamePlace(name, to) { this.findPlace(name).name = to; },
+    removePlace(name, by) { const i = list.findIndex((p) => p.name.toLowerCase() === String(name).toLowerCase()); if (i >= 0) { console.log(`   [removed ${list[i].name}: ${by?.reason || ""}]`); list.splice(i, 1); } },
+    personSaid: () => said.join("\n"),
+    lastPersonText: () => said.at(-1) || "",
   };
+  const said = [];
   host.screening = createScreening({
     host, table: distTable, skill: ntr, callClaude, model: "claude-haiku-5-5",
     onEvent: (ev) => {
@@ -89,6 +93,7 @@ for (const conv of convs) {
     const t0 = Date.now();
     const timing = { model: 0, rounds: 0, tools: [] };
     console.log(`\n> ${text}`);
+    said.push(text);
     try {
       const res = await runTurn({
         system: systemPrompt({ skills: convSkills, loaded, comingSoon: ["net developable area and constraints-and-access analysis"] }),
@@ -117,6 +122,7 @@ for (const conv of convs) {
       const total = (Date.now() - t0) / 1000;
       console.log(`\n${res.text}\n   (${total.toFixed(0)} s: model ${(timing.model / 1000).toFixed(0)} s over ${timing.rounds} rounds; tools ${(total - timing.model / 1000).toFixed(0)} s wall; slowest tools ${timing.tools.sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, ms]) => `${n} ${(ms / 1000).toFixed(1)} s`).join(", ")})`);
     } catch (e) { console.log(`TURN FAILED: ${e.message}`); }
+    console.log(`   [places now: ${list.map((p) => `${p.name} (${p.origin?.confidence || "drawn"})`).join(", ") || "none"}]`);
   }
 }
 console.log(`\nTokens: ${spend.input} in, ${spend.output} out`);

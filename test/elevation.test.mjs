@@ -67,6 +67,9 @@ const E = (typical, min, max) => ({ typical_m: typical, min_m: min, max_m: max, 
 assert.equal(elevationSignificance(E(109, 95, 130)), null, "Linlithgow: nothing to say");
 assert.equal(elevationSignificance(E(4, 1, 8)).kind, "low-lying");
 assert.equal(elevationSignificance(E(-2, -4, 1)).kind, "below sea level");
+assert.equal(elevationSignificance(E(740, 149, 1068)).kind, "upland", "Ben Nevis SAC as sampled (Rob, 20 Nov: a 1,000–2,500 m band)");
+assert.equal(elevationSignificance(E(950, 900, 990)), null, "under 1,000 m: nothing to say");
+assert.match(elevationSignificance(E(1200, 1100, 1300)).why, /exposed weather, snow and ice/);
 assert.equal(elevationSignificance(E(2400, 2300, 2600)).kind, "high altitude", "the highest point counts");
 assert.equal(elevationSignificance(E(3776, 3700, 3900)).kind, "very high altitude");
 assert.equal(elevationShort(E(4, 1, 8), elevationSignificance(E(4, 1, 8))), "Elevation about 4 m, 1–8 m across the site: low-lying (NOAA).");

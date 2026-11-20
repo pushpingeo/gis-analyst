@@ -430,4 +430,72 @@ await test("places are named after what they were built from, not 'Area 1'", () 
   assert.equal(placeName({ shape: "point", name: "C29: Miri" }, cand("Miri"), sq), "Miri");
 });
 
+await test("'United Kingdom' is the UK itself, not its territories (Ben Nevis log, 20 Nov: labelled Dhekelia)", async () => {
+  const host = memoryHost();
+  let box = null;
+  host.atlas = async (tool, args) => { if (tool === "find_datasets") { box = args.bbox; return { matches: 0, results: [] }; } return { returned: 0, features: [] }; };
+  host.fetchFn = async () => ({ ok: true, status: 200, json: async () => [] });
+  const t = createPlaceTools(host);
+  const r = await t.exec("find_place", { query: "Ben Nevis", kind: "protected area", area: "United Kingdom" });
+  assert.match(r.atlas.searched, /United Kingdom and its waters/);
+  assert.doesNotMatch(r.atlas.searched, /Dhekelia|main part/);
+  assert.ok(box[0] > -15 && box[2] < 5 && box[1] > 45, `Great Britain and Northern Ireland, not the Falklands or Cyprus (${box})`);
+  // A territory by its own name still works, and a name with no country of its own falls back to the sovereign's.
+  const g = await t.exec("find_place", { query: "x", kind: "protected area", area: "Gibraltar" });
+  assert.match(g.atlas.searched, /Gibraltar and its waters/);
+});
+
+await test("distance checks must quote the person; a rebuild replaces its proposal and keeps its checks; removing places", async () => {
+  const host = memoryHost();
+  host.said = ["Ben Nevis, Scotland"];
+  host.personSaid = () => host.said.join("\n");
+  host.lastPersonText = () => host.said.at(-1);
+  host.removePlace = (name) => { const i = host.list.findIndex((p) => p.name === name); host.list.splice(i, 1); };
+  // As in the page: places keep the name they're given, made unique with (2).
+  host.addPlace = ({ feature, origin, name }) => {
+    let nm = name || `Area ${host.list.length + 1}`;
+    for (let k = 2; host.list.some((q) => q.name === nm); k++) nm = `${name} (${k})`;
+    const p = { name: nm, feature, origin, status: "proposed", edits: [] }; host.list.push(p); return p;
+  };
+  host.fetchFn = async (url) => {
+    const u = decodeURIComponent(String(url));
+    if (u.includes("wikidata") && /Distillery/i.test(u)) return { ok: true, status: 200, json: async () => ({ search: [] }) };
+    return { ok: true, status: 200, json: async () => [] };
+  };
+  const t = createPlaceTools(host);
+  // Two candidates by hand: the summit and the distillery 6 km NW of it.
+  const cs = t.candidates;
+  cs.set("C1", { id: "C1", name: "Ben Nevis", type: "natural: peak", lonlat: [-5.0035, 56.7969], geometry: { type: "Point", coordinates: [-5.0035, 56.7969] }, source: { title: "OSM", publisher: "OpenStreetMap contributors", tier: "community" }, licence: "ODbL" });
+  cs.set("C4", { id: "C4", name: "Ben Nevis distillery", type: "whisky distillery", lonlat: [-5.0739, 56.8351], geometry: { type: "Point", coordinates: [-5.0739, 56.8351] }, source: { title: "Wikidata", publisher: "Wikidata contributors", tier: "community" }, licence: "CC0" });
+  // An invented check (the person gave no distance clue) is left out, so it can't sink or lift the confidence.
+  const a = await t.exec("make_place", { anchor: "C1", shape: "point", words: "Ben Nevis, Scotland", match: "name_and_type", reason: "x", name: "Ben Nevis", checks: [{ against: "C4", expected_km: 4, direction: "NE", quote: "4 km NE of the distillery" }, { against: "C4", expected_km: 4 }] });
+  assert.equal(a.confidence, "medium");
+  assert.ok(a.checks.every((c) => c.pass === null && /left out/.test(c.why)), JSON.stringify(a.checks));
+  // A clue the person did give is measured; when it fails, a rebuild with replaces keeps it.
+  host.said.push("the summit, about 4 km north-east of the Ben Nevis distillery");
+  const b = await t.exec("make_place", { anchor: "C1", shape: "point", words: "the summit", match: "name_and_type", reason: "x", replaces: "Ben Nevis", checks: [{ against: "C4", expected_km: 4, direction: "NE", quote: "about 4 km north-east of the Ben Nevis distillery" }] });
+  assert.equal(b.replaced, "Ben Nevis");
+  assert.equal(b.place, "Ben Nevis", "the rebuild takes the old name");
+  assert.equal(host.list.length, 1, "no duplicate left behind");
+  assert.equal(b.confidence, "low");
+  assert.equal(b.checks[0].pass, false);
+  const c = await t.exec("make_place", { anchor: "C1", shape: "point", words: "the summit", match: "name_and_type", reason: "x", replaces: "Ben Nevis" });
+  assert.equal(c.confidence, "low", "dropping the failed check doesn't lift the confidence");
+  assert.equal(c.checks[0].carried_over, true);
+  assert.equal(host.list.length, 1);
+  // Only the analyst's own proposals can be replaced or removed unasked.
+  host.list[0].status = "accepted";
+  await assert.rejects(() => t.exec("make_place", { anchor: "C1", shape: "point", words: "x", match: "name_and_type", reason: "x", replaces: "Ben Nevis" }), /isn't a proposal of yours/);
+  await assert.rejects(() => t.exec("remove_place", { place: "Ben Nevis", reason: "tidy" }), /remove it only when they ask/);
+  host.said.push("Can you remove Ben Nevis?");
+  const rm = await t.exec("remove_place", { place: "Ben Nevis", reason: "the person asked" });
+  assert.equal(rm.removed, "Ben Nevis");
+  assert.deepEqual(rm.places_left, []);
+  // Without a record of the person's words (older hosts), checks are measured as before.
+  const plain = createPlaceTools({ ...memoryHost() });
+  plain.candidates.set("C1", cs.get("C1")); plain.candidates.set("C4", cs.get("C4"));
+  const d = await plain.exec("make_place", { anchor: "C1", shape: "point", words: "x", match: "name_and_type", reason: "x", checks: [{ against: "C4", expected_km: 6, direction: "NW" }] });
+  assert.equal(d.checks[0].pass, true);
+});
+
 console.log(`${passed} place tests passed`);

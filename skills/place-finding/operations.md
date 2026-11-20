@@ -20,10 +20,17 @@ longitude/latitude; distances and areas are geodesic; shapes are built by code, 
 
 ## make_place: build the shape
 - **Does:** builds a point, square, circle, rectangle, buffer or corridor, or takes a feature's own outline, from an
-  anchor, optionally offset by a distance and bearing and rotated; measures every distance clue given as a check;
-  rates confidence by fixed rules (see the skill's "Confidence" section), not by the model.
+  anchor, optionally offset by a distance and bearing and rotated; measures every distance clue given as a check
+  (each must quote the person's words, or it's left out); rates confidence by fixed rules (see the skill's
+  "Confidence" section), not by the model. Can replace a proposal it made earlier: the old one goes, the new one
+  takes its name, and the old one's checks carry over.
 - **Returns:** the place's size and location in words, the construction steps, the confidence and the rules behind it.
 - **Tobler:** `make_place`; shapes in a local projection (`js/geometry.js`), confidence in `js/confidence.js`.
+
+## remove_place: take a place off the map
+- **Does:** removes a place when the person asks, or a proposal of the analyst's own that's no longer wanted. Places
+  the person drew or accepted go only when the person asks.
+- **Tobler:** `remove_place`.
 
 ## offer_choices: let the person pick
 - **Does:** shows two to five candidates with their sources and a recommendation, and waits for the person's choice.

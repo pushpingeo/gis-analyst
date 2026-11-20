@@ -82,6 +82,11 @@ function memoryHost() {
     addPlace({ feature, origin }) { const p = { name: `Area ${list.length + 1}`, feature, origin, status: "proposed", edits: [] }; list.push(p); return p; },
     updatePlace(name, feature, words) { const p = this.findPlace(name); p.feature = feature; p.edits.push({ change: words }); },
     renamePlace(name, to) { this.findPlace(name).name = to; },
+    removePlace(name) { const i = list.findIndex((p) => p.name.toLowerCase() === String(name).toLowerCase()); if (i >= 0) list.splice(i, 1); },
+    // The test case's words, so distance checks can be tied to them (set per case below).
+    said: [],
+    personSaid() { return this.said.join("\n"); },
+    lastPersonText() { return this.said.at(-1) || ""; },
   };
 }
 
@@ -103,6 +108,7 @@ for (const s of sites) {
   const host = memoryHost();
   const tools = createPlaceTools(host);
   const userText = prompt(s);
+  host.said.push(userText);
   const events = [];
   const t0 = Date.now();
   let rec;

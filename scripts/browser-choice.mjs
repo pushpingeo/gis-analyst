@@ -14,9 +14,12 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 await page.route(/openfreemap|nominatim|wikidata|overpass/, (r) => r.abort());
 const sent = [];
+// Scripted replies, oldest first; when the queue is empty the model just says "Done."
+const queue = [];
+const msg = (content, stop = "end_turn") => ({ id: "m", type: "message", role: "assistant", stop_reason: stop, content, usage: { input_tokens: 1, output_tokens: 1 } });
 await page.route(/tobler-api.*\/v1\/messages/, (r) => {
   sent.push(JSON.parse(r.request().postData()));
-  r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: "m", type: "message", role: "assistant", stop_reason: "end_turn", content: [{ type: "text", text: "Done." }], usage: { input_tokens: 1, output_tokens: 1 } }) });
+  r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(queue.shift() || msg([{ type: "text", text: "Done." }])) });
 });
 await page.goto("http://localhost:8000/");
 await page.waitForFunction(() => window.__ws?.map?.loaded?.() || document.querySelector(".maplibregl-canvas"), null, { timeout: 30000 });
@@ -41,6 +44,34 @@ const bubble = await page.evaluate(() => [...document.querySelectorAll(".msg.use
 check(bubble === "Use Miri (OpenStreetMap contributors).", `the person's message names the pick, no id ("${bubble}")`);
 const toModel = JSON.stringify(sent.at(-1)?.messages?.at(-1)?.content || "");
 check(/candidate C29/.test(toModel) && /match named_place/.test(toModel), "the analyst still gets the candidate id and how to build it");
+// The analyst removes places (Ben Nevis log, 20 Nov): its own proposal unasked; an accepted place only when asked.
+const box = (x, y) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[[x, y], [x + 0.05, y], [x + 0.05, y + 0.03], [x, y + 0.03], [x, y]]] } });
+await page.evaluate(([a, b]) => {
+  const h = window.__ws.host;
+  h.addPlace({ feature: a, origin: { method: "words", words: "Ben Nevis", confidence: "low", steps: ["point"], checks: [] }, name: "Ben Nevis" });
+  const k = h.addPlace({ feature: b, origin: { method: "words", words: "Ben Nevis SAC", confidence: "medium", steps: ["outline of Ben Nevis"], checks: [] }, name: "Ben Nevis SAC" });
+  k.status = "accepted";
+}, [box(-5.0, 56.79), box(-4.95, 56.81)]);
+const use = (id, name, input) => ({ type: "tool_use", id, name, input });
+const turn = async (text) => {
+  const before = await page.evaluate(() => document.querySelectorAll(".msg.analyst").length);
+  await page.fill("#say", text);
+  await page.click("button.send");
+  await page.waitForFunction((n) => document.querySelectorAll(".msg.analyst").length > n && !document.querySelector("#ask")?.classList.contains("busy"), before, { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(400);
+};
+queue.push(msg([use("t1", "remove_place", { place: "Ben Nevis", reason: "a duplicate of mine" }), use("t2", "remove_place", { place: "Ben Nevis SAC", reason: "tidying" })], "tool_use"), msg([{ type: "text", text: "Removed my duplicate." }]));
+await turn("Thanks, that looks right.");
+let state = await page.evaluate(() => ({ names: window.__ws.host.places().map((p) => p.name), gone: [...document.querySelectorAll(".gone .summary")].map((e) => e.textContent) }));
+check(!state.names.includes("Ben Nevis") && state.gone.some((t) => /Removed by the analyst: a duplicate of mine/.test(t)), `its own proposal is removed and its card says so (${JSON.stringify(state)})`);
+check(state.names.includes("Ben Nevis SAC"), "an accepted place stays when the person didn't ask");
+const toolResults = JSON.stringify(sent.at(-1)?.messages?.at(-1)?.content || "");
+check(/remove it only when they ask/.test(toolResults), "the analyst is told why the accepted place stayed");
+queue.push(msg([use("t3", "remove_place", { place: "Ben Nevis SAC", reason: "the person asked" })], "tool_use"), msg([{ type: "text", text: "Removed." }]));
+await turn("Please remove Ben Nevis SAC.");
+state = await page.evaluate(() => window.__ws.host.places().map((p) => p.name));
+check(!state.includes("Ben Nevis SAC"), `an accepted place goes when the person asks (${JSON.stringify(state)})`);
+
 check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join(" | ")}` : ""}`);
 
 await browser.close();

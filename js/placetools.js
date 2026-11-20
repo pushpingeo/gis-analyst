@@ -93,13 +93,19 @@ export function placeToolDefs(skills) {
           words: { type: "string", description: "The person's own words that this place answers" },
           name: { type: "string", description: "Optional short name for the place, as the person would say it (e.g. 'Jackdaw', 'Linlithgow Palace 4 km²', 'M9 corridor'). Leave out to name it after the anchor and the shape. No candidate ids (C1) or source names in it. Refer to the place by the name the tool returns." },
           match: { type: "string", enum: MATCHES, description: "How the anchor relates to what the person wants. named_place: they asked for this place itself (a palace, a town, a block, a field). name_and_type: the asset itself, matched by name and of the right type (a mine for a mine). type_near_clues: a feature of the right type found where the clues point, its name not confirmed. name_only: the name matches but the type is wrong or unknown. settlement_or_region: a town, village or region stands in for the site. none: nothing specific." },
-          checks: { type: "array", description: "Every distance clue in the request that the place can be checked against, e.g. 'Nok Kundi lies about 80 km south-east of the mine' → { against: <Nok Kundi's candidate id>, expected_km: 80, direction: 'SE' }. Direction is the way you travel FROM the site TO that feature. Give all you have; they are measured, not trusted.", items: { type: "object", properties: { against: { type: "string", description: "Candidate id" }, expected_km: { type: "number" }, direction: { type: "string", description: "Compass point from the site to it: N, NE, ENE… (optional)" } }, required: ["against", "expected_km"] } },
+          checks: { type: "array", description: "Every distance clue the PERSON gave that the place can be checked against, e.g. 'Nok Kundi lies about 80 km south-east of the mine' → { against: <Nok Kundi's candidate id>, expected_km: 80, direction: 'SE', quote: 'Nok Kundi lies about 80 km south-east of the mine' }. Only clues in the person's own words: never make one up from what you know (a check without a quote from the person is left out). Direction is the way you travel FROM the site TO that feature. Give all the person gave; they are measured, not trusted.", items: { type: "object", properties: { against: { type: "string", description: "Candidate id" }, expected_km: { type: "number" }, direction: { type: "string", description: "Compass point from the site to it: N, NE, ENE… (optional)" }, quote: { type: "string", description: "The exact words in the person's message this clue comes from" } }, required: ["against", "expected_km", "quote"] } },
+          replaces: { type: "string", description: "Name of a place YOU proposed earlier in this conversation that this one replaces (a rebuild or a correction). The old one is removed, the new one takes its name, and the old one's distance checks carry over. Use it instead of leaving a duplicate on the map." },
           reason: { type: "string", description: "One line: the evidence for the location" },
           clip: { type: "object", description: "Optional: cut the shape to a limit, e.g. a corridor along the M9 'within 5 km of Linlithgow' → { to: <Linlithgow's candidate id>, within_km: 5 }. Without within_km it's cut to the outline of 'to' (a place or a candidate with an outline, e.g. 'only inside Fife').", properties: { to: { type: "string", description: "Candidate id or place name" }, within_km: { type: "number" } }, required: ["to"] },
           scale: { type: "string", enum: ["local", "regional", "global"], description: "Only when the request itself says the scale of the work (e.g. 'screen Mozambique' is global, 'the whole of the Moray Firth' regional) and it differs from the shape's size. Otherwise leave it out and the size decides." },
         },
         required: ["anchor", "shape", "words", "match", "reason"],
       },
+    },
+    {
+      name: "remove_place",
+      description: "Remove a place from the map and the project. Only when the person asks to remove or delete it, or to clear a proposal of your own that's no longer wanted (to rebuild one, use make_place with replaces instead). Places the person drew or accepted are removed only when the person asks in their latest message.",
+      input_schema: { type: "object", properties: { place: { type: "string", description: "Place name" }, reason: { type: "string", description: "One short line: why it's being removed" } }, required: ["place", "reason"] },
     },
     {
       name: "offer_choices",
@@ -174,6 +180,8 @@ export function placeToolDefs(skills) {
 
 // host: { places(), addPlace({feature, origin}), updatePlace(name, feature, words), renamePlace(name, newName),
 //         findPlace(name), ref, anchors (sources), fetchFn, headers, onCandidates(list), skillText(name) }
+const norm = (t) => String(t || "").toLowerCase().replace(/[‘’“”"'`]/g, "").replace(/\s+/g, " ").trim();
+
 export function createPlaceTools(host) {
   // The person's licence settings, for every catalogue search (Esri MLA and non-commercial data are off by default).
   const allowed = () => ({ esri: !!host.esriLicence?.(), nonCommercial: !!host.nonCommercial?.() });
@@ -224,7 +232,10 @@ export function createPlaceTools(host) {
       try {
         const countries = await host.ref.get("countries");
         const name = COUNTRY_ALIASES[want] || want;
-        const hit = countries.features.filter((f) => [f.properties.name, f.properties.iso, f.properties.sovereign].some((v) => v && v.toLowerCase() === name));
+        // The country itself first; its sovereign's territories only when nothing has that name ("United Kingdom" had
+        // pulled in all 18 UK territories and been labelled Dhekelia, Ben Nevis log, 20 Nov).
+        const own = countries.features.filter((f) => [f.properties.name, f.properties.iso].some((v) => v && v.toLowerCase() === name));
+        const hit = own.length ? own : countries.features.filter((f) => f.properties.sovereign?.toLowerCase() === name);
         if (hit.length) {
           let b = turf.bbox({ type: "FeatureCollection", features: hit });
           let note = "";
@@ -430,9 +441,25 @@ export function createPlaceTools(host) {
       f = G.roundCoords({ type: "Feature", properties: {}, geometry: f.geometry });
       // Confidence from the evidence, in code: checks are measured from the place just built.
       const site = f.geometry.type === "Point" ? f.geometry.coordinates : turf.centroid(f).geometry.coordinates;
+      // Checks must come from the person's own words (Ben Nevis, 20 Nov: the analyst made one up, it failed, and it
+      // rebuilt the place without it to get the confidence back). A rebuilt place keeps the checks of the one it replaces.
+      const old = i.replaces ? host.findPlace(i.replaces) : null;
+      if (i.replaces) {
+        if (!old) throw new Error(`No place called "${i.replaces}" to replace.`);
+        if (old.origin?.method !== "words" || old.status !== "proposed") throw new Error(`"${old.name}" isn't a proposal of yours, so it can't be replaced; ask the person, or build a new place.`);
+      }
+      const given = [...(i.checks || [])];
+      for (const c of old?.origin?.checks || []) {
+        if (c.quote && c.target && !given.some((g) => norm(g.quote) === norm(c.quote))) given.push({ against: c.target, expected_km: c.expected_km, direction: c.direction, quote: c.quote, carried: true });
+      }
+      const said = host.personSaid ? norm(host.personSaid()) : null;
       const checks = [];
-      for (const c of i.checks || []) {
-        try { const t = resolve(c.against); checks.push(runCheck(site, { lonlat: t.lonlat, name: t.label }, c)); }
+      for (const c of given) {
+        if (said != null && !(c.quote && norm(c.quote).length >= 4 && said.includes(norm(c.quote)))) {
+          checks.push({ against: c.against, expected_km: c.expected_km, pass: null, why: c.quote ? `"${String(c.quote).slice(0, 80)}" isn't in the person's words, so this check was left out` : "no quote from the person's words, so this check was left out: checks must come from distance clues the person gave" });
+          continue;
+        }
+        try { const t = resolve(c.against); checks.push({ ...runCheck(site, { lonlat: t.lonlat, name: t.label }, c), quote: c.quote, target: c.against, ...(c.carried ? { carried_over: true } : {}) }); }
         catch { checks.push({ against: c.against, expected_km: c.expected_km, pass: null, why: "not a candidate id, so not checked" }); }
       }
       // Built on a place already on the map: it starts from that place's confidence (a person's drawing counts as high),
@@ -444,12 +471,31 @@ export function createPlaceTools(host) {
         anchor: a.cand ? { name: a.cand.name, type: a.cand.type, source: a.cand.source, lonlat: a.cand.lonlat, extra: a.cand.extra } : { place: a.label },
         at: new Date().toISOString(),
       };
+      // Replacing: the old proposal goes first, so the new one can take its name.
+      // Replacing: add the new place first (so a failure leaves the old one), then remove the old one and let the new
+      // one take its name unless a new name was given.
       const p = host.addPlace({ feature: f, origin, scale: i.scale, name: placeName(i, a, f), given: i.name ? String(i.name).replace(/\s+/g, " ").trim() : null });
-      return { ...(await placeSummary(p)), how: steps.join(", then "), confidence: rated.confidence, why: rated.rules,
+      if (old && host.removePlace) {
+        const oldName = old.name;
+        host.removePlace(oldName, { by: "analyst", reason: "replaced by a rebuilt place" });
+        if (!i.name && p.name !== oldName) host.renamePlace?.(p.name, oldName);
+      }
+      return { ...(await placeSummary(p)), ...(old ? { replaced: old.name } : {}), how: steps.join(", then "), confidence: rated.confidence, why: rated.rules,
         ...(checks.length ? { checks } : {}),
         next: rated.confidence === "low" && checks.some((c) => c.pass === false)
           ? "Shown as a proposal, low confidence because a check failed. Say which, and look for a feature that fits all the clues (find_features_near) before asking the person."
           : "Shown on the map as a proposal. Report the confidence as given here, and ask the person if it's what they meant." };
+    },
+
+    async remove_place({ place, reason }) {
+      const p = host.findPlace(place);
+      if (!p) throw new Error(`No place called "${place}".`);
+      if (!host.removePlace) return { not_available: "Places can't be removed here." };
+      const own = p.origin?.method === "words" && p.status === "proposed";
+      const asked = /\b(remove|delete|get rid of|bin|clear|drop|take away|lose)\b/i.test(host.lastPersonText?.() || "");
+      if (!own && !asked) throw new Error(`"${p.name}" was drawn or accepted by the person; remove it only when they ask in their latest message.`);
+      host.removePlace(p.name, { by: "analyst", reason });
+      return { removed: p.name, places_left: host.places().map((x) => x.name) };
     },
 
     async offer_choices({ candidates, recommended, reason, question }) {

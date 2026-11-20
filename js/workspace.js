@@ -488,19 +488,20 @@ function onSelect(id) {
   document.querySelector('.tools [data-action="delete"]').disabled = !selectedId;
 }
 
-function onDeleted(id) {
+function onDeleted(id, by = null) {
   const p = places.get(id);
   if (!p) return;
   if (adjustingId === id) { adjustingId = null; p.card.querySelector(".adjust").hidden = true; }
   p.card.classList.add("gone");
   p.card.classList.remove("active");
-  p.card.querySelector(".summary").textContent = "Deleted.";
+  p.card.querySelector(".summary").textContent = by ? `Removed by the analyst${by.reason ? `: ${by.reason}` : ""}.` : "Deleted.";
   places.delete(id);
   paintChips();
-  remember("user", `(I deleted ${p.name}.)`);
+  if (by) logEdit(p, `removed by the analyst: ${by.reason || "no reason given"}`);
+  remember(by ? "assistant" : "user", by ? `(I removed ${p.name}: ${by.reason || ""})` : `(I deleted ${p.name}.)`);
   if (selectedId === id) onSelect(null);
 }
-function removePlace(id) { draw.removeFeatures([id]); onDeleted(id); scheduleRefresh(); }
+function removePlace(id, by = null) { onDeleted(id, by); draw.removeFeatures([id]); scheduleRefresh(); }
 
 // Editing from the card or the analyst goes through the same deterministic functions.
 function applyGeometry(p, raw, words) {
@@ -568,6 +569,12 @@ const host = {
       if (pendingReply?.isConnected) $("conversation").insertBefore(p.card, pendingReply);
     }
   },
+  removePlace(name, by) {
+    const p = placeByName(name);
+    if (p) removePlace(p.id, by || { by: "analyst" });
+  },
+  personSaid: () => said.join("\n"),
+  lastPersonText: () => said.at(-1) || "",
   renamePlace(name, to) {
     const p = placeByName(name);
     if (!p) return;
@@ -1161,9 +1168,12 @@ function downloadLog() {
 }
 
 // `forModel` is what the analyst reads when it needs more than the person sees (a picked candidate's id).
+// Everything the person has typed or said in this project: distance checks must quote it (js/placetools.js).
+const said = [];
 async function send(text, forModel = text) {
   if (!text || busy || !draw) return;
   busy = true;
+  said.push(text);
   $("ask").classList.add("busy");
   $("conversation").append(el("div", text, "msg user"));
   say.value = ""; grow();
@@ -1237,13 +1247,14 @@ function traceLine(ev) {
     case "load_skill": return `Loaded the ${i.name} skill`;
     case "find_place": return `Searched for “${i.query}”: ${o.candidates?.length || 0} found${o.candidates?.length ? ` (${o.candidates.slice(0, 3).map((c) => `${c.name}, ${c.source.split(" – ")[0]}`).join("; ")})` : ""}`;
     case "find_features_near": return `Looked for ${i.feature_type} within ${i.radius_km} km of ${o.anchor}: ${o.found} found${o.not_listed ? ` (nearest ${o.listed} listed)` : ""}`;
-    case "make_place": return `Built ${o.place}: ${o.how}`;
+    case "make_place": return `Built ${o.place}${o.replaced ? ` (replacing the earlier proposal)` : ""}: ${o.how}`;
     case "edit_place": return `Changed ${o.place}: ${o.changed}`;
     case "get_place": return `Read ${i.place}`;
     case "find_data": return `Searched the catalogue for “${i.text}”: ${o.datasets?.length || 0} datasets${o.not_checked ? " (catalogue not checked)" : ""}`;
     case "get_data": return o.not_checked ? `Fetched ${o.dataset || i.dataset}: not checked (${String(o.not_checked).slice(0, 80)})` : `Fetched ${o.dataset} (${o.publisher}): ${o.within_distance} within ${o.within_km} km`;
     case "screen_site": return o.run ? `Screened ${o.site} (${o.run}): ${o.flags} flags; ${o.distances}` : `Screening: ${o.not_available || "no result"}`;
     case "get_run": return `Read the screen ${o.run || ""}`;
+    case "remove_place": return `Removed ${o.removed}`;
     case "get_elevation": return o.not_checked ? `Elevation: not checked (${String(o.not_checked).slice(0, 80)})` : o.water_depth_m?.typical != null ? `Water depth about ${o.water_depth_m.typical} m (${o.dataset})` : `Elevation about ${o.elevation_m?.typical} m (${o.dataset})`;
     case "sea_values": return [...(o.lines || []), ...(o.not_found || [])].join(" ") || "Read water depth and vessel traffic: nothing returned";
     default: return ev.name;
