@@ -62,7 +62,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   let [sk, tfm] = await ask("Which transformation should I use from British National Grid at Linlithgow?");
   check((sk?.method || "").length > 5000 && /Choosing a transformation/i.test(sk.method), `${label}: the coordinate-reference skill loads with its method`);
   check(toolNames.includes("crs_lookup") && toolNames.includes("transformation_options"), `${label}: the analyst has crs_lookup and transformation_options`);
-  check(tfm?.chosen === 1314 && tfm?.recommended === 5339 && tfm?.ask === false, `${label}: "choose" picks 1314 at Linlithgow (5339 recommended, needs a grid)`);
+  check(tfm?.chosen === 1314 && tfm?.recommended === 7710 && tfm?.ask === false, `${label}: "choose" picks 1314 at Linlithgow (7710 recommended, needs a grid)`);
 
   await page.click("#gear");
   await page.check('input[name="tfm"][value="ask"]');
@@ -70,7 +70,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   check(saved === "ask", `${label}: "Ask me" is saved`);
   await page.keyboard.press("Escape");
   [, tfm] = await ask("And again, please?");
-  check(tfm?.chosen === null && tfm?.ask === true && tfm?.options?.length === 4, `${label}: "ask" offers 4 options and chooses none`);
+  check(tfm?.chosen === null && tfm?.ask === true && tfm?.options?.length === 5, `${label}: "ask" offers 5 options and chooses none`);
 
   await page.click("#gear");
   await page.check('input[name="tfm"][value="choose"]');

@@ -24,15 +24,18 @@ await t("geometry helpers: point in polygon with holes; boxes across the antimer
 
 await t("Linlithgow: ranked by accuracy, not by smallest area; Scotland (18 m) comes after 1314 (2 m)", async () => {
   const r = await tools().transformation_options({ source: "27700", target: "4326", at: LINLITHGOW });
+  assert.equal(r.listed, 7, "one search, no duplicates");
   assert.equal(r.source.given, 27700);
   assert.equal(r.source.base, 4277);
-  assert.deepEqual(r.options.map((o) => o.code), [5339, 1314, 1198, 1197]);
-  assert.equal(r.recommended, 5339);
+  assert.deepEqual(r.options.map((o) => o.code), [7710, 5339, 1314, 1198, 1197], "each once; superseded 5339 after 7710");
+  assert.equal(r.recommended, 7710);
+  assert.equal(r.options[1].superseded_by.code, 7710);
   assert.equal(r.chosen, 1314, "the best one that can be applied in the page");
   assert.equal(r.ask, false);
   assert.match(r.why, /needs a grid file/);
   assert.equal(r.options[0].can_apply, false);
   assert.match(r.options[0].grid_file, /OSTN15/);
+  assert.equal(r.options.some((o) => o.reversed), false);
   assert.ok(r.not_covering.some((x) => /England/.test(x)), "England's transformation is outside Scotland's outline");
   assert.equal(r.deprecated_dropped, 1);
   assert.equal(r.outlines_checked > 0, true);
@@ -41,7 +44,7 @@ await t("Linlithgow: ranked by accuracy, not by smallest area; Scotland (18 m) c
 
 await t("London: England's (10 m) covers, Scotland's doesn't; 1314 still chosen", async () => {
   const r = await tools().transformation_options({ source: "EPSG:4277", at: LONDON });
-  assert.deepEqual(r.options.map((o) => o.code), [5339, 1314, 1196]);
+  assert.deepEqual(r.options.map((o) => o.code), [7710, 5339, 1314, 1196]);
   assert.equal(r.chosen, 1314);
   assert.ok(!r.options.some((o) => o.code === 1198));
 });
@@ -57,7 +60,7 @@ await t("'Ask me' offers the options and chooses nothing", async () => {
   assert.equal(r.chosen, null);
   assert.equal(r.ask, true);
   assert.equal(r.setting, "ask");
-  assert.equal(r.recommended, 5339);
+  assert.equal(r.recommended, 7710);
 });
 
 await t("'Choose for me' still asks when the best that can be applied is worse than 25 m", async () => {

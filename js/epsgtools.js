@@ -30,7 +30,7 @@ export const EPSG_TOOL_DEFS = [
       properties: {
         source: { type: "string", description: "EPSG code of the CRS the data is in, e.g. '27700' or '4230'" },
         target: { type: "string", description: "EPSG code to change to; usually '4326' (WGS 84)" },
-        at: { type: "string", description: "Where: a candidate id, a place name, or coordinates (read like typed coordinates)" },
+        at: { type: "string", description: "Where: a candidate id or place from this conversation, or coordinates (read like typed coordinates). For a town or area not yet found, call find_place first and pass its candidate id." },
       },
       required: ["source", "at"],
     },
@@ -73,12 +73,13 @@ const boxArea = (e) => {
 };
 const boxOf = (e) => [e.BoundingBoxWestBoundLongitude, e.BoundingBoxSouthBoundLatitude, e.BoundingBoxEastBoundLongitude, e.BoundingBoxNorthBoundLatitude];
 
-// Rank: contains the place, then best stated accuracy (unknown last), then the smaller area, then the higher code
-// (newer records). Exported for tests.
+// Rank: contains the place, then best stated accuracy (unknown last), then current before superseded, then the
+// smaller area, then the higher code (newer records). Exported for tests.
 export function rankOptions(opts) {
   return [...opts].sort((a, b) =>
     (b.contains === true) - (a.contains === true)
     || (a.accuracy_m ?? Infinity) - (b.accuracy_m ?? Infinity)
+    || !!a.superseded_by - !!b.superseded_by
     || (a._area ?? Infinity) - (b._area ?? Infinity)
     || b.code - a.code);
 }
@@ -178,12 +179,10 @@ export function createEpsgTools(host, locate) {
       src = resolved.source.base; tgt = resolved.target.base;
       if (src === tgt) return { source: resolved.source, target: resolved.target, same_base: true, note: "Same geographic CRS: only a conversion (projection) is needed, no datum transformation and no loss of accuracy." };
 
-      // EPSG stores each transformation one way round; most are reversible, so look both ways.
-      const [fwd, rev] = await Promise.all([
-        get("Transformation/crs", { sourceCRSCode: src, targetCRSCode: tgt }).catch(() => ({ Results: [] })),
-        get("Transformation/crs", { sourceCRSCode: tgt, targetCRSCode: src }).catch(() => ({ Results: [] })),
-      ]);
-      const listed = [...(fwd.Results || []).map((r) => ({ ...r, reversed: false })), ...(rev.Results || []).map((r) => ({ ...r, reversed: true }))];
+      // EPSG's search finds transformations between the two CRSs whichever way round they're stored, so one search
+      // does; each record's own source CRS says which way it runs (most are reversible).
+      const found = await get("Transformation/crs", { sourceCRSCode: src, targetCRSCode: tgt }).catch(() => ({ Results: [] }));
+      const listed = [...new Map((found.Results || []).map((r) => [r.Code, r])).values()];
       const live = listed.filter((r) => !r.Deprecated);
       const dropped = listed.length - live.length;
       if (!live.length) return { source: resolved.source, target: resolved.target, at: lonlat, options: [], ...decide([], host.transformationChoice?.() || "choose"), deprecated_dropped: dropped };
@@ -203,7 +202,8 @@ export function createEpsgTools(host, locate) {
           method: d.Method?.Name, method_code: d.Method?.Code,
           can_apply: !grid && APPLY_IN_PAGE.has(d.Method?.Code),
           ...(grid ? { grid_file: (d.ParameterValues || []).find((p) => p.ParamValueFileRef)?.ParamValueFileRef } : {}),
-          reversed: live[i].reversed,
+          reversed: d.SourceCrs?.Code != null ? d.SourceCrs.Code !== src : false,
+          ...(d.Supersessions?.[0]?.SupersededBy ? { superseded_by: { code: d.Supersessions[0].SupersededBy.Code, name: d.Supersessions[0].SupersededBy.Name, year: d.Supersessions[0].Year ?? null } } : {}),
           area: u ? u.e.Name : null, area_description: u ? u.e.Description : null, area_bbox: u ? boxOf(u.e) : null,
           scope: u?.scope || null,
           contains: hit.length ? "box" : false,

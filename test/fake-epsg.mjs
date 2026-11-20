@@ -21,6 +21,7 @@ export const TF = {
   1198: tf(1198, "OSGB36 to WGS 84 (4)", 18, 2397, { method: 9603 }),
   5339: tf(5339, "OSGB36 to WGS 84 (7)", 1, 1264, { method: 9615, grid: true }),
   1197: tf(1197, "OSGB36 to WGS 84 (3)", 21, 2397, { method: 9603 }),
+  7710: tf(7710, "OSGB36 to WGS 84 (9)", 1, 4390, { method: 9615, grid: true }),
 };
 const CRS = {
   27700: { Kind: "projected", Name: "OSGB36 / British National Grid" },
@@ -31,6 +32,7 @@ const CRS = {
   4135: { Kind: "geographic 2D", Name: "Old Hawaiian", Deprecations: [{ Reason: "test", Replacement: { Code: 4136, Name: "New" } }] },
 };
 export const calls = [];
+TF[5339].Supersessions = [{ SupersededBy: { Code: 7710, Name: "OSGB36 to WGS 84 (9)" }, Year: 2016 }];
 export function fakeEpsg(tfs = TF) {
   return async ({ path, query }) => {
     calls.push(path);
@@ -40,7 +42,8 @@ export function fakeEpsg(tfs = TF) {
     if ((m = path.match(/^GeodeticCoordRefSystem\/(\d+)$/))) return +m[1] === 4326 ? { DatumEnsemble: { Code: 6326, Name: "World Geodetic System 1984 ensemble" } } : { Datum: { Code: 6277, Name: "Ordnance Survey of Great Britain 1936" } };
     if (path === "CoordRefSystem") return { Results: [{ Code: 4230, Name: "ED50", Type: "geographic 2D", Area: "Europe", Deprecated: false }] };
     if (path === "Transformation/crs") {
-      if (query.sourceCRSCode === 4277 && query.targetCRSCode === 4326)
+      const pair = [query.sourceCRSCode, query.targetCRSCode].sort().join();
+      if (pair === "4277,4326")
         return { Results: [...Object.values(tfs).map((x) => ({ Code: x.Code, Name: x.Name, Deprecated: false })), { Code: 1195, Name: "OSGB36 to WGS 84 (1)", Deprecated: true }] };
       return { Results: [] };
     }
