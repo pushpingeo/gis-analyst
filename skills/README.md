@@ -28,3 +28,6 @@ Rules:
 Shared operations (any skill may use them; each skill's `operations.md` describes the ones it relies on):
 - **Elevation over a place** (`get_elevation`, 20 Nov 2026): metres, positive up, relative to sea level, whatever
   sign the source uses; water depth at sea is -elevation. Slope will join it as a grid when area discounting needs it.
+- **Coordinate reference** (`coordinate-reference/`, 20 Nov 2026): reading coordinates, choosing a CRS for each job,
+  choosing a transformation by the site's position and its stated accuracy (asked or chosen by a setting), and
+  recording it. Its `datums.md` is generated from the EPSG dataset by `scripts/build-datums.py`.
