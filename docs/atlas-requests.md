@@ -4,6 +4,14 @@ Tobler and the atlas are worked on in separate chats (decided 17 Nov). Tobler do
 What Tobler can rely on is written down in the atlas repo's `docs/mcp-tools.md`. When Tobler needs something
 new from the atlas, add it here (newest first), tell Rob, and he passes it to the atlas chat.
 
+- **20 Nov: a higher-resolution land elevation model (Rob is asking).** Tobler's land elevation today is ETOPO 2022 at
+  15 arc-seconds (about 460 m) through NOAA's DEM Global Mosaic: fine for altitude and "low-lying", too coarse for slope
+  (area discounting) or flood work. What Tobler needs is a service that returns **values**, not pictures (the `sample`
+  capability in the request below): Copernicus GLO-30 (open, commercial use with attribution) or national lidar, as an
+  ImageServer with identify/getSamples, a WCS, or Cloud-Optimised GeoTIFFs a browser can read (CORS). Note: the
+  Copernicus GLO-30 COGs on AWS (`copernicus-dem-30m.s3.amazonaws.com`) send no CORS header (checked 20 Nov), so Tobler
+  would read them through its Worker; a record saying so is still useful.
+
 - **19 Nov (evening): water depth and AIS traffic as values, GEBCO first.** Rob asked for water depth (what's possible
   and what it costs changes with depth) and shipping lanes from historic AIS in offshore screens. What the atlas holds,
   checked from Tobler on 19 Nov: GEBCO only as WMS pictures (`5a361dd45cf15884`, `ed24a2a84f7c4236`, the GEBCO_2020

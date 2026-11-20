@@ -502,3 +502,33 @@ Judgement calls made while building, newest first. Bigger product decisions live
 - Tested: `npm test` (new `test/elevation.test.mjs`: signs, units, a depth-positive source, sea points only for depth,
   fallbacks, significance, the tool at sea, high and mixed; a new ntrrun test: recorded always, reported only when
   significant, failure said, tracing), `browser-run-card.mjs` 79/79, `browser-choice.mjs`.
+
+## 20 Nov (morning): from Rob's Ben Nevis log — tidy places, grounded checks, upland band, UK area
+- **Upland band (Rob):** 1,000 m or more is "upland" (exposed weather, snow and ice, harder access, shorter working
+  seasons), below high altitude (2,500 m). Same rule as the others: shown on land only when it applies; a flag only
+  where it bears on the asset. NTR skill 3.7-draft. Ben Nevis SAC (sampled 149–1,068 m) now reads "upland".
+- **The analyst can remove places (`remove_place`) and replace its own proposals (`make_place` `replaces`).** In the
+  log it built "Ben Nevis", then "Ben Nevis (2)", and asked Rob to delete the first. Now a rebuild replaces the
+  proposal (added first, then the old one removed, and the new one takes its name). `remove_place` removes a place when
+  the person's latest message asks to remove or delete, or a proposal of the analyst's own; places the person drew or
+  accepted can't be removed unasked (the tool refuses and says why). The card says "Removed by the analyst: <reason>",
+  and the conversation records it as the analyst's act, not the person's.
+- **Distance checks must quote the person (`quote`).** The duplicate came from an invented check ("4 km NE of the
+  distillery"; Rob gave no distance), which failed and was then dropped by rebuilding. `make_place` now leaves out any
+  check whose quote isn't in what the person typed or said (`host.personSaid`), so it can't sink or lift the
+  confidence. Hosts that don't record the person's words (older scripts) measure checks as before; the place-finding
+  evaluation now passes the case's description as the person's words.
+- **Failed checks aren't carried over; dropping one is visible.** First version carried a replaced place's checks
+  over. The replay showed why that's wrong: "sorry, I meant north-west" carried the person's old north-east clue onto
+  the rebuilt square, it failed, and the analyst removed the square to escape it. Now a rebuild lists
+  `failed_checks_left_out` (with "tell the person unless they corrected the clue; never drop one to raise the
+  confidence"), and the conversation prompt says not to remove a place to get round its checks.
+- **"United Kingdom" is the UK, not its 18 territories.** The catalogue's country match also took the sovereign state,
+  so the area was every UK territory and the label the first of them (Dhekelia). Now the country's own name or ISO
+  code first, its sovereign's territories only when nothing has that name.
+- Place-finding skill 4.13 (quotes, `replaces`, `remove_place`); `operations.md` updated.
+- Tested: `npm test` (new place tests: grounding, replace, listed failed checks, removal rules, the UK area;
+  upland in the elevation tests), `browser-choice.mjs` 8/8 (new: own proposal removed with its reason on the card, an
+  accepted place refused unasked and removed when asked), `browser-run-card.mjs` 79/79; replays on a branch with Haiku:
+  Rob's Ben Nevis conversation (no duplicates; SAC found with "United Kingdom and its waters"; upland), and
+  "10 km NE of Linlithgow Palace → sorry, I meant NW" (one square at the end, replacing the first).
