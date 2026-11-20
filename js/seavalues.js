@@ -1,6 +1,5 @@
 // Values read off rasters at sea, done in code as part of a screen's baseline (not left to the analyst's searches):
-// - water depth over the site, from NOAA NCEI's DEM Global Mosaic (an ImageServer that returns pixel values;
-//   GEBCO-based in deep water, finer national surveys where NOAA holds them). One getSamples call for up to 25 points.
+// - water depth over the site: the shared elevation tool (js/elevation.js) shown as depth (depth = -elevation).
 // - vessel traffic from AIS, from EMODnet Human Activities' vessel density (hours per km² a month, 1 km cells, EU waters
 //   and neighbours), read with WMS GetFeatureInfo: at the site, and on two rings out to the close band, so a lane
 //   just off the site still shows. 2023 is asked for explicitly: EMODnet's default year, 2024, lost satellite AIS data
@@ -9,80 +8,22 @@
 // "values". A failed call is "not checked"; no data in coverage is "no data here", never zero.
 import * as turf from "./vendor/turf.js";
 import { geometryDistanceKm } from "./datatools.js";
+import { samplePoints, elevationFrom, depthFrom } from "./elevation.js";
 
 const r1 = (v) => Math.round(v * 10) / 10;
 const r2 = (v) => Math.round(v * 100) / 100;
-
-// Up to n points spread over a feature: the point itself; points evenly along a line; the centre plus a grid inside a polygon.
-export function samplePoints(feature, n = 25) {
-  const g = feature.geometry;
-  if (g.type === "Point") return [g.coordinates];
-  if (/LineString/.test(g.type)) {
-    const lines = g.type === "LineString" ? [g.coordinates] : g.coordinates;
-    const segs = [];
-    let total = 0;
-    for (const line of lines) for (let i = 1; i < line.length; i++) {
-      const km = turf.distance(line[i - 1], line[i]);
-      segs.push({ a: line[i - 1], b: line[i], start: total, km });
-      total += km;
-    }
-    if (!segs.length || total === 0) return [lines[0][0]];
-    const pts = [];
-    for (let k = 0; k < n; k++) {
-      const at = (total * k) / (n - 1);
-      const s = segs.find((x) => at <= x.start + x.km) || segs.at(-1);
-      const f = s.km ? Math.min(1, (at - s.start) / s.km) : 0;
-      pts.push([s.a[0] + (s.b[0] - s.a[0]) * f, s.a[1] + (s.b[1] - s.a[1]) * f]);
-    }
-    return pts;
-  }
-  const inside = (p) => { try { return turf.booleanPointInPolygon(p, feature); } catch { return false; } };
-  const pts = [turf.pointOnFeature(feature).geometry.coordinates];
-  const [w, s, e, nn] = turf.bbox(feature);
-  // A finer grid until enough points fall inside (thin or odd shapes), capped.
-  for (const k of [5, 7, 10, 14]) {
-    const grid = [];
-    for (let i = 0; i < k; i++) for (let j = 0; j < k; j++) {
-      const p = [w + ((i + 0.5) * (e - w)) / k, s + ((j + 0.5) * (nn - s)) / k];
-      if (inside(p)) grid.push(p);
-    }
-    if (grid.length >= Math.min(n - 1, 12) || k === 14) {
-      const step = Math.max(1, Math.ceil(grid.length / (n - 1)));
-      for (let i = 0; i < grid.length && pts.length < n; i += step) pts.push(grid[i]);
-      break;
-    }
-  }
-  return pts;
-}
-
-const median = (xs) => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const withTimeout = (ms) => (typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined);
 
-// Water depth over the footprint. Returns { depth, checked } (depth null when not checked or no sea).
-export async function waterDepth({ site, source, fetchFn = globalThis.fetch, timeoutMs = 12000, now = () => new Date().toISOString() }) {
-  const pts = samplePoints(site, 25);
-  const base = { evidence: "water depth", dataset: source.title, publisher: source.publisher, licence: source.licence, checked_at: now() };
-  try {
-    const geometry = JSON.stringify({ points: pts.map((p) => [r2(p[0] * 1000) / 1000, r2(p[1] * 1000) / 1000]), spatialReference: { wkid: 4326 } });
-    const url = `${source.url}/getSamples?geometry=${encodeURIComponent(geometry)}&geometryType=esriGeometryMultipoint&returnFirstValueOnly=true&f=json`;
-    const res = await fetchFn(url, { signal: withTimeout(timeoutMs) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const j = await res.json();
-    if (j.error) throw new Error(j.error.message || "service error");
-    const vals = (j.samples || []).map((s) => parseFloat(s.value)).filter((v) => Number.isFinite(v) && v > -12000 && v < 9000);
-    if (!vals.length) return { depth: null, checked: { ...base, result: "none in dataset", why: "no values returned for the site" } };
-    const sea = vals.filter((v) => v < 0).map((v) => -v);
-    const resM = (j.samples || []).map((s) => +s.resolution).find((x) => x > 0);
-    const depth = {
-      points: vals.length, sea_points: sea.length, land_points: vals.length - sea.length,
-      typical_m: sea.length ? Math.round(median(sea)) : null, min_m: sea.length ? Math.round(Math.min(...sea)) : null, max_m: sea.length ? Math.round(Math.max(...sea)) : null,
-      cell_m: resM ? Math.round(resM * 111320) : null,
-      dataset: source.title, publisher: source.publisher, licence: source.licence, attribution: source.attribution, checked_at: base.checked_at,
-    };
-    return { depth, checked: { ...base, result: sea.length ? "features" : "none in dataset", count: sea.length, ...(sea.length ? {} : { why: "the site is above sea level in this model" }) } };
-  } catch (e) {
-    return { depth: null, checked: { ...base, result: "not checked", why: String(e.message || e).slice(0, 160) } };
-  }
+export { samplePoints };
+
+// Water depth over the footprint, from the shared elevation tool (js/elevation.js: elevation positive up, whatever
+// the source's own sign; depth = -elevation). Returns { depth, checked } (depth null when not checked or no sea).
+export async function waterDepth({ site, sources, fetchFn = globalThis.fetch, now = () => new Date().toISOString() }) {
+  const { elevation, checked } = await elevationFrom(sources, { feature: site, fetchFn, now });
+  const c = { ...checked, evidence: "water depth" };
+  if (!elevation) return { depth: null, checked: c };
+  if (!elevation.below_sea_level_points) return { depth: null, elevation, checked: { ...c, result: "none in dataset", why: "the site is above sea level in this model" } };
+  return { depth: depthFrom(elevation), elevation, checked: c };
 }
 
 // Rough reading of EMODnet density (hours per km² a month), from sampled places (central North Sea under 0.1; Dover

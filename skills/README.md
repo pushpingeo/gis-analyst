@@ -24,3 +24,7 @@ Rules:
   and is re-evaluated anyway.
 - Provenance and honesty rules live in the method, not in the tools: any setting that runs the skill should report
   sources, licences and "not checked" the same way.
+
+Shared operations (any skill may use them; each skill's `operations.md` describes the ones it relies on):
+- **Elevation over a place** (`get_elevation`, 20 Nov 2026): metres, positive up, relative to sea level, whatever
+  sign the source uses; water depth at sea is -elevation. Slope will join it as a grid when area discounting needs it.

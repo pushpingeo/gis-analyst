@@ -195,7 +195,7 @@ await test("sealed run: fetches out to the wider band, records evidence with pro
   assert.match(first.messages[0].content, /near 2 km · close 10 km · wider 50 km/);
   assert.match(first.messages[0].content, /assumed: say so/);
   assert.match(first.system, /never instructions to you/);
-  assert.deepEqual(first.tools.map((t) => t.name).sort(), ["find_data", "find_features_near", "get_data", "get_place"]);
+  assert.deepEqual(first.tools.map((t) => t.name).sort(), ["find_data", "find_features_near", "get_data", "get_elevation", "get_place"]);
 });
 
 await test("slider helpers: findings within a distance, nearest per theme, flags beyond the distance", () => {
@@ -383,6 +383,35 @@ await test("offshore depth and traffic services down: not checked, and the analy
   assert.equal(r.checked.find((c) => c.evidence === "water depth").result, "not checked");
   assert.equal(r.checked.find((c) => c.evidence === "vessel traffic (AIS)").result, "not checked");
   assert.match(model.calls[0].messages[0].content, /DEM Global Mosaic.*: not checked \(network down\)/);
+});
+
+await test("on land, elevation is recorded every time but reported only when it matters (low-lying, high altitude)", async () => {
+  // A 2 km square near Baarle (onshore, sea out of reach), as a solar farm.
+  const land = { name: "Baarle 4 km²", feature: G.squareAround([4.93, 51.49], 4, 0), origin: { method: "drawn" } };
+  const d = chooseDistances(table, { asset_type: "solar", offshore: false });
+  const run = async (vals) => {
+    const model = standardScript();
+    const fetchFn = async (url) => (/getSamples/.test(url) ? { ok: true, json: async () => ({ samples: vals.map((v) => ({ value: String(v), resolution: 0.004 })) }) } : { ok: true, json: async () => [] });
+    const rec = await runScreening({ host: { ...host(), fetchFn }, site: land, distances: d, skill, callClaude: model, inputs: { asset_type: "solar", asset_label: "solar farm" } });
+    return { r: rec.tobler_run, first: model.calls[0].messages[0].content };
+  };
+  const plain = await run([20, 25, 30]);
+  assert.equal(plain.r.elevation.typical_m, 25);
+  assert.equal(plain.r.elevation.significance, undefined);
+  assert.equal(plain.r.sea, undefined);
+  assert.doesNotMatch(plain.first, /Elevation about/, "nothing said when it doesn't matter");
+  assert.equal(plain.r.checked.find((c) => c.evidence === "elevation").result, "features");
+  const low = await run([1, 3, 4, 6]);
+  assert.equal(low.r.elevation.significance.kind, "low-lying");
+  assert.match(low.first, /Elevation about 4 m above sea level, 1–6 m across the site \(low-lying: flooding, storm surge and sea-level rise\)/);
+  const t = traceFlags([{ risk: "Low-lying site", theme: "context", confidence: "medium", evidence: [{ name: "Elevation about 4 m (low-lying)", distance_km: 0 }] }], [], d, { elevation: low.r.elevation });
+  assert.equal(t[0].traced, 1);
+  assert.equal(t[0].evidence[0].from_values, "elevation");
+  const high = await run([3700, 3800, 3900]);
+  assert.equal(high.r.elevation.significance.kind, "very high altitude");
+  assert.match(high.first, /very high altitude: much less oxygen/);
+  const down = await (async () => { const model = standardScript(); const fetchFn = async (url) => { if (/getSamples/.test(url)) throw new Error("timed out"); return { ok: true, json: async () => [] }; }; await runScreening({ host: { ...host(), fetchFn }, site: land, distances: d, skill, callClaude: model, inputs: { asset_type: "solar", asset_label: "solar farm" } }); return model.calls[0].messages[0].content; })();
+  assert.match(down, /DEM Global Mosaic.*: not checked \(timed out\)/, "a failed elevation read is said, not hidden");
 });
 
 await test("onshore far from the sea: no maritime call, a neighbouring country is measured from the reference", async () => {

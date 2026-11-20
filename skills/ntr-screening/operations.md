@@ -26,13 +26,20 @@ geodesic and measured from the footprint edge.
   parks, power lines and pipelines near the site, from the catalogue and OpenStreetMap, with distance and bearing.
 - **Tobler:** `find_features_near`.
 
-## Read values at the site (at sea)
-- **Does:** reads numbers off published rasters over the footprint: water depth (metres below sea level: typical,
-  shallowest and deepest of the points sampled), and vessel traffic from AIS (hours per km² a month, by vessel type,
-  on the site and at points out to the close band). A service that fails is *not checked*; a place outside a
-  raster's coverage has *no data*, never zero.
-- **Tobler:** done in code before the analyst starts (`js/seavalues.js`; NOAA NCEI's DEM Global Mosaic for depth,
-  EMODnet's vessel density for traffic, both in `catalogue/trusted.json` "values"), and given in the baseline.
+## Elevation over a place (any skill)
+- **Does:** reads elevation over a point, line or area from published elevation models: typical, lowest and highest
+  of the points sampled, in **metres, positive up, relative to sea level** (land positive, seabed negative), whatever
+  sign the source uses (some publish depths as positive numbers: they're converted). At sea, water depth is
+  -elevation. Says the cell size and vertical datum. A service that fails is *not checked*, never zero.
+- **Tobler:** `get_elevation` (`js/elevation.js`; sources in `catalogue/trusted.json` "values" → "elevation", each
+  with its sign, units and datum). The screening baseline also runs it on every site: as water depth at sea, and on
+  land only reported when low-lying or at high altitude.
+
+## Vessel traffic at and around a site (at sea)
+- **Does:** reads AIS vessel density (hours per km² a month, by vessel type) on the site and at points out to the
+  close band. Outside the raster's coverage the answer is *no data*, never zero.
+- **Tobler:** done in code before the analyst starts (`js/seavalues.js`; EMODnet's vessel density, 2023, in
+  `catalogue/trusted.json` "values"), and given in the baseline.
 
 ## Failures, in any setting
 A source that fails or isn't reached is reported as *not checked*, never as *nothing found*. Say which.

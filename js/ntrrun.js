@@ -11,13 +11,14 @@ import { nearestBoundaries } from "./boundaries.js";
 import { DISCLAIMER } from "./disclaimer.js";
 import { aroundSiteKm2 } from "./datatools.js";
 import { waterDepth, vesselTraffic, seaLines } from "./seavalues.js";
+import { elevationFrom, elevationSignificance, elevationLine } from "./elevation.js";
 
 // The band for a piece of evidence: a wide area the site lies within is "around the site", not "on site".
 export const AROUND = "around the site";
 const bandOf = (p, d) => (p.surrounds ? AROUND : bandFor(p.distance_km, d));
 
 export const RUN_SCHEMA = "tobler-run/1";
-export const SCREEN_TOOLS = ["get_place", "find_data", "get_data", "find_features_near"];
+export const SCREEN_TOOLS = ["get_place", "find_data", "get_data", "find_features_near", "get_elevation"];
 const THEME_OF = { PS4: "community", PS5: "land", PS6: "biodiversity", PS7: "indigenous", PS8: "heritage", context: "context" };
 export const THEME_CODE = Object.fromEntries(Object.entries(THEME_OF).map(([k, v]) => [v, k]));
 const CONF_ORDER = { high: 0, medium: 1, low: 2 };
@@ -88,10 +89,12 @@ export function parseResult(text) {
 // Evidence the analyst takes from the values the run read at sea (water depth, AIS traffic) has no feature to match:
 // it traces to those values instead, when the run has them.
 const DEPTH_WORDS = /water depth|\bdepth\b|bathymetr|DEM Global Mosaic/i;
+const ELEV_WORDS = /elevation|altitude|above sea level|below sea level|low-lying|DEM Global Mosaic|ETOPO/i;
 const TRAFFIC_WORDS = /vessel|\bAIS\b|traffic|Vessel Density/i;
 function traceToSea(e, sea, d) {
   const text = `${e.name || ""} ${e.dataset || ""}`;
   const v = sea?.depth && DEPTH_WORDS.test(text) ? { src: sea.depth, km: 0, value: "water depth" }
+    : sea?.elevation && ELEV_WORDS.test(text) ? { src: sea.elevation, km: 0, value: "elevation" }
     : sea?.traffic && TRAFFIC_WORDS.test(text) ? { src: sea.traffic, km: e.distance_km > 0 ? sea.traffic.busiest.distance_km : 0, value: "vessel traffic" } : null;
   if (!v) return null;
   return { ...e, distance_km: v.km, band: v.km === 0 ? "on site" : bandFor(v.km, d), dataset: v.src.dataset, publisher: v.src.publisher, licence: v.src.licence, checked: v.src.checked_at, from_values: v.value, traced: true };
@@ -224,24 +227,32 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   const sb = turf.bbox(fp.feature);
   const layers = (host.trusted?.baseline || []).filter((b) => (b.setting !== "sea" || sea) && !(sb[2] < b.where[0] || sb[0] > b.where[2] || sb[3] < b.where[1] || sb[1] > b.where[3]));
   const before = checked.length;
-  // Values read off rasters at sea (catalogue/trusted.json "values"): water depth on an offshore site; AIS vessel
-  // traffic when the sea is within the close band. Alongside the baseline layers, in parallel.
+  // Values read off rasters (catalogue/trusted.json "values"): elevation over the footprint on every site (shown as
+  // water depth at sea; on land only when it matters: low-lying or high altitude); AIS vessel traffic when the sea is
+  // within the close band. Alongside the baseline layers, in parallel.
   const vals = host.trusted?.values || {};
-  const wantDepth = offshore && !!vals.depth;
+  const elevSources = vals.elevation || [];
+  const wantDepth = offshore && elevSources.length > 0;
+  const wantElev = !offshore && elevSources.length > 0;
   const wantTraffic = !inside && !!vals.traffic && (offshore || (describe.coast_km != null && describe.coast_km <= distances.close));
   const fetchFn = host.fetchFn || globalThis.fetch;
   const seaVals = {};
-  const seaJob = (wantDepth || wantTraffic) ? (async () => {
+  let elevation = null, elevSig = null;
+  const seaJob = (wantDepth || wantElev || wantTraffic) ? (async () => {
     const t0 = Date.now();
-    const [d, t] = await Promise.all([
-      wantDepth ? waterDepth({ site: fp.feature, source: vals.depth, fetchFn, now }) : null,
+    const [d, e, t] = await Promise.all([
+      wantDepth ? waterDepth({ site: fp.feature, sources: elevSources, fetchFn, now }) : null,
+      wantElev ? elevationFrom(elevSources, { feature: fp.feature, fetchFn, now }) : null,
       wantTraffic ? vesselTraffic({ site: fp.feature, closeKm: distances.close, source: vals.traffic, fetchFn, now }) : null,
     ]);
-    if (d) { checked.push(d.checked); if (d.depth) seaVals.depth = d.depth; }
+    if (d) { checked.push(d.checked); if (d.depth) seaVals.depth = d.depth; if (d.elevation) elevation = d.elevation; }
+    if (e) { checked.push(e.checked); if (e.elevation) { elevation = e.elevation; elevSig = elevationSignificance(elevation); } }
     if (t) { checked.push(t.checked); if (t.traffic) seaVals.traffic = t.traffic; capture(t.evidence, { theme: "community" }); }
-    const lines = seaLines(seaVals);
-    const notChecked = [d, t].filter((x) => x && x.checked.result !== "features").map((x) => `${x.checked.dataset}: ${x.checked.result}${x.checked.why ? ` (${x.checked.why})` : ""}`);
-    onEvent({ type: "tool", name: "sea_values", input: { depth: wantDepth, traffic: wantTraffic }, ms: Date.now() - t0, baseline: true, output: { lines, not_found: notChecked } });
+    const lines = [...(elevSig ? [elevationLine(elevation, elevSig)] : []), ...seaLines(seaVals)];
+    // Tell the analyst about depth or traffic that didn't come back; elevation on land only if it couldn't be checked.
+    const notChecked = [d, t, e && e.checked.result === "not checked" ? e : null].filter((x) => x && x.checked.result !== "features")
+      .map((x) => `${x.checked.dataset}: ${x.checked.result}${x.checked.why ? ` (${x.checked.why})` : ""}`);
+    onEvent({ type: "tool", name: "sea_values", input: { depth: wantDepth, elevation: wantElev, traffic: wantTraffic }, ms: Date.now() - t0, baseline: true, output: { lines, not_found: notChecked } });
     return { lines, notChecked };
   })() : null;
   onEvent({ type: "baseline", layers: layers.length + (seaJob ? 1 : 0) });
@@ -253,8 +264,8 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     try { const output = await exec("get_data", input); onEvent({ type: "tool", name: "get_data", input, output, ms: Date.now() - t0, baseline: true }); }
     catch (e) { onEvent({ type: "tool", name: "get_data", input, error: String(e.message || e), ms: Date.now() - t0, baseline: true }); }
   }));
-  const seaRes = seaJob ? await seaJob.catch((e) => ({ lines: [], notChecked: [`water depth and vessel traffic: not checked (${String(e.message || e).slice(0, 120)})`] })) : null;
-  for (const c of checked.slice(before)) if (!/^(water depth|vessel traffic)/.test(c.evidence)) baselineLines.push(summarise(c));
+  const seaRes = seaJob ? await seaJob.catch((e) => ({ lines: [], notChecked: [`elevation, water depth and vessel traffic: not checked (${String(e.message || e).slice(0, 120)})`] })) : null;
+  for (const c of checked.slice(before)) if (!/^(water depth|vessel traffic|elevation)/.test(c.evidence)) baselineLines.push(summarise(c));
   if (seaRes) for (const l of [...seaRes.lines, ...seaRes.notChecked.map((x) => `${x}.`)]) baselineLines.push(`- ${l}`);
   const baselineCalls = calls.length;
   const origin = site.origin?.method === "words"
@@ -293,7 +304,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     } catch (e) { debug.repair_error = String(e.message || e).slice(0, 300); }
     debug.raw_tail = String(res.text || "").slice(-1500);
   }
-  const flags = traceFlags(parsed.json?.flags, evidence, distances, seaVals);
+  const flags = traceFlags(parsed.json?.flags, evidence, distances, { ...seaVals, elevation });
   const siteFeature = { type: "Feature", geometry: fp.feature.geometry, properties: { role: "site", name: site.name, run: runId } };
   return {
     type: "FeatureCollection",
@@ -309,6 +320,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
         stage: inputs.stage || "greenfield (assumed)", capacity_mw: inputs.capacity_mw ?? null, tip_height_m: inputs.tip_height_m ?? null,
       },
       ...(Object.keys(seaVals).length ? { sea: seaVals } : {}),
+      ...(elevation ? { elevation: { ...elevation, ...(elevSig ? { significance: elevSig } : {}) } } : {}),
       extent: inside ? "inside" : "around", distances, fetched_to_km: reach, assessed_within_km: reach,
       method: inside
         ? "Inside the area only, at the person's request: features inside the area or touching its edge (distance 0), geodesic on WGS84; the surroundings weren't fetched. Coordinates WGS84 (EPSG:4326)."
@@ -371,7 +383,7 @@ export async function reassess({ record, km, skill, callClaude, now = () => new 
   const parsed = parseResult(text);
   if (!parsed.json) throw new Error("The re-assessment came back without a readable result. The earlier flags are unchanged.");
   run.assessments.push({ at: now(), within_km: run.assessed_within_km, flags: run.flags, summary: run.summary, distances: run.distances });
-  run.flags = traceFlags(parsed.json.flags, evidenceOf(record), d, run.sea);
+  run.flags = traceFlags(parsed.json.flags, evidenceOf(record), d, { ...(run.sea || {}), elevation: run.elevation });
   run.data_gaps = Array.isArray(parsed.json.data_gaps) ? parsed.json.data_gaps.map(String) : run.data_gaps;
   run.summary = parsed.summary;
   run.distances = d;
@@ -440,6 +452,7 @@ export function createScreening({ host, table, skill, callClaude, model = "", on
         checked: r.checked.map((c) => ({ dataset: c.dataset, publisher: c.publisher, result: c.result, ...(c.count ? { count: c.count } : {}), ...(c.why ? { why: c.why.slice(0, 160) } : {}) })),
         data_gaps: r.data_gaps,
         ...(r.sea ? { sea: seaLines(r.sea) } : {}),
+        ...(r.elevation ? { elevation: elevationLine(r.elevation, r.elevation.significance) } : {}),
       };
     },
   };

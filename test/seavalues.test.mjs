@@ -5,7 +5,7 @@ import * as turf from "../js/vendor/turf.js";
 import { samplePoints, waterDepth, vesselTraffic, seaLines, seaShort, trafficWord } from "../js/seavalues.js";
 
 const trusted = JSON.parse(readFileSync(new URL("../catalogue/trusted.json", import.meta.url), "utf8"));
-const { depth: DEPTH, traffic: TRAFFIC } = trusted.values;
+const { elevation: ELEV, traffic: TRAFFIC } = trusted.values;
 const json = (o) => ({ ok: true, status: 200, json: async () => o, text: async () => JSON.stringify(o) });
 
 // Sample points: a point is itself; a line spreads along it; a polygon gives its centre plus points inside.
@@ -23,7 +23,7 @@ assert.ok(pts.every((p) => turf.booleanPointInPolygon(p, box)));
 {
   let asked = "";
   const fetchFn = async (url) => { asked = url; return json({ samples: [-80, -90, -91, -95, -120, 3].map((v, i) => ({ locationId: i, value: String(v), resolution: 0.0041666 })) }); };
-  const { depth, checked } = await waterDepth({ site: box, source: DEPTH, fetchFn });
+  const { depth, checked } = await waterDepth({ site: box, sources: ELEV, fetchFn });
   assert.match(asked, /ImageServer\/getSamples\?geometry=/);
   assert.match(asked, /esriGeometryMultipoint/);
   assert.equal(depth.typical_m, 91);
@@ -32,15 +32,16 @@ assert.ok(pts.every((p) => turf.booleanPointInPolygon(p, box)));
   assert.equal(depth.land_points, 1);
   assert.equal(depth.cell_m, 464);
   assert.equal(checked.result, "features");
-  assert.equal(checked.publisher, DEPTH.publisher);
+  assert.equal(checked.publisher, ELEV[0].publisher);
+  assert.equal(checked.evidence, "water depth");
 }
 // Depth: a failed service is "not checked", never zero; dry land is "none".
 {
-  const r = await waterDepth({ site: box, source: DEPTH, fetchFn: async () => { throw new Error("timed out"); } });
+  const r = await waterDepth({ site: box, sources: ELEV, fetchFn: async () => { throw new Error("timed out"); } });
   assert.equal(r.depth, null);
   assert.equal(r.checked.result, "not checked");
   assert.match(r.checked.why, /timed out/);
-  const dry = await waterDepth({ site: box, source: DEPTH, fetchFn: async () => json({ samples: [{ value: "109" }] }) });
+  const dry = await waterDepth({ site: box, sources: ELEV, fetchFn: async () => json({ samples: [{ value: "109" }] }) });
   assert.equal(dry.checked.result, "none in dataset");
 }
 

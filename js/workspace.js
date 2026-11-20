@@ -19,6 +19,7 @@ import { getUserKey, setUserKey } from "./claude.js";
 import { distancesLine, bandFor } from "./distances.js";
 import { DISCLAIMER } from "./disclaimer.js";
 import { seaShort } from "./seavalues.js";
+import { elevationShort } from "./elevation.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
@@ -855,7 +856,9 @@ function showRun(record) {
   ].filter(Boolean).join(" · ");
   card.querySelector(".disclaimer").textContent = DISCLAIMER;
   // Water depth and vessel traffic, read in code for sites at sea (js/seavalues.js).
-  const seaText = seaShort(r.sea, { units: (km) => U.dist(km) });
+  // On land, elevation shows only when it matters (low-lying, high altitude); at sea it's the water depth.
+  const elevText = r.elevation?.significance && !r.sea?.depth ? elevationShort(r.elevation, r.elevation.significance) : "";
+  const seaText = [elevText, seaShort(r.sea, { units: (km) => U.dist(km) })].filter(Boolean).join(" ");
   if (seaText) { const p = card.querySelector(".sea"); p.hidden = false; p.textContent = seaText; }
   if (r.parse_error) { const pr = card.querySelector(".problem"); pr.hidden = false; pr.textContent = r.parse_error; }
   const slider = card.querySelector('input[type="range"]');
@@ -1241,6 +1244,7 @@ function traceLine(ev) {
     case "get_data": return o.not_checked ? `Fetched ${o.dataset || i.dataset}: not checked (${String(o.not_checked).slice(0, 80)})` : `Fetched ${o.dataset} (${o.publisher}): ${o.within_distance} within ${o.within_km} km`;
     case "screen_site": return o.run ? `Screened ${o.site} (${o.run}): ${o.flags} flags; ${o.distances}` : `Screening: ${o.not_available || "no result"}`;
     case "get_run": return `Read the screen ${o.run || ""}`;
+    case "get_elevation": return o.not_checked ? `Elevation: not checked (${String(o.not_checked).slice(0, 80)})` : o.water_depth_m?.typical != null ? `Water depth about ${o.water_depth_m.typical} m (${o.dataset})` : `Elevation about ${o.elevation_m?.typical} m (${o.dataset})`;
     case "sea_values": return [...(o.lines || []), ...(o.not_found || [])].join(" ") || "Read water depth and vessel traffic: nothing returned";
     default: return ev.name;
   }

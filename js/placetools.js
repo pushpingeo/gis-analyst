@@ -7,6 +7,7 @@ import * as R from "./reference.js";
 import { rateConfidence, runCheck, MATCHES } from "./confidence.js";
 import { atlasFindNamed, NAMED_KINDS, describeChecked } from "./atlasfeatures.js";
 import { DATA_TOOL_DEFS, createDataTools, geometryDistanceKm } from "./datatools.js";
+import { elevationFrom, elevationSignificance } from "./elevation.js";
 import { themeFor, THEME_IDS } from "./findings.js";
 import { ASSET_TYPES } from "./distances.js";
 import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES } from "./gazetteer.js";
@@ -134,6 +135,11 @@ export function placeToolDefs(skills) {
       input_schema: { type: "object", properties: { place: { type: "string" } }, required: ["place"] },
     },
     ...DATA_TOOL_DEFS,
+    {
+      name: "get_elevation",
+      description: "Elevation over a place or candidate, on land or at sea: typical, lowest and highest of up to 25 points sampled over it, in metres, positive up (land above sea level is positive, the seabed negative), from published elevation models. At sea it also gives the water depth (depth = -elevation). Use it when height or depth matters to the question (flooding, altitude, what can be built in that depth of water). Cells are a few hundred metres on land and in open ocean, so it's for screening, not design.",
+      input_schema: { type: "object", properties: { place: { type: "string", description: "Place name (e.g. Area 1) or candidate id" } }, required: ["place"] },
+    },
     {
       name: "screen_site",
       description: "Screen a place for non-technical risk (NTR: land and livelihoods, biodiversity, Indigenous Peoples, cultural heritage, community health and safety, operating context). Runs the NTR method as its own sealed run with the data tools, then shows a run card (flags first, evidence on the map, the distances used with a slider, gaps) and returns the headline. Use it for any request to screen a site or ask what risks, sensitivities or constraints it raises. The place must already exist (find or build it first). Distances come from the asset type and size unless the person gives their own. Takes 30 to 90 seconds.",
@@ -499,6 +505,23 @@ export function createPlaceTools(host) {
     return r.shown ? { ...r, note: "The map now shows these with the place in focus." } : { shown: 0, note: "Nothing to show: no findings with those ids are on the map." };
   };
   run.get_data = (i) => data.get_data(i);
+  // Elevation for any skill (js/elevation.js): positive up, whatever sign the source uses; depth shown at sea.
+  run.get_elevation = async ({ place }) => {
+    const r = resolve(place);
+    if (!r?.feature) throw new Error(`No place or candidate called "${place}".`);
+    const sources = host.trusted?.values?.elevation || [];
+    const { elevation, checked } = await elevationFrom(sources, { feature: r.feature, fetchFn: host.fetchFn || globalThis.fetch, ...(host.now ? { now: host.now } : {}) });
+    if (!elevation) return { not_checked: checked.why || checked.result, dataset: checked.dataset };
+    const sig = elevationSignificance(elevation);
+    const atSea = elevation.below_sea_level_points === elevation.points;
+    return {
+      place, elevation_m: { typical: elevation.typical_m, lowest: elevation.min_m, highest: elevation.max_m, convention: elevation.convention },
+      ...(elevation.below_sea_level_points ? { water_depth_m: atSea ? { typical: -elevation.below.typical_m, shallowest: -elevation.below.max_m, deepest: -elevation.below.min_m } : "part of the place is below sea level: it may be sea, or land below sea level (polders); check the coastline" } : {}),
+      ...(sig && !atSea ? { notable: sig.why } : {}),
+      points: elevation.points, cell_m: elevation.cell_m, vertical_datum: elevation.vertical_datum,
+      dataset: elevation.dataset, publisher: elevation.publisher, licence: elevation.licence, checked_at: elevation.checked_at,
+    };
+  };
   run.screen_site = async (i) => {
     if (!host.screening) return { not_available: "Screening isn't connected here." };
     const p = host.findPlace(i.place);
