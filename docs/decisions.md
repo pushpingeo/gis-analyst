@@ -775,3 +775,31 @@ Judgement calls made while building, newest first. Bigger product decisions live
   normally (not cut off) but its JSON couldn't be read, so the repair ran; its summary now matches its decision. The
   cause wasn't visible (the replay's debug line was cut), so `try-requests` now prints the reply's ending whenever a
   repair runs. If unreadable JSON recurs, consider a lenient parse (trailing commas, comments).
+
+## 20 Nov (night): datum transformations chosen from the EPSG registry, by where the site is (Rob: "yes please")
+- **Why:** the right transformation between two datums depends on where in its area of use you are (OSGB36 to
+  WGS 84: the Scotland transformation is 18 m, the national one 2 m, the grid-based ones 1 m). Picking from memory,
+  or by the smallest area, gets it wrong. Rob wanted it explicit, with the option to ask an informed user or to choose
+  quietly and accept the error.
+- **Source:** the EPSG Geodetic Parameter Dataset (IOGP), read live through a read-only Worker route `/epsg` (allowlisted
+  paths and query fields, cached a week, `EPSG_PER_VISITOR_DAILY` 1,000). The EPSG API has no CORS, so the page can't
+  call it directly. The workspace shell can't reach it; Rob's browser and the Worker can.
+- **Tools** (`js/epsgtools.js`): `crs_lookup` (code or words: kind, base CRS, datum, axes, area of use, deprecated
+  and replacement) and `transformation_options` (source, target, place).
+- **Choosing, in code:**
+  - One search; EPSG's search ignores direction, so each record's own source CRS says which way it runs.
+  - Drop deprecated records.
+  - Keep those whose area of use contains the site: bounding box first, then the outline polygon when more than one
+    box contains it (the Scotland and England boxes overlap at the border).
+  - Rank by stated accuracy, then current before superseded (5339 is superseded by 7710 since 2016), then smaller area.
+  - Grid-based transformations (OSTN15) are recommended but marked as not applicable in the page.
+- **Setting** (gear → Datum transformations): "Choose for me" (default) picks the best one that can be applied here and
+  records it; it still asks when that is worse than 25 m. "Ask me" offers the options, recommended first.
+- **Fix found on the way:** a loaded skill went to the model through the fence, which cuts every string to 200
+  characters, so on the turn a skill was first loaded the analyst saw only its opening lines (all skills, not just this
+  one). Skills are our own text and now go to the model whole (`resultFor` in `js/converse.js`).
+- **Tested:** 11 tool tests against a fake registry; Worker route tests; browser check (18, desktop and phone); live
+  route from asktobler.com; real-model replays (Linlithgow, Berwick, EPSG:23031, an ED50 well in the North Sea, and
+  "Ask me"). At Berwick the Scotland-only transformation was rightly left out; the ED50 well got EPSG:1311 (1 m).
+- **Not done:** a `transform` tool that applies the chosen transformation (the analyst says honestly it can't give the
+  exact shift yet); grid-based transformations in the page; checking EPSG's terms of use for commercial serving.
