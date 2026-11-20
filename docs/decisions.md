@@ -667,3 +667,32 @@ Judgement calls made while building, newest first. Bigger product decisions live
   decision "insufficient evidence" because the bird-protection and habitat-species layers failed), Rosebank (6 flags;
   "progress with targeted investigation"), a 2 ha Heswall housing site (the analyst said the method is built for
   energy, offered a general screen and said construction is coming, without screening unasked).
+
+## 20 Nov (afternoon): the report and share links ("energy is done" item 1)
+- **One page for both** (my call): `report.html` reads the run from the link's # part and is the share link, the
+  web report and, printed, the PDF ("Save as PDF" calls the browser's print; works on phones through the share or
+  print sheet). Nothing stored, as decided for share links (16 Nov).
+- **What travels** (`js/share.js`): the site; the evidence features behind the flags only (not every feature
+  fetched); flags with IDs, severity, confidence, next steps and evidence; what was checked; gaps; the decision; the
+  summary; distances, method and change log. Shapes simplified for display (Douglas–Peucker, ~20 m) and coordinates
+  to ~1 m; calls, usage and debug left out. deflate-raw + base64url, prefix `v1.`. A Rosebank-sized test run is
+  ~4.6k characters. Over 8k the copy note warns that some chat apps cut long links; past 400k it simplifies harder,
+  then says to use the PDF.
+- **Report** (`js/report.js` pure, `js/reportpage.js`, `css/report.css`), to the plan's outline: decision first, the
+  analyst's summary, facts (site, how found, planned, screened and why, at sea or elevation, data as of), a site map
+  with the distance bands, a findings map with numbered labels (stacked when they'd overlap), one row per finding
+  (severity and confidence in words, evidence with dates, untraced evidence marked, next step), evidence checked
+  (failures first) and grouped gaps, method and change log, sources and licences (traced evidence and checked
+  sources only), disclaimer. A4 print: maps as pictures with the labels painted in (WebGL canvases don't print
+  reliably); about 5 pages for the test run. Phone layout stacks the findings.
+- **Not done from the outline:** the gaps map (a site screen has no coverage geometry for failed sources; every gap
+  covers the whole extent, so a map would add nothing a list doesn't) and a printed link or QR code (the link holds
+  the run, so it's too long for a QR; needs short links, which means storing runs: Rob's call).
+- **Run card:** "Report (PDF)" (opens the report in a new tab) and "Copy share link".
+- `scripts/stamp.mjs` now stamps both pages.
+- Tested: `test/report.test.mjs` (what travels, round trip, simplifying, labels, rows, sources, summary, change log);
+  `browser-run-card.mjs` 107/107 (report opens from the card at desktop and phone sizes, both maps captured, rows and
+  next steps, sources and disclaimer, no errors, a printed A4 PDF looked at, Copy share link). Live: the page and a
+  test link load on asktobler.com in Rob's built-in browser, but the pane was hidden to the page, so the maps didn't
+  draw there; added a capture just before printing for that case. **Not tested:** the report with the real basemap
+  drawn; printing from a real phone.

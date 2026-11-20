@@ -27,7 +27,11 @@ const main = $("report");
 const pending = [];
 window.__report = { ready: false, maps: [] };
 
-$("print").addEventListener("click", async () => { await Promise.allSettled(pending); window.print(); });
+// Maps in a hidden tab don't draw until it's shown, so any picture still missing is taken just before printing.
+const captures = [];
+const captureMissing = () => captures.forEach((c) => { if (!c.img.src && c.map.loaded()) capture(c.map, c.img, c.labels); });
+$("print").addEventListener("click", async () => { await Promise.allSettled(pending); captureMissing(); await new Promise((ok) => setTimeout(ok, 150)); window.print(); });
+addEventListener("beforeprint", captureMissing);
 $("copy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(location.href); $("copy").textContent = "Link copied"; }
   catch { $("copy").textContent = "Copy from the address bar"; }
@@ -191,6 +195,7 @@ function drawMap(f, { site, rings, evidence, labels }) {
   return new Promise((resolve) => {
     const map = new maplibregl.Map({ container: f.box, style: BASEMAP, attributionControl: false, preserveDrawingBuffer: true, interactive: true, cooperativeGestures: true, fadeDuration: 0 });
     window.__report.maps.push(map);
+    captures.push({ map, img: f.img, labels });
     let done = false;
     const finish = () => { if (!done) { done = true; resolve(); } };
     setTimeout(finish, 20000);
