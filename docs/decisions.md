@@ -719,3 +719,8 @@ Judgement calls made while building, newest first. Bigger product decisions live
   `CONFIG.screenMaxTokens`); the conversation keeps 8,000. The Worker's `MAX_TOKENS` is 16,000. The limit costs
   nothing unless used; the per-visitor daily call caps still bound misuse. The repair stays as the backstop.
 - Not done: limiting thinking in the request (needs checking how Haiku 5.5 takes it, and could lower quality).
+- Replays after the change (Haiku, real services): Linlithgow 1 km² solar finished in one go; Kelso's write-up took
+  8,906 output tokens and finished in one go (it would have been cut at 8,000). One earlier Kelso replay ended
+  normally (not cut off) but its JSON couldn't be read, so the repair ran; its summary now matches its decision. The
+  cause wasn't visible (the replay's debug line was cut), so `try-requests` now prints the reply's ending whenever a
+  repair runs. If unreadable JSON recurs, consider a lenient parse (trailing commas, comments).
