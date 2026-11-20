@@ -23,7 +23,7 @@ longitude/latitude; distances and areas are geodesic; shapes are built by code, 
   anchor, optionally offset by a distance and bearing and rotated; measures every distance clue given as a check
   (each must quote the person's words, or it's left out); rates confidence by fixed rules (see the skill's
   "Confidence" section), not by the model. Can replace a proposal it made earlier: the old one goes, the new one
-  takes its name, and the old one's checks carry over.
+  takes its name, and any failed check left out of the rebuild is listed.
 - **Returns:** the place's size and location in words, the construction steps, the confidence and the rules behind it.
 - **Tobler:** `make_place`; shapes in a local projection (`js/geometry.js`), confidence in `js/confidence.js`.
 

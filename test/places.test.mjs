@@ -480,9 +480,14 @@ await test("distance checks must quote the person; a rebuild replaces its propos
   assert.equal(b.confidence, "low");
   assert.equal(b.checks[0].pass, false);
   const c = await t.exec("make_place", { anchor: "C1", shape: "point", words: "the summit", match: "name_and_type", reason: "x", replaces: "Ben Nevis" });
-  assert.equal(c.confidence, "low", "dropping the failed check doesn't lift the confidence");
-  assert.equal(c.checks[0].carried_over, true);
+  assert.equal(c.failed_checks_left_out[0].quote, "about 4 km north-east of the Ben Nevis distillery", "a dropped failed check is listed, not hidden");
+  assert.match(c.about_them, /never drop one to raise the confidence/);
   assert.equal(host.list.length, 1);
+  // A corrected clue replaces the old one: nothing listed.
+  host.said.push("sorry, about 6 km south-east of the distillery");
+  const e = await t.exec("make_place", { anchor: "C1", shape: "point", words: "the summit", match: "name_and_type", reason: "x", replaces: "Ben Nevis", checks: [{ against: "C4", expected_km: 6, direction: "NW", quote: "about 6 km south-east of the distillery" }] });
+  assert.equal(e.checks[0].pass, true, "6 km SE of the distillery, as the site is");
+  assert.equal(e.failed_checks_left_out, undefined, "the earlier failed clue came from a previous rebuild, not this one");
   // Only the analyst's own proposals can be replaced or removed unasked.
   host.list[0].status = "accepted";
   await assert.rejects(() => t.exec("make_place", { anchor: "C1", shape: "point", words: "x", match: "name_and_type", reason: "x", replaces: "Ben Nevis" }), /isn't a proposal of yours/);

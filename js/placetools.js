@@ -442,16 +442,17 @@ export function createPlaceTools(host) {
       // Confidence from the evidence, in code: checks are measured from the place just built.
       const site = f.geometry.type === "Point" ? f.geometry.coordinates : turf.centroid(f).geometry.coordinates;
       // Checks must come from the person's own words (Ben Nevis, 20 Nov: the analyst made one up, it failed, and it
-      // rebuilt the place without it to get the confidence back). A rebuilt place keeps the checks of the one it replaces.
+      // rebuilt the place without it to get the confidence back). A rebuild doesn't carry old checks over (the person may
+      // have corrected the clue: "sorry, I meant north-west"), but any that failed and are now left out are listed in
+      // the result, so dropping one is visible and has to be explained.
       const old = i.replaces ? host.findPlace(i.replaces) : null;
       if (i.replaces) {
         if (!old) throw new Error(`No place called "${i.replaces}" to replace.`);
         if (old.origin?.method !== "words" || old.status !== "proposed") throw new Error(`"${old.name}" isn't a proposal of yours, so it can't be replaced; ask the person, or build a new place.`);
       }
       const given = [...(i.checks || [])];
-      for (const c of old?.origin?.checks || []) {
-        if (c.quote && c.target && !given.some((g) => norm(g.quote) === norm(c.quote))) given.push({ against: c.target, expected_km: c.expected_km, direction: c.direction, quote: c.quote, carried: true });
-      }
+      const dropped = (old?.origin?.checks || []).filter((c) => c.pass === false && c.quote && !given.some((g) => norm(g.quote) === norm(c.quote)))
+        .map((c) => ({ quote: c.quote, against: c.against, was: c.why }));
       const said = host.personSaid ? norm(host.personSaid()) : null;
       const checks = [];
       for (const c of given) {
@@ -459,7 +460,7 @@ export function createPlaceTools(host) {
           checks.push({ against: c.against, expected_km: c.expected_km, pass: null, why: c.quote ? `"${String(c.quote).slice(0, 80)}" isn't in the person's words, so this check was left out` : "no quote from the person's words, so this check was left out: checks must come from distance clues the person gave" });
           continue;
         }
-        try { const t = resolve(c.against); checks.push({ ...runCheck(site, { lonlat: t.lonlat, name: t.label }, c), quote: c.quote, target: c.against, ...(c.carried ? { carried_over: true } : {}) }); }
+        try { const t = resolve(c.against); checks.push({ ...runCheck(site, { lonlat: t.lonlat, name: t.label }, c), quote: c.quote, target: c.against }); }
         catch { checks.push({ against: c.against, expected_km: c.expected_km, pass: null, why: "not a candidate id, so not checked" }); }
       }
       // Built on a place already on the map: it starts from that place's confidence (a person's drawing counts as high),
@@ -482,6 +483,7 @@ export function createPlaceTools(host) {
       }
       return { ...(await placeSummary(p)), ...(old ? { replaced: old.name } : {}), how: steps.join(", then "), confidence: rated.confidence, why: rated.rules,
         ...(checks.length ? { checks } : {}),
+        ...(dropped.length ? { failed_checks_left_out: dropped, about_them: "These clues failed on the place this one replaces and aren't checked now. Tell the person, unless they corrected the clue themselves; never drop one to raise the confidence." } : {}),
         next: rated.confidence === "low" && checks.some((c) => c.pass === false)
           ? "Shown as a proposal, low confidence because a check failed. Say which, and look for a feature that fits all the clues (find_features_near) before asking the person."
           : "Shown on the map as a proposal. Report the confidence as given here, and ask the person if it's what they meant." };
