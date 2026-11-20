@@ -616,3 +616,18 @@ Judgement calls made while building, newest first. Bigger product decisions live
   listed buildings and schools at the edge, 66 s), Rosebank unchanged (2/10/50 km, 7 flags, 60 s). No repair needed.
 - Seen, not changed: Heswall still ran the marine baseline (the Dee estuary is within 5 km; fair). The housing frame is
   still energy's (themes, wording): that's the construction profile's job.
+
+## 20 Nov (early afternoon): construction and property, thinking only (Rob's research; nothing built)
+- **Inputs:** two AI research reports Rob shared (adapting the energy workflow to construction site screening; which
+  markets might buy). Rob: AI research, so take the direction, not the detail. Full notes in the plan's "Industries".
+- **Shared themes, mapped to IFC.** Both reports took the IFC Performance Standards as the global backbone, as NTR
+  already does. Themes are defined once; each profile picks its own and adds more. Construction adds planning and land
+  use, flood and drainage, ground and contamination, access, utilities and site capacity.
+- **Picks are the overlays:** one construction profile; logistics first (reuses main roads, substations, receptors;
+  less crowded than housing), housing second, data centres later (Rob finds the competition there interesting; parked).
+- **Finance is a reader, not an industry:** a report template and later portfolio screening. Retail, offices and
+  hotels parked (location performance, a different product).
+- **For the plumbing (step 2 of the order):** themes in the profile with IFC mapping; picks that add themes and baseline
+  layers, not just distances; baseline per country; run record ready for results per theme, severity beside
+  confidence and a next step per finding. Energy keeps its flags-first card.
+- **Order unchanged:** plumbing, then finish energy, then construction.
