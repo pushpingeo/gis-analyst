@@ -344,6 +344,7 @@ await test("a result cut off at the length cap is asked for again, as JSON only,
   assert.equal(rec.tobler_run.parse_error, undefined);
   assert.deepEqual(rec.tobler_run.debug.repairs.map((r) => [r.how, r.json]), [["summary", true]]);
   assert.equal(rec.tobler_run.debug.final_stop, "max_tokens");
+  assert.ok(model.calls.every((c) => c.maxTokens === 16000), "every call in a screening asks for the larger reply limit");
 });
 
 await test("if the summary repair fails too, the full history is tried, and both attempts are in the debug", async () => {

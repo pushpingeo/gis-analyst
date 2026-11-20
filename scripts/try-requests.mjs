@@ -26,12 +26,12 @@ const convSkills = [skill];
 const distTable = JSON.parse(readFileSync("catalogue/distances.json", "utf8"));
 let spend = { input: 0, output: 0 };
 
-async function callClaude({ system, messages, tools }) {
+async function callClaude({ system, messages, tools, maxTokens }) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 8000, system, messages, tools }),
+      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: maxTokens || 8000, system, messages, tools }),
     });
     if (r.ok) { const j = await r.json(); spend.input += j.usage?.input_tokens || 0; spend.output += j.usage?.output_tokens || 0; return j; }
     if (r.status === 429 || r.status >= 500) { await new Promise((ok) => setTimeout(ok, 5000 * (attempt + 1))); continue; }

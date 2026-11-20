@@ -85,7 +85,7 @@ export function systemFor(skill) {
 - Put independent searches in the same step: they run at the same time. Aim to finish within about ten steps.
 - Name features and datasets as the data names them. Ids (C3, D2) are for tool calls only.
 - Your last message is the result: the short summary, then the JSON block, exactly as the method's Output section says. Use the distances given (not the skill's table) in "distances_km".
-- Keep the result compact so it fits in one reply: summary under 300 words; at most 8 flags, each next_step one short line; at most 4 evidence items per flag (the nearest or strongest, and say in "why" how many more there are); "data_gaps" at most 12 short lines; leave "checked" as an empty list, because the run records what the tools checked itself. Keep your thinking before the result short: the reply limit (8,000 tokens) includes it.
+- Keep the result compact so it fits in one reply: summary under 300 words; at most 8 flags, each next_step one short line; at most 4 evidence items per flag (the nearest or strongest, and say in "why" how many more there are); "data_gaps" at most 12 short lines; leave "checked" as an empty list, because the run records what the tools checked itself. Keep your thinking before the result short: the reply limit (16,000 tokens) includes it.
 
 <method skill="${skill.name}" version="${skill.version}">
 ${skill.body}
@@ -190,7 +190,12 @@ function checkedFrom(tool, input, out) {
 
 // host: the same host the page gives createPlaceTools (atlas, firms, ref, trusted, fetchFn…). The run gets its own
 // tools, with a host whose only place is the site footprint and whose findings go into the run, not the map.
-export async function runScreening({ host, site, inputs, distances, skill, callClaude, model = "", runId = "R1", maxRounds = 14, onEvent = () => {}, now = () => new Date().toISOString() }) {
+export const SCREEN_MAX_TOKENS = 16000;
+// Every model call in a screening run asks for the larger reply limit (the conversation keeps the smaller one).
+const roomy = (callClaude) => (args) => callClaude({ ...args, maxTokens: SCREEN_MAX_TOKENS });
+
+export async function runScreening({ host, site, inputs, distances, skill, callClaude: call, model = "", runId = "R1", maxRounds = 14, onEvent = () => {}, now = () => new Date().toISOString() }) {
+  const callClaude = roomy(call);
   const started = now();
   const fp = footprintOf(site.feature, distances);
   // Inside only (areas, when the person asks): fetch only what's inside or touching; otherwise out to the wider band.
@@ -421,7 +426,8 @@ export function flagBeyond(flag, km) {
 }
 
 // Re-assess on tap: the stored evidence within km, no new fetching, one model call without tools.
-export async function reassess({ record, km, skill, callClaude, now = () => new Date().toISOString() }) {
+export async function reassess({ record, km, skill, callClaude: call, now = () => new Date().toISOString() }) {
+  const callClaude = roomy(call);
   const run = record.tobler_run;
   const d = { ...run.distances, wider: km, close: Math.min(run.distances.close, km), near: Math.min(run.distances.near, km), set_by: "person",
     reasons: [`re-assessed from the stored evidence within ${km} km (fetched to ${run.fetched_to_km} km)`, ...run.distances.reasons] };

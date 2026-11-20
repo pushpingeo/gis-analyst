@@ -12,7 +12,7 @@ const mf = new Miniflare({
   compatibilityDate: "2026-08-01",
   durableObjects: { COUNTER: "Counter", LOGS: { className: "LogStore", useSQLite: true } },
   bindings: {
-    MODEL: "claude-haiku-5-5", MAX_TOKENS: "8000",
+    MODEL: "claude-haiku-5-5", MAX_TOKENS: "16000",
     ALLOWED_ORIGINS: "https://asktobler.com,https://pushpingeo.github.io,http://localhost:8000",
     // Small limits so they can be reached in a test.
     PER_VISITOR_DAILY: "5", TOTAL_DAILY: "8", ATLAS_PER_VISITOR_DAILY: "25",
@@ -93,7 +93,7 @@ try {
     assert.equal(sent.url, "https://api.anthropic.com/v1/messages");
     assert.equal(sent.key, "sk-test");
     assert.equal(sent.body.model, "claude-haiku-5-5");
-    assert.equal(sent.body.max_tokens, 8000);
+    assert.equal(sent.body.max_tokens, 16000);
     assert.equal(sent.body.temperature, undefined);
     assert.deepEqual(sent.body.tools, [{ name: "t" }]);
   });

@@ -712,3 +712,10 @@ Judgement calls made while building, newest first. Bigger product decisions live
   why, flags most serious first with next steps, the number of gaps, and a line saying the write-up was cut off). The
   cut-off draft is kept in `debug.cut_off_summary` for the log. Not a model rewrite: a second call could disagree too.
 - Tested: the cut-off test now checks the summary names every flag and doesn't repeat the draft.
+
+## 20 Nov (evening): screening runs get a 16,000-token reply limit (Rob: "go ahead")
+- Kelso's cut-off reply held only ~7,500 characters of text (~2,000 tokens): Haiku's thinking used most of the 8,000.
+  Every model call in a screening run (the loop, the repair, re-assess) now asks for 16,000 (`SCREEN_MAX_TOKENS`,
+  `CONFIG.screenMaxTokens`); the conversation keeps 8,000. The Worker's `MAX_TOKENS` is 16,000. The limit costs
+  nothing unless used; the per-visitor daily call caps still bound misuse. The repair stays as the backstop.
+- Not done: limiting thinking in the request (needs checking how Haiku 5.5 takes it, and could lower quality).

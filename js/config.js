@@ -5,6 +5,9 @@ export const CONFIG = {
   proxyUrl: "https://tobler-api.robdunfey.workers.dev",
   model: "claude-haiku-5-5",
   maxTokens: 8000,
+  // Screening runs get more room: Haiku thinks before it writes, and on busy sites the thinking used most of 8,000
+  // tokens before the write-up ended (Kelso, 20 Nov). The cap costs nothing unless used. The Worker allows up to this.
+  screenMaxTokens: 16000,
   maxRounds: 10,
   // The workspace analyst: a screening asks for many datasets, so it gets more rounds per turn.
   workspaceRounds: 14,

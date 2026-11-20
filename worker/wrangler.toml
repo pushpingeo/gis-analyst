@@ -5,7 +5,7 @@ workers_dev = true
 
 [vars]
 MODEL = "claude-haiku-5-5"
-MAX_TOKENS = "8000"
+MAX_TOKENS = "16000"
 # Origins the Worker serves, no trailing slash. localhost is for local tests.
 ALLOWED_ORIGINS = "https://asktobler.com,https://www.asktobler.com,https://pushpingeo.github.io,http://localhost:8000"
 # Claude calls: a conversation turn is a few calls.
