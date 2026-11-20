@@ -1,0 +1,144 @@
+{
+  "about": "Energy's profile (20 Nov 2026): the first and only full one. What's here was spread across the page and catalogue before; the screening method, distances and baseline layers stay in their own files and are named here. Picks: the buttons shown when someone screens a place without saying what's planned (order matters: the first `first` that suit the setting show as buttons, the rest under More…; each type must be an asset in the distances table; `onshore`/`offshore` give a different type by setting; `only` limits a pick to one setting). Themes are shared across industries and mapped to IFC's Performance Standards where they fit.",
+  "id": "energy",
+  "label": "Energy",
+  "version": "1",
+  "skill": "ntr-screening",
+  "skill_file": "skills/ntr-screening/SKILL.md",
+  "distances": "catalogue/distances.json",
+  "baseline": {
+    "from": "catalogue/trusted.json",
+    "about": "Energy uses every must-check layer in trusted.json 'baseline' (each limited to its own bounding box, 'where'). Another profile can list its own layers here in the same shape, with a 'where' per country or region."
+  },
+  "wording": {
+    "screen_chip": "Screen this location for risks",
+    "findings": "risks",
+    "method": "non-technical risk screening for energy projects"
+  },
+  "themes": [
+    {
+      "id": "community",
+      "label": "Community health, safety and security",
+      "ifc": "PS4"
+    },
+    {
+      "id": "land",
+      "label": "Land and livelihoods",
+      "ifc": "PS5"
+    },
+    {
+      "id": "biodiversity",
+      "label": "Biodiversity",
+      "ifc": "PS6"
+    },
+    {
+      "id": "indigenous",
+      "label": "Indigenous Peoples",
+      "ifc": "PS7"
+    },
+    {
+      "id": "heritage",
+      "label": "Cultural heritage",
+      "ifc": "PS8"
+    },
+    {
+      "id": "context",
+      "label": "Operating context",
+      "ifc": null
+    }
+  ],
+  "decisions": [
+    "progress",
+    "progress with targeted investigation",
+    "major issue",
+    "insufficient evidence"
+  ],
+  "other_requests": "If the person asks to screen something the energy method isn't built for (housing, a warehouse, offices, a shop), say in one sentence that the screening method is built for energy projects, offer a general screen (asset_type other) with that caveat, and mention that construction and property is coming.",
+  "asset_picks": {
+    "first": 6,
+    "picks": [
+      {
+        "label": "Solar farm",
+        "type": "solar",
+        "only": "onshore"
+      },
+      {
+        "label": "Onshore wind",
+        "type": "wind-onshore",
+        "only": "onshore"
+      },
+      {
+        "label": "Offshore wind",
+        "type": "wind-offshore",
+        "only": "offshore"
+      },
+      {
+        "label": "Oil and gas",
+        "onshore": "oil-gas-onshore",
+        "offshore": "oil-gas-field"
+      },
+      {
+        "label": "Mine",
+        "type": "mine",
+        "only": "onshore"
+      },
+      {
+        "label": "Pipeline or cable",
+        "type": "pipeline-cable"
+      },
+      {
+        "label": "Platform",
+        "type": "platform",
+        "only": "offshore"
+      },
+      {
+        "label": "Substation",
+        "type": "substation",
+        "only": "onshore"
+      },
+      {
+        "label": "Hydro",
+        "type": "hydro",
+        "only": "onshore"
+      },
+      {
+        "label": "Thermal power plant",
+        "type": "thermal",
+        "only": "onshore"
+      },
+      {
+        "label": "Road or rail",
+        "type": "road-rail",
+        "only": "onshore"
+      },
+      {
+        "label": "Port or terminal",
+        "type": "port-terminal"
+      },
+      {
+        "label": "Exploration block",
+        "type": "exploration-block"
+      },
+      {
+        "label": "Seismic survey",
+        "type": "seismic-survey"
+      }
+    ]
+  },
+  "examples": {
+    "find": [
+      "Show me Linlithgow Palace and 5 km around it",
+      "Show me Lake Tekapo in New Zealand"
+    ],
+    "shape": [
+      "Draw a 2 km square around the Kinderdijk windmills",
+      "Mark out 10 km around Peggy's Cove, Nova Scotia",
+      "Mark out 3 km around Mont-Saint-Michel"
+    ],
+    "screen": [
+      "Screen a 1 km² wind farm site 3 km south-east of Lemvig, Denmark",
+      "Screen a 1 km² solar farm site 5 km west of Évora, Portugal"
+    ]
+  },
+  "report": null
+}

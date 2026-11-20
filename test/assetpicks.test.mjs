@@ -1,10 +1,10 @@
-// Quick picks for what's planned at a site (catalogue/asset-picks.json, js/assetpicks.js) and the ask_asset_type tool.
+// Quick picks for what's planned at a site (the energy profile's asset_picks, js/assetpicks.js) and the ask_asset_type tool.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { picksFor, pickMessage } from "../js/assetpicks.js";
 import { createPlaceTools, placeToolDefs } from "../js/placetools.js";
 
-const config = JSON.parse(readFileSync(new URL("../catalogue/asset-picks.json", import.meta.url)));
+const config = JSON.parse(readFileSync(new URL("../catalogue/industries/energy.json", import.meta.url))).asset_picks;
 const table = JSON.parse(readFileSync(new URL("../catalogue/distances.json", import.meta.url)));
 
 // Every pick is an asset the distances table knows, in both settings.

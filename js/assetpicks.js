@@ -1,4 +1,4 @@
-// What's planned at a site, as quick picks (catalogue/asset-picks.json): the buttons shown when someone screens a
+// What's planned at a site, as quick picks (the industry profile's "asset_picks", catalogue/industries/): the buttons shown when someone screens a
 // place without saying. Pure, so it can be tested; the card itself is drawn in js/workspace.js.
 
 // The picks that suit the setting, each resolved to one asset type: the first `first` as buttons, the rest for More….

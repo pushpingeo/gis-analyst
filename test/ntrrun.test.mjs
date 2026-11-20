@@ -295,6 +295,27 @@ await test("traceFlags maps PS codes to themes and leaves unknown evidence untra
 });
 
 
+await test("findings get IDs in the order shown; severity sorts before confidence; next steps and the decision are kept", async () => {
+  const f = traceFlags([
+    { risk: "a", theme: "PS4", confidence: "high", severity: "low", evidence: [] },
+    { risk: "b", theme: "PS6", confidence: "low", severity: "high", next_step: " walkover survey ", evidence: [] },
+    { risk: "c", theme: "PS8", confidence: "medium", evidence: [] },
+  ], [], { near: 1, close: 5, wider: 20 });
+  assert.deepEqual(f.map((x) => [x.id, x.risk]), [["F-01", "b"], ["F-02", "a"], ["F-03", "c"]]);
+  assert.equal(f[0].next_step, "walkover survey");
+  assert.equal(f[2].severity, null, "an unrated flag isn't given a severity");
+  const { readDecision } = await import("../js/industry.js");
+  assert.deepEqual(readDecision("Progress with targeted investigation", " wreck nearby "), { value: "progress with targeted investigation", why: "wreck nearby" });
+  assert.equal(readDecision("go for it", "x"), null, "a decision outside the list is dropped, not guessed");
+  const model = scriptedModel([final(RESULT().replace('"flags":[', '"decision":"major issue","decision_why":"wreck on the route","flags":['))]);
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const rec = await runScreening({ host: { ...host(), profile: () => ({ id: "energy", decisions: ["progress", "major issue"] }) }, site, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
+  assert.deepEqual(rec.tobler_run.decision, { value: "major issue", why: "wreck on the route" });
+  assert.equal(rec.tobler_run.industry, "energy");
+  assert.equal(rec.tobler_run.flags[0].id, "F-01");
+  assert.equal(headline(rec).decision, "major issue");
+});
+
 await test("a result cut off at the length cap is asked for again, as JSON only, from a compact summary first", async () => {
   const cut = { stop_reason: "max_tokens", content: [{ type: "thinking", thinking: "long", signature: "sig" }, { type: "text", text: "Long summary…\n\n```json\n{\"flags\":[{\"risk\":\"x" }], usage: { input_tokens: 10, output_tokens: 8000 } };
   const model = scriptedModel([

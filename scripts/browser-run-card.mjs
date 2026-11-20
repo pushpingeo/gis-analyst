@@ -31,10 +31,10 @@ function atlas(tool, args) {
 }
 
 const json = (s) => "```json\n" + JSON.stringify(s) + "\n```";
-const RESULT = "Screened as an offshore oil field (assumed, greenfield).\n\n" + json({ flags: [
-  { risk: "Existing pipelines on and near the site (simultaneous operations)", theme: "PS4", confidence: "high", why: "Work beside live lines needs SIMOPS planning.", evidence: [{ name: "Rosebank 9 inch Production flowline 1", distance_km: 0, dataset: "UKCS pipelines (WGS84)" }, { name: "West of Shetland Pipeline", distance_km: 1.5, dataset: "UKCS pipelines (WGS84)" }] },
-  { risk: "A wreck close to the field may need a survey and an exclusion zone", theme: "PS8", confidence: "medium", why: "Heritage and safety.", evidence: [{ name: "TROLDFOS (POSSIBLY)", distance_km: 2, dataset: "Worldwide wreck locations (UK Hydrographic Office)" }] },
-  { risk: "Seabird colonies on Shetland may be in spill reach", theme: "PS6", confidence: "low", why: "Regional knowledge, not mapped data.", evidence: [{ name: "Foula seabird colony", distance_km: 40, dataset: "none (regional knowledge)" }] },
+const RESULT = "Screened as an offshore oil field (assumed, greenfield).\n\n" + json({ decision: "progress with targeted investigation", decision_why: "Live pipelines and a wreck need checking; nothing found so far should stop it.", flags: [
+  { risk: "Existing pipelines on and near the site (simultaneous operations)", theme: "PS4", severity: "high", confidence: "high", next_step: "Agree crossing and proximity arrangements with the pipeline operators", why: "Work beside live lines needs SIMOPS planning.", evidence: [{ name: "Rosebank 9 inch Production flowline 1", distance_km: 0, dataset: "UKCS pipelines (WGS84)" }, { name: "West of Shetland Pipeline", distance_km: 1.5, dataset: "UKCS pipelines (WGS84)" }] },
+  { risk: "A wreck close to the field may need a survey and an exclusion zone", theme: "PS8", severity: "medium", confidence: "medium", why: "Heritage and safety.", evidence: [{ name: "TROLDFOS (POSSIBLY)", distance_km: 2, dataset: "Worldwide wreck locations (UK Hydrographic Office)" }] },
+  { risk: "Seabird colonies on Shetland may be in spill reach", theme: "PS6", severity: "medium", confidence: "low", why: "Regional knowledge, not mapped data.", evidence: [{ name: "Foula seabird colony", distance_km: 40, dataset: "none (regional knowledge)" }] },
 ], checked: [], data_gaps: ["Key Biodiversity Areas not checked", "Fishing effort not checked", "No Indigenous Peoples data in the catalogue here", "Stage assumed to be greenfield"] });
 const REASSESS = "Within 1 km only the field's own lines matter.\n\n" + json({ flags: [{ risk: "Existing flowlines on site", theme: "PS4", confidence: "high", why: "SIMOPS.", evidence: [{ name: "Rosebank 9 inch Production flowline 1", distance_km: 0, dataset: "UKCS pipelines (WGS84)" }] }], data_gaps: ["Key Biodiversity Areas not checked"] });
 
@@ -173,9 +173,14 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     rings: window.__ws.map.getSource("rings")._data.features?.length ?? 0,
     staleText: document.querySelector(".run .stale button").textContent,
     reply: [...document.querySelectorAll(".msg.analyst")].at(-1).textContent.slice(0, 120),
+    decision: document.querySelector(".run .decision").hidden ? "" : document.querySelector(".run .decision").textContent,
+    next: document.querySelector(".run .flag .next")?.textContent || "",
   }));
   let s = await st();
   check(s.flags.length === 3 && /pipelines/.test(s.flags[0]), `${label}: three flags, high first (${s.flags[0]})`);
+  check(/^Progress with targeted investigation\. Live pipelines/.test(s.decision), `${label}: decision line first on the card (${s.decision.slice(0, 50)})`);
+  check(/^F-01/.test(s.flags[0]) && /F-03/.test(s.flags[2]), `${label}: findings numbered F-01 to F-03`);
+  check(/^Next step: Agree crossing/.test(s.next), `${label}: a flag shows its next step (${s.next.slice(0, 40)})`);
   check(s.out === "50 km" && s.onMap === 6, `${label}: slider at 50 km, 5 findings and the wide area on the map (${s.out}, ${s.onMap})`);
   check(/near 2 km · close 10 km · wider 50 km/.test(s.dists), `${label}: distances and reason shown`);
   check(s.sea === "Water depth about 120 m, 110–130 m across the site (NOAA). Vessel traffic: light on the site (0.3 h/km² a month) (AIS 2023, EMODnet).", `${label}: water depth and vessel traffic on the card (${s.sea.slice(0, 80)})`);
@@ -226,6 +231,8 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   await page.click("#gear");
   await page.waitForSelector("#settings[open]");
   check(await page.evaluate(() => document.querySelectorAll('#settings .links a[href="lab-results.html"]').length === 1), `${label}: About in settings links to how the screening was tested`);
+  const ind = await page.evaluate(() => [...document.querySelectorAll('#settings input[name="industry"]')].map((r) => `${r.value}:${r.checked ? "on" : ""}:${r.disabled ? "soon" : ""}`));
+  check(ind.join(",") === "energy:on:,construction::soon,retail::soon", `${label}: Settings → Industry: Energy chosen, the others coming soon (${ind.join(", ")})`);
   await page.screenshot({ path: `/tmp/settings-${label}.png` });
   await page.check('#settings input[name="units"][value="imperial"]');
   await page.click('#settings [data-colour="#00a0b0"]');

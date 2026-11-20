@@ -128,7 +128,8 @@ await test("a country only clipped at an area's edge is 'touching', not 'across'
 });
 
 await test("welcome examples: one of each kind, rotating, none about oil and gas", async () => {
-  const { EXAMPLES, pickExamples } = await import("../js/examples.js");
+  const { pickExamples } = await import("../js/examples.js");
+  const EXAMPLES = JSON.parse(readFileSync(new URL("../catalogue/industries/energy.json", import.meta.url))).examples;
   const first = pickExamples(EXAMPLES, () => 0), last = pickExamples(EXAMPLES, () => 0.999);
   assert.equal(first.length, 3);
   assert.deepEqual(first, [EXAMPLES.find[0], EXAMPLES.shape[0], EXAMPLES.screen[0]]);

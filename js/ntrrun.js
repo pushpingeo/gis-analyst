@@ -12,6 +12,7 @@ import { DISCLAIMER } from "./disclaimer.js";
 import { aroundSiteKm2 } from "./datatools.js";
 import { waterDepth, vesselTraffic, seaLines } from "./seavalues.js";
 import { elevationFrom, elevationSignificance, elevationLine } from "./elevation.js";
+import { baselineFor, readDecision } from "./industry.js";
 
 // The band for a piece of evidence: a wide area the site lies within is "around the site", not "on site".
 export const AROUND = "around the site";
@@ -22,6 +23,11 @@ export const SCREEN_TOOLS = ["get_place", "find_data", "get_data", "find_feature
 const THEME_OF = { PS4: "community", PS5: "land", PS6: "biodiversity", PS7: "indigenous", PS8: "heritage", context: "context" };
 export const THEME_CODE = Object.fromEntries(Object.entries(THEME_OF).map(([k, v]) => [v, k]));
 const CONF_ORDER = { high: 0, medium: 1, low: 2 };
+// Severity (how much it would matter if real) is kept apart from confidence (how sure the evidence is). A flag the
+// analyst didn't rate sorts after the rated ones of the same confidence; nothing is guessed for it.
+const SEV_ORDER = { high: 0, medium: 1, low: 2 };
+const sevRank = (f) => SEV_ORDER[f.severity] ?? 3;
+export const findingId = (i) => `F-${String(i + 1).padStart(2, "0")}`;
 const round = (v, d = 2) => (v == null || !Number.isFinite(+v) ? null : Math.round(+v * 10 ** d) / 10 ** d);
 const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
@@ -63,7 +69,7 @@ export function systemFor(skill) {
 - Put independent searches in the same step: they run at the same time. Aim to finish within about ten steps.
 - Name features and datasets as the data names them. Ids (C3, D2) are for tool calls only.
 - Your last message is the result: the short summary, then the JSON block, exactly as the method's Output section says. Use the distances given (not the skill's table) in "distances_km".
-- Keep the result compact so it fits in one reply: summary under 300 words; at most 8 flags; at most 4 evidence items per flag (the nearest or strongest, and say in "why" how many more there are); "data_gaps" at most 12 short lines; leave "checked" as an empty list, because the run records what the tools checked itself. Keep your thinking before the result short: the reply limit (8,000 tokens) includes it.
+- Keep the result compact so it fits in one reply: summary under 300 words; at most 8 flags, each next_step one short line; at most 4 evidence items per flag (the nearest or strongest, and say in "why" how many more there are); "data_gaps" at most 12 short lines; leave "checked" as an empty list, because the run records what the tools checked itself. Keep your thinking before the result short: the reply limit (8,000 tokens) includes it.
 
 <method skill="${skill.name}" version="${skill.version}">
 ${skill.body}
@@ -138,10 +144,14 @@ export function traceFlags(flags, evidence, d, sea = null) {
     const dists = (traced.length ? traced : ev).map((e) => e.distance_km).filter((v) => v != null);
     return {
       risk: String(flag.risk || "").trim(), theme: THEME_OF[flag.theme] || THEME_OF[String(flag.theme || "").toUpperCase()] || (THEME_CODE[flag.theme] ? flag.theme : "context"),
-      confidence: CONF_ORDER[flag.confidence] != null ? flag.confidence : "low", why: flag.why || "", evidence: ev,
+      confidence: CONF_ORDER[flag.confidence] != null ? flag.confidence : "low",
+      severity: SEV_ORDER[flag.severity] != null ? flag.severity : null, why: flag.why || "",
+      next_step: String(flag.next_step || "").trim(), evidence: ev,
       fids: traced.map((e) => e.fid), nearest_km: dists.length ? Math.min(...dists) : null, traced: traced.length, untraced: ev.length - traced.length,
     };
-  }).sort((a, b) => CONF_ORDER[a.confidence] - CONF_ORDER[b.confidence] || (a.nearest_km ?? 1e9) - (b.nearest_km ?? 1e9));
+  }).sort((a, b) => sevRank(a) - sevRank(b) || CONF_ORDER[a.confidence] - CONF_ORDER[b.confidence] || (a.nearest_km ?? 1e9) - (b.nearest_km ?? 1e9))
+    // Finding IDs follow the order shown, so F-01 is the same on the card, the map, the download and later the PDF.
+    .map((f, i) => ({ id: findingId(i), ...f }));
 }
 
 // What the tools actually checked, from their replies (ground truth for the card, beside the model's own list).
@@ -246,7 +256,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     for (const c of nb.checked) { checked.push(c); baselineLines.push(summarise(c)); }
   } catch (e) { checked.push({ evidence: "transboundary", dataset: "boundaries", result: "not checked", why: String(e.message || e).slice(0, 160) }); }
   const sb = turf.bbox(fp.feature);
-  const layers = (host.trusted?.baseline || []).filter((b) => (b.setting !== "sea" || sea) && !(sb[2] < b.where[0] || sb[0] > b.where[2] || sb[3] < b.where[1] || sb[1] > b.where[3]));
+  const layers = baselineFor(host.profile?.(), host.trusted).filter((b) => (b.setting !== "sea" || sea) && !(sb[2] < b.where[0] || sb[0] > b.where[2] || sb[3] < b.where[1] || sb[1] > b.where[3]));
   const before = checked.length;
   // Values read off rasters (catalogue/trusted.json "values"): elevation over the footprint on every site (shown as
   // water depth at sea; on land only when it matters: low-lying or high altitude); AIS vessel traffic when the sea is
@@ -315,7 +325,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       return { ...m, content: keep.length ? keep : [{ type: "text", text: "…" }] };
     });
     if (history.at(-1)?.role === "user") history.pop();
-    const ASK = "Reply now with only the JSON block, compact: at most 6 flags, at most 3 evidence items each (name, distance_km, dataset only), data_gaps at most 10 short lines, checked as []. Keep any thinking brief.";
+    const ASK = "Reply now with only the JSON block, compact: the decision and its reason in one line; at most 6 flags, each with severity and a short next_step, and at most 3 evidence items each (name, distance_km, dataset only); data_gaps at most 10 short lines; checked as []. Keep any thinking brief.";
     // First from a compact summary of what the tools found, not the whole history (Rob's housing screen, 20 Nov: the
     // full history was ~34k tokens and the write-up hit the cap); then, if that fails, from the full history as before.
     const found = checked.filter((c) => c.result === "features" || c.result === "not checked").map(summarise).join("\n");
@@ -343,6 +353,8 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     type: "FeatureCollection",
     tobler_run: {
       schema: RUN_SCHEMA, id: runId, kind: "ntr-screen", skill: { name: skill.name, version: skill.version }, model,
+      industry: host.profile?.()?.id || null,
+      decision: readDecision(parsed.json?.decision, parsed.json?.decision_why, host.profile?.()?.decisions),
       started_at: started, finished_at: now(),
       site: {
         name: site.name, how_found: origin, confidence: site.origin?.method === "words" ? site.origin.confidence : "drawn",
@@ -415,8 +427,9 @@ export async function reassess({ record, km, skill, callClaude, now = () => new 
   const text = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
   const parsed = parseResult(text);
   if (!parsed.json) throw new Error("The re-assessment came back without a readable result. The earlier flags are unchanged.");
-  run.assessments.push({ at: now(), within_km: run.assessed_within_km, flags: run.flags, summary: run.summary, distances: run.distances });
+  run.assessments.push({ at: now(), within_km: run.assessed_within_km, flags: run.flags, decision: run.decision ?? null, summary: run.summary, distances: run.distances });
   run.flags = traceFlags(parsed.json.flags, evidenceOf(record), d, { ...(run.sea || {}), elevation: run.elevation });
+  run.decision = readDecision(parsed.json.decision, parsed.json.decision_why); // a decision written for the old distance no longer stands
   run.data_gaps = Array.isArray(parsed.json.data_gaps) ? parsed.json.data_gaps.map(String) : run.data_gaps;
   run.summary = parsed.summary;
   run.distances = d;
@@ -434,11 +447,12 @@ export function headline(record) {
   const notChecked = r.checked.filter((c) => c.result === "not checked");
   return {
     run: r.id, site: r.site.name, scope: r.extent === "inside" ? "inside the area only" : "the site and its surroundings", distances: r.extent === "inside" ? "none (inside the area only)" : distancesLine(r.distances), asset: `${r.site.asset_label}${r.site.asset_assumed ? " (assumed)" : ""}`, stage: r.site.stage,
+    ...(r.decision ? { decision: r.decision.value } : {}),
     flags: r.flags.length, by_confidence: byConf,
-    top_flags: r.flags.slice(0, 5).map((f) => ({ risk: f.risk, confidence: f.confidence, theme: f.theme, nearest_km: f.nearest_km })),
+    top_flags: r.flags.slice(0, 5).map((f) => ({ id: f.id, risk: f.risk, ...(f.severity ? { severity: f.severity } : {}), confidence: f.confidence, theme: f.theme, nearest_km: f.nearest_km })),
     evidence_features: evidenceOf(record).length, sources_checked: r.checked.length, not_checked: notChecked.map((c) => c.dataset).slice(0, 6), gaps: r.data_gaps.length,
     ...(r.parse_error ? { problem: r.parse_error } : {}),
-    note: "The run card under your reply shows the flags, evidence, distances (with a slider) and gaps, and the map shows the evidence. Reply in two or three sentences: the most serious flags and the main gaps. Don't repeat the card.",
+    note: "The run card under your reply shows the decision, the flags (F-01…), evidence, next steps, distances (with a slider) and gaps, and the map shows the evidence. Reply in two or three sentences: the most serious flags and the main gaps. Don't repeat the card.",
   };
 }
 
@@ -480,7 +494,8 @@ export function createScreening({ host, table, skill, callClaude, model = "", on
       const r = rec.tobler_run;
       return {
         run: r.id, site: r.site.name, scope: r.extent === "inside" ? "inside the area only" : "the site and its surroundings", asset: r.site.asset_label, stage: r.site.stage, distances: distancesLine(r.distances), assessed_within_km: r.assessed_within_km,
-        flags: r.flags.map((f) => ({ risk: f.risk, theme: THEME_CODE[f.theme] || f.theme, confidence: f.confidence, why: f.why,
+        ...(r.decision ? { decision: r.decision } : {}),
+        flags: r.flags.map((f) => ({ id: f.id, risk: f.risk, theme: THEME_CODE[f.theme] || f.theme, ...(f.severity ? { severity: f.severity } : {}), confidence: f.confidence, why: f.why, ...(f.next_step ? { next_step: f.next_step } : {}),
           evidence: f.evidence.map((e) => ({ name: e.name, distance_km: e.distance_km, band: e.band, dataset: e.dataset, publisher: e.publisher, traced: e.traced })) })),
         checked: r.checked.map((c) => ({ dataset: c.dataset, publisher: c.publisher, result: c.result, ...(c.count ? { count: c.count } : {}), ...(c.why ? { why: c.why.slice(0, 160) } : {}) })),
         data_gaps: r.data_gaps,

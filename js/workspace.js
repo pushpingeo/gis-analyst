@@ -15,6 +15,7 @@ import { createScreening, evidenceOf, evidenceWithin, nearestByTheme, flagBeyond
 import { groupGaps, gapSummary, GAP_GROUPS } from "./gaps.js";
 import * as U from "./units.js";
 import { pickExamples } from "./examples.js";
+import { chooseIndustry, industryNote } from "./industry.js";
 import { getUserKey, setUserKey } from "./claude.js";
 import { distancesLine, bandFor } from "./distances.js";
 import { DISCLAIMER } from "./disclaimer.js";
@@ -612,10 +613,14 @@ const host = {
 };
 // Screening runs: sealed NTR runs with their own tools; the conversation gets the headline, the card the detail.
 let distTable = null;
-let assetPicks = null;
+// The industry profile in use (Settings → Industry; catalogue/industries/). Only Energy is ready so far.
+let industries = null, profile = null;
+host.profile = () => profile;
+const assetPicks = () => profile?.asset_picks || null;
+const screenSkill = () => skills[profile?.skill || "ntr-screening"];
 let runLog = null, runSteps = null; // the turn a run belongs to, for the log and "How I worked this out"
 host.screening = createScreening({
-  host, table: () => distTable, skill: () => skills["ntr-screening"], callClaude, model: CONFIG.model,
+  host, table: () => distTable, skill: screenSkill, callClaude, model: CONFIG.model,
   onRun: (record) => {
     const r = record.tobler_run;
     // The log keeps what the card shows, so a downloaded log explains the card on its own.
@@ -639,14 +644,30 @@ host.screening = createScreening({
 });
 const tools = createPlaceTools(host);
 // The conversation doesn't load the NTR method itself: screen_site runs it as a sealed run.
-const conversationSkills = () => Object.values(skills).filter((s) => s.name !== "ntr-screening");
+const conversationSkills = () => Object.values(skills).filter((s) => s.name !== (profile?.skill || "ntr-screening"));
+
+// Loads the industry index and the chosen (ready) profile, its screening skill if not already loaded, and puts its
+// wording and examples on the page. Called at start and when Settings → Industry changes.
+async function loadIndustry(stored) {
+  industries = industries || await fetch(asset("catalogue/industries/index.json")).then((r) => r.json());
+  const id = chooseIndustry(industries, stored);
+  const entry = industries.industries.find((i) => i.id === id);
+  if (!entry) throw new Error("no industry profile is ready");
+  const next = await fetch(asset(entry.file)).then((r) => r.json());
+  if (next.skill_file && !skills[next.skill]) { const sk = parseSkill(await fetch(asset(next.skill_file)).then((r) => r.text())); skills[sk.name] = sk; }
+  profile = next;
+  const chip = document.querySelector(".chip[data-screen]");
+  if (chip && profile.wording?.screen_chip) chip.textContent = profile.wording.screen_chip;
+  paintExamples();
+  return profile;
+}
 
 Promise.all([
   ...["skills/place-finding/SKILL.md", "skills/ntr-screening/SKILL.md"].map((f) => fetch(asset(f)).then((r) => r.text()).then((t) => { const s = parseSkill(t); skills[s.name] = s; })),
   fetch(asset("catalogue/anchors.json")).then((r) => r.json()).then((j) => { anchors = j.sources; }),
   fetch(asset("catalogue/trusted.json")).then((r) => r.json()).then((j) => { trusted = j; }),
   fetch(asset("catalogue/distances.json")).then((r) => r.json()).then((j) => { distTable = j; }),
-  fetch(asset("catalogue/asset-picks.json")).then((r) => r.json()).then((j) => { assetPicks = j; }),
+  loadIndustry(store.get("industry")),
 ]).catch((e) => note(`Something the analyst needs didn't load: ${e.message}`));
 
 // ---- cards ----------------------------------------------------------------------------
@@ -953,7 +974,7 @@ function showRun(record) {
     activity(`Re-assessing ${r.site.name} ${entry.km === 0 && entry.area ? "inside the area" : `within ${U.dist(entry.km)}`}…`, true);
     const t0 = Date.now();
     try {
-      await reassess({ record, km: entry.km, skill: skills["ntr-screening"], callClaude });
+      await reassess({ record, km: entry.km, skill: screenSkill(), callClaude });
       const done = { at: new Date().toISOString(), reassess: r.id, within_km: entry.km, ms: Date.now() - t0, flags: r.flags.length };
       sessionLog.push(done);
       sharer.share(done);
@@ -992,9 +1013,14 @@ function paintRun(entry) {
     const d = document.createElement("details");
     const s = document.createElement("summary");
     const sw = el("span", null, "swatch"); sw.style.background = THEMES[f.theme]?.colour || THEMES.context.colour; sw.title = THEMES[f.theme]?.label || "";
-    s.append(el("span", f.confidence, "conf"), sw, el("span", f.risk, "risk"), el("span", f.nearest_km == null ? "" : fmtKm(f.nearest_km), "dist"));
+    const risk = el("span", null, "risk");
+    if (f.id) risk.append(el("span", f.id, "fid"));
+    risk.append(document.createTextNode(f.risk));
+    s.append(el("span", f.confidence, "conf"), sw, risk, el("span", f.nearest_km == null ? "" : fmtKm(f.nearest_km), "dist"));
+    s.title = `${f.severity ? `Severity ${f.severity}, ` : ""}confidence ${f.confidence}`;
     const body = el("div", null, "body");
-    body.append(el("p", `${THEMES[f.theme]?.label || "Operating context"}${THEME_CODE[f.theme] && THEME_CODE[f.theme] !== "context" ? ` (${THEME_CODE[f.theme]})` : ""}. ${f.why || ""}`, "why"));
+    body.append(el("p", `${THEMES[f.theme]?.label || "Operating context"}${THEME_CODE[f.theme] && THEME_CODE[f.theme] !== "context" ? ` (${THEME_CODE[f.theme]})` : ""}.${f.severity ? ` Severity ${f.severity}, confidence ${f.confidence}.` : ""} ${f.why || ""}`, "why"));
+    if (f.next_step) { const nx = el("p", null, "next"); nx.append(el("b", "Next step: "), document.createTextNode(f.next_step)); body.append(nx); }
     const ev = el("ul", null, "ev");
     for (const e of f.evidence) {
       const item = el("li");
@@ -1011,6 +1037,13 @@ function paintRun(entry) {
     return li;
   }));
   if (!r.flags.length && !r.parse_error) list.replaceChildren(el("li", "No flags raised. See what was checked and the gaps below.", "flag note"));
+  // The decision first (from the ESIA read, 20 Nov): what the screen suggests, in the analyst's words, and why.
+  const dec = card.querySelector(".decision");
+  dec.hidden = !r.decision;
+  if (r.decision) {
+    dec.replaceChildren(el("b", `${r.decision.value.charAt(0).toUpperCase()}${r.decision.value.slice(1)}.`), document.createTextNode(r.decision.why ? ` ${r.decision.why}` : ""));
+    dec.title = "The analyst's overall reading of this screen. A screen, not a decision to build: see the disclaimer.";
+  }
   card.querySelector(".dists").textContent = r.extent === "inside"
     ? "Inside the area only: findings inside it or touching its edge."
     : entry.area && r.assessed_within_km === 0
@@ -1202,7 +1235,11 @@ let pendingReply = null;
 const loadedSkills = new Set();
 $("ask").addEventListener("submit", (e) => { e.preventDefault(); send(say.value.trim()); });
 // The welcome examples change on every load: one of each kind from a small pool (js/examples.js).
-pickExamples().forEach((text, i) => { const b = document.querySelectorAll("[data-example]")[i]; if (b) b.textContent = text; });
+// Examples come from the industry profile once it has loaded (the page's own text stands until then).
+function paintExamples() {
+  if (!profile?.examples) return;
+  pickExamples(profile.examples).forEach((text, i) => { const b = document.querySelectorAll("[data-example]")[i]; if (b) b.textContent = text; });
+}
 document.querySelectorAll("[data-example]").forEach((b) => b.addEventListener("click", () => send(b.textContent.trim())));
 
 // The whole session, tool inputs and outputs included, for checking what the analyst did. Kept in the page only;
@@ -1248,11 +1285,11 @@ async function send(text, forModel = text) {
   const turnLog = { at: new Date().toISOString(), user: text, ...(forModel !== text ? { sent: forModel } : {}), events: [] };
   sessionLog.push(turnLog);
   try {
-    const summary = [await projectSummary(ref, host.places(), focusName, viewBounds()), U.unitsNote()].filter(Boolean).join("\n");
+    const summary = [await projectSummary(ref, host.places(), focusName, viewBounds()), U.unitsNote(), industryNote(profile, industries)].filter(Boolean).join("\n");
     const skillList = conversationSkills();
     runLog = turnLog; runSteps = steps;
     const res = await runTurn({
-      system: systemPrompt({ skills: skillList, loaded: skillList.filter((s) => loadedSkills.has(s.name)), comingSoon: ["net developable area and constraints-and-access analysis"] }),
+      system: systemPrompt({ skills: skillList, loaded: skillList.filter((s) => loadedSkills.has(s.name)), comingSoon: ["net developable area and constraints-and-access analysis"], industryRule: profile?.other_requests || "" }),
       messages: buildMessages({ recent, summary, userText: forModel }),
       tools: placeToolDefs(skillList),
       maxRounds: CONFIG.workspaceRounds || 10,
@@ -1353,7 +1390,7 @@ async function askAssetType(name, question) {
   if (!p) throw new Error(`No place called "${name}".`);
   let offshore = false;
   try { offshore = !!(await R.describe(ref, p.feature)).offshore; } catch { /* reference not loaded: on land */ }
-  const { shown, more } = picksFor(assetPicks, offshore);
+  const { shown, more } = picksFor(assetPicks(), offshore);
   const card = el("div", null, "msg analyst asset-pick");
   card.append(el("p", question || `What's planned at ${p.name}? It sets how far the screen looks.`));
   const row = el("div", null, "picks");
@@ -1412,6 +1449,17 @@ document.querySelectorAll(".tools [data-mode]").forEach((b) => b.addEventListene
 const dlg = $("settings");
 const form = dlg.querySelector("form");
 function paintSettings() {
+  const ic = form.querySelector(".industry-choices");
+  ic.replaceChildren(...(industries?.industries || []).map((i) => {
+    const ready = i.status === "ready";
+    const lab = el("label", null, ready ? "" : "soon");
+    const r = Object.assign(document.createElement("input"), { type: "radio", name: "industry", value: i.id, disabled: !ready, checked: i.id === profile?.id });
+    r.addEventListener("change", () => { if (!r.checked) return; store.set("industry", i.id); loadIndustry(i.id).catch((e) => note(`That industry didn't load: ${e.message}`)); });
+    const text = el("span");
+    text.append(el("b", i.label), document.createTextNode(ready ? ` · ${i.about}` : ` · coming soon: ${i.about.charAt(0).toLowerCase()}${i.about.slice(1)}`));
+    lab.append(r, text);
+    return lab;
+  }));
   form.esri.checked = host.esriLicence();
   form.nonCommercial.checked = host.nonCommercial();
   form.shareSessions.checked = store.get("shareSessions") !== "no";

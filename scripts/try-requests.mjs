@@ -6,6 +6,7 @@ import * as turf from "@turf/turf";
 import * as R from "../js/reference.js";
 import { createPlaceTools, placeToolDefs, projectSummary } from "../js/placetools.js";
 import { parseSkill, systemPrompt, buildMessages, runTurn } from "../js/converse.js";
+import { chooseIndustry, industryNote } from "../js/industry.js";
 import { atlasCall } from "./atlas-client.mjs";
 import { createScreening, evidenceOf } from "../js/ntrrun.js";
 import { firmsCall } from "./firms-client.mjs";
@@ -14,6 +15,9 @@ const UA = { "User-Agent": "tobler-try/1.0 (+https://github.com/pushpingeo/toble
 const ref = R.createReference(async (n) => JSON.parse(readFileSync(`data/ref/${n}.json`, "utf8")));
 const anchors = JSON.parse(readFileSync("catalogue/anchors.json", "utf8")).sources;
 const trusted = JSON.parse(readFileSync("catalogue/trusted.json", "utf8"));
+// The industry profile, as the page uses it (Energy until another is ready).
+const industries = JSON.parse(readFileSync("catalogue/industries/index.json", "utf8"));
+const profile = JSON.parse(readFileSync(industries.industries.find((i) => i.id === chooseIndustry(industries, process.env.INDUSTRY)).file, "utf8"));
 const skill = parseSkill(readFileSync("skills/place-finding/SKILL.md", "utf8"));
 const ntr = parseSkill(readFileSync("skills/ntr-screening/SKILL.md", "utf8"));
 const allSkills = [skill, ntr];
@@ -40,7 +44,7 @@ const convs = (process.env.REQUESTS || "").split("\n").map((l) => l.trim()).filt
 for (const conv of convs) {
   const list = [];
   const host = {
-    ref, anchors, headers: UA, list, trusted,
+    ref, anchors, headers: UA, list, trusted, profile: () => profile,
     firms: process.env.FIRMS_MAP_KEY ? firmsCall : null,
     esriLicence: () => process.env.ESRI_LICENCE === "yes",
     nonCommercial: () => process.env.NON_COMMERCIAL === "yes",
@@ -79,7 +83,8 @@ for (const conv of convs) {
       const r = rec.tobler_run;
       console.log(`   [RUN CARD ${r.id}: ${r.site.name}; ${r.site.asset_label}${r.site.asset_assumed ? " (assumed)" : ""}; ${r.site.footprint}; ${r.distances.near}/${r.distances.close}/${r.distances.wider} km (${r.distances.reasons[0]})]`);
       if (r.sea) console.log(`     SEA ${JSON.stringify(r.sea).slice(0, 900)}`);
-      for (const f of r.flags) console.log(`     ${f.confidence.toUpperCase()} [${f.theme}] ${f.risk} | nearest ${f.nearest_km} km | evidence ${f.traced} traced, ${f.untraced} not traced: ${f.evidence.map((e) => `${e.name} ${e.distance_km} km${e.traced ? "" : " (untraced)"}`).join("; ").slice(0, 400)}`);
+      console.log(`     DECISION: ${r.decision ? `${r.decision.value} (${r.decision.why})` : "none given"}`);
+      for (const f of r.flags) console.log(`     ${f.id} ${f.severity ? `sev ${f.severity}, ` : ""}${f.confidence.toUpperCase()} [${f.theme}]${f.next_step ? ` next: ${f.next_step} |` : ""} ${f.risk} | nearest ${f.nearest_km} km | evidence ${f.traced} traced, ${f.untraced} not traced: ${f.evidence.map((e) => `${e.name} ${e.distance_km} km${e.traced ? "" : " (untraced)"}`).join("; ").slice(0, 400)}`);
       console.log(`     checked: ${r.checked.map((c) => `${c.dataset} → ${c.result}${c.count ? ` ${c.count}` : ""}`).join("; ").slice(0, 900)}`);
       console.log(`     gaps: ${r.data_gaps.join(" | ").slice(0, 600)}`);
       console.log(`     evidence features: ${evidenceOf(rec).length}; tokens ${r.usage.input_tokens} in / ${r.usage.output_tokens} out${r.parse_error ? `; PROBLEM ${r.parse_error}` : ""}`);
@@ -98,8 +103,8 @@ for (const conv of convs) {
     said.push(text);
     try {
       const res = await runTurn({
-        system: systemPrompt({ skills: convSkills, loaded, comingSoon: ["net developable area and constraints-and-access analysis"] }),
-        messages: buildMessages({ recent, summary: await projectSummary(ref, list, list.at(-1)?.name), userText: text }),
+        system: systemPrompt({ skills: convSkills, loaded, comingSoon: ["net developable area and constraints-and-access analysis"], industryRule: profile.other_requests }),
+        messages: buildMessages({ recent, summary: [await projectSummary(ref, list, list.at(-1)?.name), industryNote(profile, industries)].join("\n"), userText: text }),
         tools: placeToolDefs(convSkills),
         maxRounds: 14,
         exec: (name, input) => tools.exec(name, input),

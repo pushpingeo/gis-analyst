@@ -9,12 +9,12 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=712ad327">
+<link rel="stylesheet" href="css/workspace.css?v=9e897dae">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
  "imports": {
-  "./js/assetpicks.js": "./js/assetpicks.js?v=9f159dcf",
+  "./js/assetpicks.js": "./js/assetpicks.js?v=01d8f63a",
   "./js/atlasclient.js": "./js/atlasclient.js?v=354e8a1e",
   "./js/atlasfeatures.js": "./js/atlasfeatures.js?v=c8e33cad",
   "./js/boundaries.js": "./js/boundaries.js?v=b245dfdc",
@@ -22,19 +22,20 @@
   "./js/confidence.js": "./js/confidence.js?v=ad22f5c6",
   "./js/config.js": "./js/config.js?v=06c1aa11",
   "./js/config.js?v=m2b": "./js/config.js?v=06c1aa11",
-  "./js/converse.js": "./js/converse.js?v=197e1233",
+  "./js/converse.js": "./js/converse.js?v=bdc7fdc3",
   "./js/datatools.js": "./js/datatools.js?v=4291d91e",
   "./js/disclaimer.js": "./js/disclaimer.js?v=8cfa6424",
   "./js/distances.js": "./js/distances.js?v=8be82f4f",
   "./js/elevation.js": "./js/elevation.js?v=a05f52e1",
-  "./js/examples.js": "./js/examples.js?v=d012a83f",
+  "./js/examples.js": "./js/examples.js?v=7400f8d2",
   "./js/fence.js": "./js/fence.js?v=eee6e5f0",
   "./js/findings.js": "./js/findings.js?v=b71c96c8",
   "./js/gaps.js": "./js/gaps.js?v=0fa336a8",
   "./js/gazetteer.js": "./js/gazetteer.js?v=6eeefff7",
   "./js/geometry.js": "./js/geometry.js?v=6bc3cd92",
+  "./js/industry.js": "./js/industry.js?v=46df5282",
   "./js/licence.js": "./js/licence.js?v=cf8fd6ef",
-  "./js/ntrrun.js": "./js/ntrrun.js?v=07c88075",
+  "./js/ntrrun.js": "./js/ntrrun.js?v=ef4921eb",
   "./js/placetools.js": "./js/placetools.js?v=232333b6",
   "./js/reference.js": "./js/reference.js?v=b21a38d8",
   "./js/seavalues.js": "./js/seavalues.js?v=5477290d",
@@ -43,7 +44,7 @@
   "./js/units.js": "./js/units.js?v=77029a89",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=3fe9d05f",
+  "./js/workspace.js": "./js/workspace.js?v=324e4edd",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -51,16 +52,17 @@
 </script>
 <script type="application/json" id="asset-versions">
 {
- "skills/ntr-screening/SKILL.md": "skills/ntr-screening/SKILL.md?v=80e8f726",
+ "skills/ntr-screening/SKILL.md": "skills/ntr-screening/SKILL.md?v=33ea446a",
  "skills/ntr-screening/operations.md": "skills/ntr-screening/operations.md?v=224cb367",
  "skills/ntr-screening-ifc/SKILL.md": "skills/ntr-screening-ifc/SKILL.md?v=d087c0ba",
  "skills/ntr-screening-ifc/operations.md": "skills/ntr-screening-ifc/operations.md?v=2277331a",
  "skills/place-finding/SKILL.md": "skills/place-finding/SKILL.md?v=a61f2c5e",
  "skills/place-finding/operations.md": "skills/place-finding/operations.md?v=5603be0c",
  "catalogue/anchors.json": "catalogue/anchors.json?v=4239096c",
- "catalogue/asset-picks.json": "catalogue/asset-picks.json?v=088acc95",
  "catalogue/catalogue.json": "catalogue/catalogue.json?v=1fae6aef",
  "catalogue/distances.json": "catalogue/distances.json?v=0373f482",
+ "catalogue/industries/energy.json": "catalogue/industries/energy.json?v=2d4916f1",
+ "catalogue/industries/index.json": "catalogue/industries/index.json?v=68e2b890",
  "catalogue/trusted.json": "catalogue/trusted.json?v=49864a30",
  "data/ref/coastline.json": "data/ref/coastline.json?v=e913d7a4",
  "data/ref/countries.json": "data/ref/countries.json?v=bd02bffd",
@@ -141,6 +143,11 @@
 <dialog class="settings" id="settings" aria-labelledby="settings-title">
   <form method="dialog">
     <header><h2 id="settings-title">Settings</h2><button class="close" value="close" title="Close" aria-label="Close settings">×</button></header>
+    <fieldset>
+      <legend>Industry</legend>
+      <div class="industry-choices" role="radiogroup" aria-label="Industry"></div>
+      <p class="hint-line">Decides the screening method, the quick picks and the examples. Energy is ready; the others are on the way.</p>
+    </fieldset>
     <fieldset>
       <legend>Data the analyst may use</legend>
       <label class="switch"><input type="checkbox" name="esri"> <span><b>I hold an Esri licence</b>Lets the analyst use layers under Esri's Master License Agreement (Living Atlas copies). Leave off unless your organisation is licensed.</span></label>
@@ -249,6 +256,7 @@
     <p class="setup"></p>
     <p class="sea" hidden></p>
     <p class="problem" hidden></p>
+    <p class="decision" hidden></p>
     <ol class="flags"></ol>
     <div class="reach">
       <div class="scope" role="radiogroup" aria-label="What to look at" hidden>
@@ -272,6 +280,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=3fe9d05f"></script>
+<script type="module" src="js/workspace.js?v=324e4edd"></script>
 </body>
 </html>
