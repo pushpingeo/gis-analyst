@@ -202,6 +202,14 @@ try {
     assert.equal((await post("/epsg", { path: "Extent/2397" }, { ip: "9.9.9.1", origin: "https://evil.example" })).status, 403);
   });
 
+  await t("EPSG: datum, ellipsoid, unit and version records for the transform tool", async () => {
+    for (const path of ["Datum/6277", "DatumEnsemble/6326", "Ellipsoid/7001", "PrimeMeridian/8901", "Unit/9104"])
+      assert.equal((await post("/epsg", { path }, { ip: "9.9.9.2" })).status, 200, path);
+    assert.equal((await post("/epsg", { path: "VersionHistory", query: { pageSize: 1 } }, { ip: "9.9.9.3" })).status, 200);
+    assert.equal((await post("/epsg", { path: "Ellipsoid/7001/alias" }, { ip: "9.9.9.3" })).status, 400);
+    assert.equal((await post("/epsg", { path: "VersionHistory/446/export" }, { ip: "9.9.9.3" })).status, 400);
+  });
+
   await t("Logs: stored from Tobler's pages only, with checks on the shape", async () => {
     assert.equal((await post("/logs", turn(0), { origin: "https://evil.example" })).status, 403);
     assert.equal((await post("/logs", turn(0, { session: "x" }))).status, 400);

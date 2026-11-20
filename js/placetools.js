@@ -13,7 +13,7 @@ import { elevationFrom, elevationSignificance } from "./elevation.js";
 import { themeFor, THEME_IDS } from "./findings.js";
 import { ASSET_TYPES } from "./distances.js";
 import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES, candidate, settlementNear } from "./gazetteer.js";
-import { parseCoordinates } from "./coords.js";
+import { parseCoordinates, formatLatLon } from "./coords.js";
 
 // Common names that aren't Natural Earth's own, and seas (energy basins especially) by rough box.
 const COUNTRY_ALIASES = { "united states": "united states of america", us: "usa", america: "united states of america", "u.s.": "usa", "u.s.a.": "usa",
@@ -646,7 +646,27 @@ export function createPlaceTools(host) {
     return host.screening.screen(i, p);
   };
   // Coordinate reference (EPSG registry via the Worker): js/epsgtools.js.
-  Object.assign(run, createEpsgTools(host, (ref) => resolve(ref).lonlat));
+  // transform takes the person's own numbers only: a typed-coordinates candidate, never a place already in WGS 84.
+  const typedAt = (ref) => { try { const r = resolve(ref); return r.cand?.source?.id === "typed" ? r.cand.lonlat : null; } catch { return null; } };
+  Object.assign(run, createEpsgTools(host, (ref) => resolve(ref).lonlat, typedAt));
+  // Each transformed point becomes a candidate, so make_place can use it and the place keeps how it was transformed.
+  const transformTool = run.transform;
+  run.transform = async (i) => {
+    const r = await transformTool(i);
+    if (!r?.applied) return r;
+    r.points.forEach((pt) => {
+      const c = candidate({
+        name: formatLatLon(pt.output.lon, pt.output.lat, 6), type: `coordinates transformed to ${r.to.name}`,
+        geometry: { type: "Point", coordinates: [pt.output.lon, pt.output.lat] },
+        source: { id: "transformed", title: `your coordinates, ${r.from.name} → ${r.to.name} by EPSG:${r.operation.code}`, publisher: "You", licence: "your own" },
+        extra: { input: pt.input, from: r.from.name, transformation: r.record, moved_m: pt.moved_m, ...(pt.outside_area_of_use ? { outside_area_of_use: true } : {}) },
+      });
+      c.lonlat = [pt.output.lon, pt.output.lat];
+      pt.candidate = keep(c);
+    });
+    r.next = "Each point is now a candidate (see candidate): use it with make_place to put it on the map; the place keeps the transformation.";
+    return r;
+  };
   run.get_run = async ({ run: id }) => {
     if (!host.screening) return { not_available: "Screening isn't connected here." };
     return host.screening.getRun(id);

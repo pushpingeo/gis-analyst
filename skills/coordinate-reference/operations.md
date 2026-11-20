@@ -33,11 +33,16 @@ carries the whole dataset as SQLite). Always report which version was used.
   (`choose` or `ask`).
 
 ## transform: apply an operation
-- **Does:** moves coordinates from one CRS to another with a named operation (never an unnamed default), and records
-  it.
-- **Returns:** the coordinates, the operation applied and its stated accuracy.
-- **Tobler:** British National Grid → WGS 84 in `js/coords.js` (EPSG:1314). General transformation in the page needs a
-  projection library; until then, other datums are looked up and reported, not applied.
+- **Does:** moves coordinates from one CRS to another with a named operation (never an unnamed default), computed from
+  the operation's own parameters and the two datums' ellipsoids as the registry gives them; runs it in reverse when
+  asked the other way; checks each point against the operation's area of use; and records it.
+- **Returns:** the coordinates, how far each moved, any points outside the area of use, the operation applied (code,
+  name, method, direction, stated accuracy) and the dataset version.
+- **Tobler:** `transform` (`js/epsgtools.js` reading the records through `/epsg`; the maths in `js/transform.js`):
+  geocentric translations, Position Vector and Coordinate Frame (geog2D, geog3D and geocentric domains, EPSG methods
+  9603/1035/1031, 9606/1037/1033, 9607/1038/1032), Molodensky and abridged Molodensky (9604, 9605). Checked against
+  IOGP's GIGS tests 5203 and 5204. Grid-based methods (OSTN15, NTv2, NADCON) aren't applied. Typed British National Grid
+  references are still converted in `js/coords.js` (EPSG:1314).
 
 ## measure_equal_area: share of an area, overlays
 - **Does:** intersects and measures areas in a Lambert azimuthal equal-area projection centred on the area of

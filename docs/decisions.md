@@ -2,6 +2,40 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 20 Nov 2026 (late night): the `transform` tool applies the chosen transformation (Rob)
+- **Why:** `transformation_options` could choose an operation but nothing could apply it, so the analyst couldn't say
+  how far a point moved, and once said 1314 "was applied" when it had only been chosen.
+- **Built:** `js/transform.js` (pure maths, nothing copied from EPSG): geographic ↔ geocentric, geocentric
+  translations (9603, 1035, 1031), Position Vector (9606, 1037, 1033), Coordinate Frame (9607, 1038, 1032),
+  Molodensky and abridged Molodensky (9604, 9605). The `transform` tool (`js/epsgtools.js`) reads the operation's
+  record, its parameters and their units (the registry's own `Unit` records), the source and target datums'
+  ellipsoids (`GeodeticCoordRefSystem` → `Datum` → `Ellipsoid`) and the dataset version (`VersionHistory`, today
+  13.106), then applies it forward or in reverse as the CRSs ask. It returns the moved coordinates, how far each moved,
+  points outside the operation's area of use, and a record (operation code, name, accuracy, direction, EPSG version).
+  Each moved point becomes a candidate, so `make_place` puts it on the map and the place keeps the transformation.
+- **Only the person's own numbers:** `transform` takes a typed-coordinates candidate or numbers; a place already on
+  the map (WGS 84) is refused, so nothing is shifted twice. Grid methods, a non-Greenwich prime meridian, unknown
+  units and projected numbers are refused with a reason.
+- **Reverse direction:** the exact inverse (X = R⁻¹(X' − T)/M), not EPSG's sign change. Both are within GIGS's
+  tolerances on the reverse points (sign change fits GIGS's printed values slightly better: worst 2.0 cm vs 3.3 cm,
+  the tolerance being 3.3 cm), but only the exact inverse round-trips: the sign change is about 1.5 cm off for 1314
+  (its scale is 20 ppm), above GIGS's 6 mm round-trip tolerance. My call; one function to change.
+- **Wording:** `transformation_options` says a chosen operation is "chosen, not yet applied" and names `transform`;
+  the conversation prompt and the skill (1.1-draft, "Chosen is not applied") say "applied" only after `transform`.
+- **Worker:** `/epsg` now also serves `Datum`, `DatumEnsemble`, `Ellipsoid`, `PrimeMeridian`, `Unit` records and the
+  `VersionHistory` list (read-only, same cache and limit).
+- **Tested:** `test/transform.test.mjs` (maths against PROJ 9 values computed independently: 1314, 15929, 1311 forward
+  and reverse, Molodensky; the tool against the fake registry); Worker tests 17/17; `browser-epsg.mjs` 28/28 (an ED50
+  well typed in the chat, moved 117.6 m by 1311 and placed, desktop and phone). **GIGS 5203 and 5204**
+  (`scripts/gigs-check.mjs`, Action "GIGS check"): all 82 points (2D and 3D, forward and reverse) within GIGS's
+  tolerances, with the parameters from GIGS's own objects and from the live registry through the tool; the 3D round
+  trips come back exact. One 2D round trip (5203-01, at 80° N, 150° E) is 1.5 cm off against a 6 mm tolerance: a 2D
+  method drops the height on the way (the point is 172 m above the OSGB36 ellipsoid there), which any 2D implementation
+  does; reported, not hidden. Longitude differences are scaled by cos(latitude) so GIGS's 0.0000003° means about 3 cm
+  everywhere; unscaled, PROJ misses it at ±70° too.
+- **GIGS licence:** the dataset is cloned into the runner's temp folder by the Action; nothing from it is in this
+  repo, and only differences are printed. IOGP acknowledged in the script.
+
 ## 20 Nov 2026 (late evening): coordinates typed into the chat are a place (Rob)
 - **Why:** Rob typed "55.522759, -5.650122". `find_place` sent it to the name searches, Nominatim returned the Argyll
   and Bute county centre about 100 km away, `make_place` was refused, and the analyst told him to drop the pin himself.

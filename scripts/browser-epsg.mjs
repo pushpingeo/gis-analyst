@@ -1,5 +1,6 @@
 // Headless browser check of the coordinate reference tools: the skill loads, the settings switch is saved and read,
-// and transformation_options answers through the page's Worker client with "choose" and with "ask". The model and
+// transformation_options answers through the page's Worker client with "choose" and with "ask", and transform applies
+// EPSG:1311 to an ED50 well typed in the chat and puts the moved point on the map with its record. The model and
 // the EPSG registry are faked (test/fake-epsg.mjs), so this checks the page and tools, not the model or EPSG.
 // Run: python3 -m http.server 8000 (in the repo), then node scripts/browser-epsg.mjs [chrome path].
 import { chromium } from "playwright-core";
@@ -11,6 +12,7 @@ const toolUse = (...u) => ({ id: "m", type: "message", role: "assistant", stop_r
 const text = (t) => ({ id: "m", type: "message", role: "assistant", stop_reason: "end_turn", content: [{ type: "text", text: t }], usage: { input_tokens: 100, output_tokens: 10 } });
 const outputs = [];
 let toolNames = [];
+let wellMode = false;
 function model(body) {
   toolNames = body.tools.map((t) => t.name);
   const last = body.messages.at(-1);
@@ -19,6 +21,12 @@ function model(body) {
   const raw = typeof res.content === "string" ? res.content : res.content[0].text;
   const out = raw.startsWith("Skill ") ? { skill: raw.split(".")[0].slice(6), method: raw } : JSON.parse(raw);
   outputs.push(out); if (process.env.DEBUG) console.log(JSON.stringify(out).slice(0, 400));
+  if (wellMode) {
+    if (out.skill) return toolUse(["find_place", { query: "57 30 00 N, 1 45 00 E" }]);
+    if (out.candidates || out.found != null || Array.isArray(out.results)) { const id = JSON.stringify(out).match(/"(C\d+)"/)?.[1]; return toolUse(["transform", { operation: "1311", source: "4230", target: "4326", at: id }]); }
+    if (out.applied) return toolUse(["make_place", { anchor: out.points[0].candidate, shape: "point", match: "named_place", words: "My well is at 57 30 00 N, 1 45 00 E in ED50", name: "Well" }]);
+    return text(`Moved ${outputs.find((o) => o.applied)?.points[0].moved_m} m by EPSG:1311.`);
+  }
   if (out.skill) return toolUse(["transformation_options", { source: "27700", target: "4326", at: "55.97, -3.60" }]);
   return text(out.chosen ? `Using EPSG:${out.chosen}.` : "Here are the options.");
 }
@@ -74,6 +82,24 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
 
   await page.click("#gear");
   await page.check('input[name="tfm"][value="choose"]');
+  await page.keyboard.press("Escape");
+
+  // An ED50 well typed in the chat: read, transformed by 1311 in the page, and placed where WGS 84 puts it.
+  wellMode = true;
+  const before = outputs.length;
+  await page.fill("#say", "My well is at 57 30 00 N, 1 45 00 E in ED50. Put it on the map in WGS 84.");
+  await page.click("#ask button[type=submit]");
+  for (let i = 0; i < 80 && !outputs.slice(before).some((o) => o.place); i++) await page.waitForTimeout(250);
+  wellMode = false;
+  const tr = outputs.slice(before).find((o) => o.applied);
+  check(toolNames.includes("transform"), `${label}: the analyst has transform`);
+  check(tr && Math.abs(tr.points[0].output.lat - 57.49936045) < 2e-8 && Math.abs(tr.points[0].output.lon - 1.74843851) < 2e-8 && Math.abs(tr.points[0].moved_m - 117.6) < 0.1,
+    `${label}: transform moves the well by 1311 to 57.49936045, 1.74843851 (117.6 m)${tr ? "" : ": no transform result"}`);
+  check(tr?.record?.operation === "EPSG:1311" && tr?.record?.accuracy_m === 1 && tr?.record?.epsg_version === "13.106", `${label}: the result records EPSG:1311, 1 m and the EPSG version`);
+  const well = await page.evaluate(() => { const p = window.__ws.host.places().find((x) => x.name === "Well"); return p && { c: p.feature.geometry.coordinates, t: p.origin?.anchor?.extra?.transformation }; });
+  check(well && Math.abs(well.c[1] - 57.49936045) < 1e-7 && Math.abs(well.c[0] - 1.74843851) < 1e-7, `${label}: the well is placed at the transformed position${well ? ` (${well.c})` : ": not placed"}`);
+  check(well?.t?.operation === "EPSG:1311", `${label}: the place keeps the transformation it was built from`);
+  await page.click("#gear");
   check(await page.evaluate(() => localStorage.getItem("tobler.transformationChoice")) === null, `${label}: back to "Choose for me" clears the saved value`);
   await page.screenshot({ path: `/tmp/epsg-${label}.png` });
   check(!errors.length, `${label}: no page errors${errors.length ? `: ${errors.slice(0, 3).join(" | ")}` : ""}`);

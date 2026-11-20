@@ -26,10 +26,10 @@ const FIRMS_SOURCES = new Set(["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "VIIRS_NOAA
 const FIRMS_MAX_DEG2 = 400; // keeps one call to a few FIRMS transactions
 // EPSG registry (apps.epsg.org/api/v1): read-only paths the coordinate tools need, and their query fields.
 const EPSG_PATHS = [
-  /^(CoordRefSystem|GeodeticCoordRefSystem|ProjectedCoordRefSystem|Transformation|ConcatenatedOperation|CoordOperation|CoordOperationMethod|Extent)\/\d{1,6}$/,
+  /^(CoordRefSystem|GeodeticCoordRefSystem|ProjectedCoordRefSystem|Transformation|ConcatenatedOperation|CoordOperation|CoordOperationMethod|Extent|Datum|DatumEnsemble|Ellipsoid|PrimeMeridian|Unit)\/\d{1,6}$/,
   /^(CoordRefSystem|Transformation|ConcatenatedOperation|Extent)\/\d{1,6}\/export$/,
   /^Extent\/\d{1,6}\/polygon$/,
-  /^(CoordRefSystem|Transformation|Extent)$/,
+  /^(CoordRefSystem|Transformation|Extent|VersionHistory)$/,
   /^Transformation\/crs$/,
 ];
 const EPSG_QUERY = new Set(["keywords", "page", "pageSize", "includeDeprecated", "includeWorld", "sourceCRSCode", "targetCRSCode", "format", "formatVersion"]);

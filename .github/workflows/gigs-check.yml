@@ -1,0 +1,26 @@
+name: GIGS check
+# Checks the datum transformations (js/transform.js and the transform tool) against IOGP's GIGS tests 5203 and 5204.
+# GIGS files are cloned into the runner's temp folder as test data only, never into this repo (GIGS licence), and
+# only differences are printed. No Anthropic cost. Runs on changes to the transformation code, or by hand.
+on:
+  workflow_dispatch:
+    inputs:
+      via_worker: { description: 'Read EPSG through the live Worker route instead of apps.epsg.org (yes/no)', required: false, default: 'no' }
+  push:
+    branches: [main]
+    paths: ['js/transform.js', 'js/epsgtools.js', 'scripts/gigs-check.mjs']
+jobs:
+  gigs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: git clone --depth 1 https://github.com/IOGP-GIGS/GIGSTestDataset "$RUNNER_TEMP/gigs"
+      - name: Parameters from GIGS's own objects
+        run: node scripts/gigs-check.mjs "$RUNNER_TEMP/gigs"
+      - name: The transform tool, reading the EPSG registry live
+        run: node scripts/gigs-check.mjs "$RUNNER_TEMP/gigs" --live
+        env:
+          EPSG_PROXY: "${{ inputs.via_worker == 'yes' && 'https://tobler-api.robdunfey.workers.dev/epsg' || '' }}"
