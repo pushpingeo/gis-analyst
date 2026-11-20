@@ -20,7 +20,7 @@ import { getUserKey, setUserKey } from "./claude.js";
 import { distancesLine, bandFor } from "./distances.js";
 import { DISCLAIMER } from "./disclaimer.js";
 import { seaShort, seaMatters } from "./seavalues.js";
-import { placeRole, whereText, searchHeadline, SEARCH_BAND } from "./siterole.js";
+import { placeRole, whereText, searchHeadline, SEARCH_BAND, EDGE_BAND, edgeText, approxHeadline } from "./siterole.js";
 import { elevationShort } from "./elevation.js";
 import { createLogSharer } from "./sharelog.js";
 import { settlementNear } from "./gazetteer.js";
@@ -189,7 +189,7 @@ function start() {
   map.addSource("aoi", { type: "geojson", data: turf.featureCollection([]) });
   const proposed = ["==", ["get", "status"], "proposed"];
   // A search area (a stand-in for an outline nobody found) is drawn lighter: a thin dashed line, no ranging pole.
-  const search = ["==", ["get", "role"], "search_area"];
+  const search = ["in", ["get", "role"], ["literal", ["search_area", "approximate_site"]]];
   const solid = ["all", ["!=", ["geometry-type"], "Point"], ["!", search]];
   map.addLayer({ id: "aoi-fill", type: "fill", source: "aoi", filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], paint: { "fill-color": C.pole, "fill-opacity": ["case", search, 0.03, proposed, 0.04, 0.07] } });
   map.addLayer({ id: "aoi-halo", type: "line", source: "aoi", filter: solid, paint: { "line-color": C.ink, "line-width": 6.5, "line-opacity": ["case", proposed, 0.45, 0.85] } });
@@ -302,7 +302,7 @@ function scheduleRefresh() {
     const feats = draw.getSnapshot().filter((f) => places.has(f.id) || !isGuide(f)).map((f) => {
       const p = places.get(f.id);
       const role = p ? placeRole(p.origin || {}, p.feature?.geometry || f.geometry).role : "";
-      return { type: "Feature", geometry: withExtras(p, f.geometry), properties: { label: p ? `${p.name}${role === "search_area" ? " · search area" : ""}${p.status === "proposed" ? " (proposed)" : ""}` : "", status: p?.status || "", role } };
+      return { type: "Feature", geometry: withExtras(p, f.geometry), properties: { label: p ? `${p.name}${role === "search_area" ? " · search area" : role === "approximate_site" ? " · approximate site" : ""}${p.status === "proposed" ? " (proposed)" : ""}` : "", status: p?.status || "", role } };
     });
     map.getSource("aoi")?.setData(turf.featureCollection(feats));
   });
@@ -407,7 +407,7 @@ function findingPopup(e) {
   box.className = "finding-pop";
   const name = document.createElement("b"); name.textContent = p.label || "Unnamed feature";
   const what = document.createElement("span");
-  const km = p.surrounds ? "around the site (a wide area it lies within) · " : p.in_search_area ? `${whereText(p)} · ` : p.distance_km == null || p.distance_km === "null" ? "" : +p.distance_km === 0 ? "on site · " : `${U.dist(+p.distance_km)} from the site · `;
+  const km = p.surrounds ? "around the site (a wide area it lies within) · " : p.in_search_area ? `${whereText(p)} · ` : p.site_position === "edge" ? `${edgeText(p)} · ` : p.distance_km == null || p.distance_km === "null" ? "" : +p.distance_km === 0 ? "on site · " : `${U.dist(+p.distance_km)} from the site · `;
   what.textContent = `${THEMES[p.theme]?.label || ""} · ${km}${p.dataset}${p.publisher ? ` (${p.publisher})` : ""}`;
   box.append(name, what);
   new maplibregl.Popup({ closeButton: true, maxWidth: "280px" }).setLngLat(e.lngLat).setDOMContent(box).addTo(map);
@@ -886,10 +886,10 @@ function showRunOnMap(record, { fit = true } = {}) {
   findings.clear(); hiddenThemes.clear();
   for (const f of evidenceOf(record)) {
     const p = f.properties;
-    const band = p.band === "on site" || p.band === SEARCH_BAND ? "near" : p.band === "beyond" || p.band === "unknown" ? "wider" : p.band;
+    const band = p.band === "on site" || p.band === SEARCH_BAND || p.band === EDGE_BAND ? "near" : p.band === "beyond" || p.band === "unknown" ? "wider" : p.band;
     findings.set(`${r.id}:${p.fid}`, { type: "Feature", geometry: f.geometry, properties: {
       id: `${r.id}:${p.fid}`, run: r.id, label: p.name, theme: p.theme, band: p.surrounds ? "wider" : band, ...(p.surrounds ? { surrounds: true } : {}),
-      ...(p.in_search_area ? { in_search_area: true, ...(p.coverage != null ? { coverage: p.coverage } : {}), ...(p.side ? { side: p.side } : {}) } : {}), distance_km: p.distance_km, area_km2: p.area_km2 ?? null, dataset: p.dataset, publisher: p.publisher,
+      ...(p.in_search_area ? { in_search_area: true, ...(p.coverage != null ? { coverage: p.coverage } : {}), ...(p.side ? { side: p.side } : {}) } : {}), ...(p.site_position ? { site_position: p.site_position, ...(p.side ? { side: p.side } : {}) } : {}), distance_km: p.distance_km, area_km2: p.area_km2 ?? null, dataset: p.dataset, publisher: p.publisher,
     } });
   }
   shownRun = r.id;
@@ -948,9 +948,9 @@ function showRun(record) {
   ].filter(Boolean).join(" · ");
   card.querySelector(".disclaimer").textContent = DISCLAIMER;
   // A search area says so first: the site's outline wasn't found, so nothing on this card is "on site".
-  if (r.site.role === "search_area") {
+  if (r.site.role === "search_area" || r.site.role === "approximate_site") {
     const sn = card.querySelector(".search-note"); sn.hidden = false;
-    sn.textContent = U.localise(searchHeadline(r.site));
+    sn.textContent = U.localise(r.site.role === "search_area" ? searchHeadline(r.site) : approxHeadline(r.site));
   }
   // Water depth and vessel traffic, read in code for sites at sea (js/seavalues.js).
   // On land, elevation shows only when it matters (low-lying, high altitude); at sea it's the water depth.
@@ -1085,7 +1085,7 @@ function paintRun(entry) {
     const risk = el("span", null, "risk");
     if (f.id) risk.append(el("span", f.id, "fid"));
     risk.append(document.createTextNode(f.risk));
-    s.append(el("span", f.confidence, "conf"), sw, risk, el("span", f.relation === SEARCH_BAND ? "in search area" : f.nearest_km == null ? "" : fmtKm(f.nearest_km), "dist"));
+    s.append(el("span", f.confidence, "conf"), sw, risk, el("span", f.relation === SEARCH_BAND ? "in search area" : f.relation === EDGE_BAND ? "site edge" : f.nearest_km == null ? "" : fmtKm(f.nearest_km), "dist"));
     s.title = `${f.severity ? `Severity ${f.severity}, ` : ""}confidence ${f.confidence}`;
     const body = el("div", null, "body");
     body.append(el("p", `${THEMES[f.theme]?.label || "Operating context"}${THEME_CODE[f.theme] && THEME_CODE[f.theme] !== "context" ? ` (${THEME_CODE[f.theme]})` : ""}.${f.severity ? ` Severity ${f.severity}, confidence ${f.confidence}.` : ""} ${f.why || ""}${f.confidence_capped ? ` (Confidence ${f.confidence_capped}.)` : ""}`, "why"));
@@ -1093,7 +1093,7 @@ function paintRun(entry) {
     const ev = el("ul", null, "ev");
     for (const e of f.evidence) {
       const item = el("li");
-      item.append(el("b", e.name || "Unnamed"), document.createTextNode(` · ${e.band === "around the site" ? "around the site (a wide area it lies within)" : e.band === SEARCH_BAND ? whereText(e) : e.distance_km == null ? "distance not given" : `${fmtKm(e.distance_km)}${e.band && e.band !== "on site" ? ` (${e.band})` : ""}`} `));
+      item.append(el("b", e.name || "Unnamed"), document.createTextNode(` · ${e.band === "around the site" ? "around the site (a wide area it lies within)" : e.band === SEARCH_BAND ? whereText(e) : e.band === EDGE_BAND ? edgeText(e) : e.distance_km == null ? "distance not given" : `${fmtKm(e.distance_km)}${e.band && e.band !== "on site" ? ` (${e.band})` : ""}`} `));
       item.append(el("span", `· ${[e.dataset, e.publisher && `(${e.publisher})`].filter(Boolean).join(" ")}${e.licence ? `, ${e.licence}` : ""}${e.checked ? `, checked ${String(e.checked).slice(0, 10)}` : ""} `, "src"));
       item.append(e.traced ? el("span", "· traced to the data", "src") : el("span", "· not traced to fetched data", "untraced"));
       ev.append(item);
@@ -1162,7 +1162,7 @@ function paintReach(entry) {
   const where = inside ? (r.site.role === "search_area" ? "inside the search area or touching its edge" : "inside the area or touching its edge") : `within ${U.dist(km)}`;
   const wideLine = wide.length ? ` The site also lies within ${wide.length === 1 ? "a wide area" : `${wide.length} wide areas`}: ${wide.slice(0, 3).join("; ")}${wide.length > 3 ? ` and ${wide.length - 3} more` : ""}.` : "";
   card.querySelector(".nearest").textContent = (n
-    ? `${n} finding${n === 1 ? "" : "s"} ${where}. ${inside ? "Found" : "Nearest"}: ${near.map((x) => `${(THEMES[x.theme]?.label || x.theme).toLowerCase()}, ${x.name}${inside ? "" : ` (${r.site.role === "search_area" && x.distance_km === 0 ? "in the search area" : fmtKm(x.distance_km)})`}`).join("; ")}.`
+    ? `${n} finding${n === 1 ? "" : "s"} ${where}. ${inside ? "Found" : "Nearest"}: ${near.map((x) => `${(THEMES[x.theme]?.label || x.theme).toLowerCase()}, ${x.name}${inside ? "" : ` (${r.site.role === "search_area" && x.distance_km === 0 ? "in the search area" : x.site_position === "edge" ? "at the site's edge" : fmtKm(x.distance_km)})`}`).join("; ")}.`
     : `Nothing found ${where} in the sources checked.`) + wideLine;
   card.querySelectorAll(".flag").forEach((li, i) => {
     const f = r.flags[i];
@@ -1229,6 +1229,7 @@ async function refreshCard(p) {
     const [lon, lat] = d.centroid;
     const role = placeRole(p.origin || {}, p.feature.geometry);
     const rows = [
+      role.role === "approximate_site" && ["What it is", `An approximate site (${role.why}): the centre is known, the boundary estimated. A screen counts findings reaching its middle as on site and marks those only in its outer part as at its edge. If you have the real outline, draw it.`],
       role.role === "search_area" && ["What it is", `A search area (${role.why}), standing in for an outline that wasn't found. A screen of it says how much of it each finding covers, not "on site". If you have the real outline, draw it.`],
       [p.kind === "Point" ? "Location" : "Centre", `${lat.toFixed(4)}, ${lon.toFixed(4)}`],
       d.area_km2 != null && ["Area", U.area(d.area_km2)],

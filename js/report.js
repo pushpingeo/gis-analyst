@@ -51,7 +51,8 @@ export function findingRows(run) {
     severity: f.severity || "not rated", confidence: f.confidence, nearest_km: f.nearest_km, why: f.why || "", next_step: f.next_step || "",
     relation: f.relation || null, confidence_capped: f.confidence_capped || null,
     evidence: (f.evidence || []).map((e) => ({ name: e.name || "Unnamed", distance_km: e.distance_km, band: e.band, dataset: e.dataset || "", publisher: e.publisher || "", checked: e.checked ? String(e.checked).slice(0, 10) : "", traced: !!e.traced,
-      ...(e.in_search_area ? { in_search_area: true, coverage: e.coverage ?? null, side: e.side ?? null } : {}) })),
+      ...(e.in_search_area ? { in_search_area: true, coverage: e.coverage ?? null, side: e.side ?? null } : {}),
+      ...(e.site_position ? { site_position: e.site_position, side: e.side ?? null } : {}) })),
   }));
 }
 

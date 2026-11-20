@@ -100,6 +100,8 @@ export function placeToolDefs(skills) {
           replaces: { type: "string", description: "Name of a place YOU proposed earlier in this conversation that this one replaces (a rebuild or a correction). The old one is removed, the new one takes its name, and the old one's distance checks carry over. Use it instead of leaving a duplicate on the map." },
           reason: { type: "string", description: "One line: the evidence for the location" },
           clip: { type: "object", description: "Optional: cut the shape to a limit, e.g. a corridor along the M9 'within 5 km of Linlithgow' → { to: <Linlithgow's candidate id>, within_km: 5 }. Without within_km it's cut to the outline of 'to' (a place or a candidate with an outline, e.g. 'only inside Fife').", properties: { to: { type: "string", description: "Candidate id or place name" }, within_km: { type: "number" } }, required: ["to"] },
+          size_from: { type: "string", description: "With site_centre: where the size came from, in a few words (\"your estimate\", \"about 0.5 km² per turbine for 29 turbines\", \"the default for an onshore wind farm\")." },
+          site_centre: { type: "boolean", description: "True when the anchor is the site's own centre as the person gave it (their coordinates, or a point they said is the site), and this circle or square is the site's approximate size: their estimate, or a default you said you'd use. The place then counts as an approximate site: findings reaching its middle are on site, those only in its outer part are marked as at its edge. Not for an area the person asked for round a landmark, and not with an offset." },
           scale: { type: "string", enum: ["local", "regional", "global"], description: "Only when the request itself says the scale of the work (e.g. 'screen Mozambique' is global, 'the whole of the Moray Firth' regional) and it differs from the shape's size. Otherwise leave it out and the size decides." },
         },
         required: ["anchor", "shape", "words", "match", "reason"],
@@ -531,6 +533,11 @@ export function createPlaceTools(host) {
       // What the place stands for, set in code from how it was built (js/siterole.js): a published outline, an area
       // the person asked for, or a search area standing in for an outline nobody found (Cnoc Buidhe, 20 Nov).
       { const r = placeRole(origin, f.geometry); origin.role = r.role; origin.role_why = r.why; }
+      // Built round the site's own centre at an estimated size: an approximate site (Rob, 20 Nov late night).
+      if (i.site_centre && ["circle", "square", "rectangle"].includes(i.shape) && !i.offset_km) {
+        origin.role = "approximate_site";
+        origin.role_why = `round the site centre given; size from ${i.size_from ? String(i.size_from).replace(/^(from|size from)\s+/i, "") : "an estimate"}`;
+      }
       // Replacing: the old proposal goes first, so the new one can take its name.
       // Replacing: add the new place first (so a failure leaves the old one), then remove the old one and let the new
       // one take its name unless a new name was given.
@@ -542,6 +549,7 @@ export function createPlaceTools(host) {
         if ((!i.name || norm(i.name) === norm(oldName)) && p.name !== oldName) host.renamePlace?.(p.name, oldName);
       }
       return { ...(await placeSummary(p)), ...(old ? { replaced: old.name } : {}), how: steps.join(", then "), confidence: rated.confidence, why: rated.rules,
+        ...(origin.role === "approximate_site" ? { what_it_is: `An approximate site (${origin.role_why}): the centre is known, the boundary estimated. A screen of it counts findings reaching its middle as on site and marks those only in its outer part as at its edge.` } : {}),
         ...(origin.role === "search_area" ? { what_it_is: `A search area (${origin.role_why}), standing in for an outline that wasn't found. Say so when you show it, and that a screen of it reports findings by how much of the area they cover, not as "on site". If the person has the real outline, they can draw it.` } : {}),
         ...(checks.length ? { checks } : {}),
         ...(dropped.length ? { failed_checks_left_out: dropped, about_them: "These clues failed on the place this one replaces and aren't checked now. Tell the person, unless they corrected the clue themselves; never drop one to raise the confidence." } : {}),
@@ -597,7 +605,7 @@ export function createPlaceTools(host) {
       return {
         place: p.name, status: p.status, summary: R.summaryLine(d), ...pickD(d),
         how_made: p.origin?.method === "words" ? { words: p.origin.words, anchor: p.origin.anchor?.name || p.origin.anchor?.place, source: p.origin.anchor?.source?.title, steps: p.origin.steps, confidence: p.origin.confidence } : { method: "drawn on the map" },
-        what_it_is: (({ role, why }) => `${role === "search_area" ? "search area" : role}: ${why}`)(placeRole(p.origin, p.feature.geometry)),
+        what_it_is: (({ role, why }) => `${role === "search_area" ? "search area" : role === "approximate_site" ? "approximate site" : role}: ${why}`)(placeRole(p.origin, p.feature.geometry)),
         edits: (p.edits || []).map((e) => e.change),
       };
     },
@@ -722,7 +730,8 @@ export async function projectSummary(ref, places, focus, view = null) {
   for (const p of places) {
     const d = await R.describe(ref, p.feature);
     const how = p.origin?.method === "words" ? `from words "${p.origin.words}" (anchor: ${p.origin.anchor?.name || p.origin.anchor?.place}, ${p.origin.confidence} confidence)` : "drawn on the map";
-    const role = placeRole(p.origin, p.feature.geometry).role === "search_area" ? "; a search area (the site's outline wasn't found)" : "";
+    const r0 = placeRole(p.origin, p.feature.geometry).role;
+    const role = r0 === "search_area" ? "; a search area (the site's outline wasn't found)" : r0 === "approximate_site" ? "; an approximate site (centre known, boundary estimated)" : "";
     const edits = p.edits?.length ? `; edited: ${p.edits.slice(-3).map((e) => e.change).join("; ")}` : "";
     lines.push(`- ${p.name}${p.name === focus ? " [in focus]" : ""} (${p.status}): ${R.summaryLine(d)}; scale ${p.scale || d.scale}${p.scaleFrom && p.scaleFrom !== "size" ? ` (from ${p.scaleFrom === "you" ? "the person" : p.scaleFrom})` : ""}; ${how}${role}${edits}`);
   }

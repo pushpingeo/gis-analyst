@@ -123,6 +123,15 @@ await test("make_place builds a 3 km² square on the anchor and records how", as
   assert.equal(host.list[1].origin.role, "search_area");
   assert.match(s2.what_it_is, /^A search area \(built from clues round JACKDAW\)/);
   assert.match(await projectSummary(host.ref, host.list, null), /a search area \(the site's outline wasn't found\)/);
+  // Round the site's own centre at an estimated size: an approximate site, not a search area or the person's area.
+  const s3 = await t.exec("make_place", { anchor: id, shape: "circle", area_km2: 15, site_centre: true, size_from: "your estimate", words: "the site, centred here, about 15 km²", match: "named_place", reason: "x" });
+  assert.equal(host.list[2].origin.role, "approximate_site");
+  assert.equal(host.list[2].origin.role_why, "round the site centre given; size from your estimate");
+  assert.match(s3.what_it_is, /^An approximate site/);
+  assert.match(await projectSummary(host.ref, host.list, null), /an approximate site \(centre known, boundary estimated\)/);
+  // site_centre with an offset isn't the centre any more.
+  await t.exec("make_place", { anchor: id, shape: "circle", area_km2: 15, site_centre: true, offset_km: 3, bearing_deg: 0, words: "x", match: "named_place", reason: "x" });
+  assert.notEqual(host.list[3].origin.role, "approximate_site");
 });
 
 await test("feature shape uses the block outline; edits resize and rotate on the ground", async () => {

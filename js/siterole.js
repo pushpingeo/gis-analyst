@@ -9,9 +9,19 @@ export const SEARCH_BAND = "in the search area";
 // A finding covering less than this share of a search area is low confidence: a layout could easily avoid it.
 export const LOW_COVERAGE = 0.1;
 
+// Approximate sites (Rob, 20 Nov late night: "it shouldn't be low confidence just because it's a centre point"). When
+// the site's centre is known (a point, or coordinates the person gave as the site's centre) and only its size is
+// estimated, the uncertainty is where the boundary runs, not where the site is. So a finding reaching the middle of
+// the approximate site is on site at full confidence; one only in its outer part is "at the site's edge", with its
+// confidence capped. The core is a disc of CORE_SHARE of the site's radius round the centre (checkpoint for Rob).
+export const EDGE_BAND = "at the site's edge";
+export const CORE_SHARE = 0.5;
+
 // Roles: "footprint" (a published outline of the asset, or a shape the person drew), "area" (an area the person asked
-// for round a found place: "3 km² round the Jackdaw platform"), "search_area" (a stand-in for an unknown outline,
-// including the default footprint round a point), "point".
+// for round a found place: "3 km² round the Jackdaw platform"), "approximate_site" (a known centre with an estimated
+// size: a point screened on its default footprint, or a shape built round the site centre the person gave),
+// "search_area" (a stand-in for an outline nobody found, built from clues round something that isn't the asset),
+// "point".
 export function placeRole(origin = {}, geometry = {}) {
   if (geometry.type === "Point") return { role: "point", why: "a point" };
   if (origin.role) return { role: origin.role, why: origin.role_why || "" };
@@ -144,6 +154,74 @@ export function applySearchArea(flags, evidenceByFid) {
       ...(capped ? { confidence: cap, confidence_capped: `${f.confidence} → ${cap}: inside a search area, not a known site outline${small ? `, and covering under ${Math.round(LOW_COVERAGE * 100)}% of it` : ""}` } : {}) };
   });
 }
+
+// ---- approximate sites ----------------------------------------------------------------
+// Planar distance from the origin to a segment.
+function segDist([x1, y1], [x2, y2]) {
+  const dx = x2 - x1, dy = y2 - y1, L = dx * dx + dy * dy;
+  const t = L ? Math.max(0, Math.min(1, -(x1 * dx + y1 * dy) / L)) : 0;
+  return Math.hypot(x1 + t * dx, y1 + t * dy);
+}
+// Where a feature inside an approximate site sits: "core" if it reaches the disc of CORE_SHARE × the site's radius
+// round the centre, else "edge"; with the side it's on. Equal-area projection centred on the site's centre.
+// site: the footprint Feature; centre: [lon, lat] of the known centre.
+export function positionIn(site, centre, geometry) {
+  if (!site?.geometry || !geometry || !/Polygon/.test(site.geometry.type)) return null;
+  const P = laea(centre);
+  const km2 = planarArea(projectGeom(site.geometry, P));
+  if (!(km2 > 0)) return null;
+  const radius = Math.sqrt(km2 / Math.PI), core = CORE_SHARE * radius;
+  const g = projectGeom(geometry, P);
+  const segs = (lines) => lines.flatMap((l) => l.slice(0, -1).map((c, i) => [c, l[i + 1]]));
+  let d;
+  if (g.type === "Point") d = Math.hypot(...g.coordinates);
+  else if (g.type === "MultiPoint") d = Math.min(...g.coordinates.map((c) => Math.hypot(...c)));
+  else if (/LineString/.test(g.type)) {
+    const lines = g.type === "LineString" ? [g.coordinates] : g.coordinates;
+    d = Math.min(...segs(lines).map(([a, b]) => segDist(a, b)), ...lines.flat().map((c) => Math.hypot(...c)));
+  } else if (/Polygon/.test(g.type)) {
+    const polys = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
+    const contains = polys.some((poly) => turf.booleanPointInPolygon([0, 0], { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: poly } }));
+    d = contains ? 0 : Math.min(...segs(polys.flat()).map(([a, b]) => segDist(a, b)));
+  } else return null;
+  if (!Number.isFinite(d)) return null;
+  // The side: of the nearest bit is hard to name; use the direction of the feature's middle from the centre.
+  let side = null;
+  try { const c = turf.centroid({ type: "Feature", properties: {}, geometry: g }).geometry.coordinates; side = Math.hypot(...c) < 0.35 * radius ? "middle" : sideOf(c, radius); } catch { side = null; }
+  return { position: d <= core ? "core" : "edge", core_km: Math.round(core * 100) / 100, from_centre_km: Math.round(d * 100) / 100, side };
+}
+
+// "at the site's edge (its south-western side)"
+export const edgeText = (p) => `${EDGE_BAND}${p?.side && p.side !== "middle" && p.side !== "most" ? ` (its ${p.side} side)` : ""}`;
+
+// The analyst's "on site" for a flag resting only on edge findings reads "at the site's edge".
+export function rewordEdge(text) {
+  if (!text) return text;
+  const keepCase = (m, to) => (m[0] === m[0].toUpperCase() ? to[0].toUpperCase() + to.slice(1) : to);
+  return String(text).replace(/\bon[- ]site\b|\bon the site\b|\bwithin the (site|footprint)\b|\binside the (site|footprint)\b/gi, (m) => keepCase(m, EDGE_BAND));
+}
+
+// Flags on an approximate site: a flag with traced evidence reaching the core is on site, unchanged. A flag whose
+// on-site evidence lies only in the outer part says "at the site's edge" and is capped at medium: the real boundary
+// may leave it out. Severity stays. Flags resting only on features off the site are unchanged.
+export function applyApproximateSite(flags, evidenceByFid) {
+  const ORDER = { high: 0, medium: 1, low: 2 };
+  return flags.map((f) => {
+    const on = (f.fids || []).map((id) => evidenceByFid.get(id)).filter((p) => p?.site_position);
+    if (!on.length) return f;
+    if (on.some((p) => p.site_position === "core")) return { ...f, relation: "on site" };
+    const capped = ORDER[f.confidence] < ORDER.medium;
+    return { ...f, risk: rewordEdge(f.risk), why: rewordEdge(f.why), relation: EDGE_BAND,
+      ...(capped ? { confidence: "medium", confidence_capped: `${f.confidence} → medium: only in the outer part of an approximate site, whose real boundary may leave it out` } : {}) };
+  });
+}
+
+const sizeWords = (km2) => (km2 == null ? "" : km2 < 1 ? `${Math.round(km2 * 100)} ha ` : `${Math.round(km2 * 10) / 10} km² `);
+// The line the card and the report lead with for an approximate site.
+export function approxHeadline(site = {}) {
+  return `Screened an approximate site of ${sizeWords(site.area_km2) || "estimated size "}(${site.role_why || "round the site's centre"}), because the site's outline wasn't available. Findings reaching its middle count as on site; findings only in its outer part are marked "at the site's edge", with confidence capped at medium, since the real boundary may leave them out.`;
+}
+export const APPROX_NOTE = (km2, why) => `an approximate site of ${sizeWords(km2).trim()} (${why}): the centre is known, the boundary is estimated`;
 
 // The line the card and the report lead with for a search area.
 export function searchHeadline(site = {}) {

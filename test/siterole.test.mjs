@@ -1,7 +1,7 @@
 // Site footprint vs search area (js/siterole.js), from Rob's Cnoc Buidhe screen (20 Nov).
 import assert from "node:assert/strict";
 import * as turf from "../js/vendor/turf.js";
-import { placeRole, coverageIn, whereText, reword, applySearchArea, searchHeadline, SEARCH_BAND, LOW_COVERAGE } from "../js/siterole.js";
+import { placeRole, coverageIn, whereText, reword, applySearchArea, searchHeadline, SEARCH_BAND, LOW_COVERAGE, positionIn, applyApproximateSite, approxHeadline, edgeText, EDGE_BAND, CORE_SHARE } from "../js/siterole.js";
 import { seaMatters } from "../js/seavalues.js";
 
 let passed = 0;
@@ -92,6 +92,58 @@ await test("headline and when the sea belongs in the write-up", () => {
   assert.equal(seaMatters({ site: { setting: "onshore" }, sea: { traffic }, flags: [{ evidence: [{ from_values: "vessel traffic" }] }] }), true);
   assert.equal(seaMatters({ site: { setting: "offshore" }, sea: { traffic }, flags: [] }), true);
   assert.equal(seaMatters({ site: { setting: "offshore" }, flags: [] }), false);
+});
+
+await test("approximate site: a known centre, an estimated size; the middle is on site, the outer part is the edge", () => {
+  // Cnoc Buidhe's centre (169700 E, 630800 N) with a 3 km radius, as the default footprint round a point.
+  const centre = [-5.6495, 55.5165];
+  const site = turf.circle(centre, 3, { units: "kilometers", steps: 64 });
+  assert.equal(CORE_SHARE, 0.5);
+  const at = (km, bearing) => turf.destination(centre, km, bearing, { units: "kilometers" }).geometry;
+  assert.equal(positionIn(site, centre, at(0.5, 0)).position, "core", "a point near the centre");
+  assert.equal(positionIn(site, centre, at(1.4, 90)).position, "core", "just inside half the radius");
+  const edge = positionIn(site, centre, at(2.5, 225));
+  assert.equal(edge.position, "edge");
+  assert.equal(edge.side, "south-western");
+  assert.equal(edgeText(edge), "at the site's edge (its south-western side)");
+  // An area clipping the eastern edge: edge. An area containing the centre: core (distance 0).
+  const clip = turf.circle(turf.destination(centre, 3.5, 90, { units: "kilometers" }), 1, { units: "kilometers" }).geometry;
+  assert.equal(positionIn(site, centre, clip).position, "edge");
+  const big = turf.circle(turf.destination(centre, 2, 0, { units: "kilometers" }), 3, { units: "kilometers" }).geometry;
+  const pb = positionIn(site, centre, big);
+  assert.equal(pb.position, "core"); assert.equal(pb.from_centre_km, 0);
+  // A line passing 1 km north of the centre, with no vertex near it: core (segment distance, not vertices).
+  const line = turf.lineString([turf.destination(centre, 5, 270, { units: "kilometers" }).geometry.coordinates, turf.destination(centre, 5, 90, { units: "kilometers" }).geometry.coordinates].map((c) => turf.destination(c, 1, 0, { units: "kilometers" }).geometry.coordinates)).geometry;
+  const pl = positionIn(site, centre, line);
+  assert.equal(pl.position, "core"); near(pl.from_centre_km, 1, 0.05, "line distance");
+  // Works the same far north (equal-area, centred on the site).
+  const north = [20, 70];
+  assert.equal(positionIn(turf.circle(north, 3, { units: "kilometers" }), north, turf.destination(north, 2.5, 0, { units: "kilometers" }).geometry).position, "edge");
+});
+
+await test("approximate site flags: core evidence keeps its confidence; edge-only is capped and reworded", () => {
+  const ev = new Map([
+    ["E1", { fid: "E1", site_position: "core" }],
+    ["E2", { fid: "E2", site_position: "edge", side: "eastern" }],
+    ["E3", { fid: "E3", distance_km: 2 }],
+  ]);
+  const out = applyApproximateSite([
+    { risk: "SPA on site", confidence: "high", severity: "high", fids: ["E1", "E2"] },
+    { risk: "Goose roost on site", why: "It lies on the site.", confidence: "high", severity: "high", fids: ["E2"] },
+    { risk: "Houses nearby", confidence: "high", fids: ["E3"] },
+    { risk: "Peat on site", confidence: "low", fids: ["E2"] },
+  ], ev);
+  assert.equal(out[0].confidence, "high"); assert.equal(out[0].relation, "on site");
+  assert.equal(out[1].confidence, "medium"); assert.equal(out[1].relation, EDGE_BAND);
+  assert.equal(out[1].severity, "high", "severity stays");
+  assert.match(out[1].confidence_capped, /high → medium: only in the outer part/);
+  assert.equal(out[1].risk, "Goose roost at the site's edge");
+  assert.doesNotMatch(out[1].why, /on the site/);
+  assert.deepEqual(out[2], { risk: "Houses nearby", confidence: "high", fids: ["E3"] }, "off-site flags untouched");
+  assert.equal(out[3].confidence, "low"); assert.equal(out[3].confidence_capped, undefined);
+  assert.match(approxHeadline({ area_km2: 28.27, role_why: "a 3 km radius round the point, the default for an onshore wind farm" }),
+    /^Screened an approximate site of 28\.3 km² \(a 3 km radius round the point, the default for an onshore wind farm\), because the site's outline wasn't available\./);
+  assert.equal(placeRole({ method: "words", role: "approximate_site", role_why: "x" }, { type: "Polygon" }).role, "approximate_site");
 });
 
 console.log(`${passed} siterole tests passed`);

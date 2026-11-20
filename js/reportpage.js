@@ -7,7 +7,7 @@ import { decodeRun } from "./share.js";
 import { distancesLine } from "./distances.js";
 import { DISCLAIMER } from "./disclaimer.js";
 import { seaLines, seaMatters } from "./seavalues.js";
-import { whereText, searchHeadline, SEARCH_BAND } from "./siterole.js";
+import { whereText, searchHeadline, SEARCH_BAND, EDGE_BAND, edgeText, approxHeadline } from "./siterole.js";
 import { elevationLine } from "./elevation.js";
 import { findingLabels, findingRows, evidenceRows, sourcesOf, gapsOf, decisionText, summaryBlocks, changeLog } from "./report.js";
 
@@ -72,7 +72,8 @@ function render(record) {
   if (dec) decision.append(el("b", dec.head), document.createTextNode(dec.why ? ` ${dec.why}` : ""));
   else decision.append(el("span", "No overall decision was recorded for this run.", "none"));
   const searchArea = s.role === "search_area";
-  const searchNote = searchArea ? el("p", U.localise(searchHeadline(s)), "search-note") : null;
+  const approxSite = s.role === "approximate_site";
+  const searchNote = searchArea ? el("p", U.localise(searchHeadline(s)), "search-note") : approxSite ? el("p", U.localise(approxHeadline(s)), "search-note") : null;
   const summary = el("section", null, "summary");
   summary.append(el("h2", "Summary"));
   for (const b of summaryBlocks(r.summary)) {
@@ -96,8 +97,9 @@ function render(record) {
   siteSec.append(facts);
   const siteFig = figure("site-map", searchArea
     ? "The search area and the distances screened. The site's outline wasn't found, so the dashed outline is where it probably is, not its boundary; dashed rings are the near, close and wider bands."
+    : approxSite ? "The approximate site and the distances screened. Its centre is known; the dashed outline is an estimate of its size, not its boundary. Dashed rings are the near, close and wider bands."
     : "The site and the distances screened. The site is outlined; dashed rings are the near, close and wider bands.",
-    [["site", searchArea ? "The search area" : "The site"], ["ring", "Distance bands"]]);
+    [["site", searchArea ? "The search area" : approxSite ? "The approximate site" : "The site"], ["ring", "Distance bands"]]);
   siteSec.append(siteFig.fig);
 
   // 3. Findings: the numbered map and one row per finding.
@@ -106,7 +108,7 @@ function render(record) {
   findSec.append(el("h2", `Findings (${rows.length})`));
   const themesUsed = [...new Set(r.flags.map((f) => f.theme))];
   const findFig = figure("findings-map", "The evidence behind each finding, labelled with its number. Shapes are simplified for display.",
-    [["site", searchArea ? "The search area" : "The site"], ...themesUsed.map((t) => [t, THEMES[t]?.label || "Operating context"])]);
+    [["site", searchArea ? "The search area" : approxSite ? "The approximate site" : "The site"], ...themesUsed.map((t) => [t, THEMES[t]?.label || "Operating context"])]);
   findSec.append(findFig.fig);
   if (!rows.length) findSec.append(el("p", "No findings were raised. See what was checked and the gaps below."));
   else {
@@ -123,7 +125,7 @@ function render(record) {
       if (f.evidence.length) {
         const ul = el("ul", null, "ev");
         for (const e of f.evidence) {
-          const li = el("li", `${e.name} · ${e.band === "around the site" ? "around the site" : e.band === SEARCH_BAND ? whereText(e) : km(e.distance_km)}${e.dataset ? ` · ${e.dataset}` : ""}${e.publisher ? ` (${e.publisher})` : ""}${e.checked ? `, ${e.checked}` : ""}`);
+          const li = el("li", `${e.name} · ${e.band === "around the site" ? "around the site" : e.band === SEARCH_BAND ? whereText(e) : e.band === EDGE_BAND ? edgeText(e) : km(e.distance_km)}${e.dataset ? ` · ${e.dataset}` : ""}${e.publisher ? ` (${e.publisher})` : ""}${e.checked ? `, ${e.checked}` : ""}`);
           if (!e.traced) li.append(el("span", " · not traced to fetched data", "untraced"));
           ul.append(li);
         }
@@ -133,7 +135,7 @@ function render(record) {
       const rating = el("td", null, "rating");
       rating.append(el("span", `Severity ${f.severity}`), el("span", `Confidence ${f.confidence}${f.confidence_capped ? " (capped)" : ""}`));
       if (f.confidence_capped) rating.title = `Confidence ${f.confidence_capped}`;
-      tr.append(el("td", f.id, "id"), what, rating, el("td", f.relation === SEARCH_BAND ? "in the search area" : km(f.nearest_km), "dist"));
+      tr.append(el("td", f.id, "id"), what, rating, el("td", f.relation === SEARCH_BAND ? "in the search area" : f.relation === EDGE_BAND ? "at the site's edge" : km(f.nearest_km), "dist"));
       t.tBodies[0].append(tr);
     }
     findSec.append(t);
@@ -185,8 +187,8 @@ function render(record) {
   main.replaceChildren(...head, decision, ...(searchNote ? [searchNote] : []), summary, siteSec, findSec, evSec, meth, src, foot);
   const site = record.features.find((f) => f.properties.role === "site");
   const evid = record.features.filter((f) => f.properties.role === "evidence");
-  pending.push(drawMap(siteFig, { site, rings: r.extent === "inside" ? [] : [r.distances.near, r.distances.close, r.distances.wider], evidence: [], labels: null, searchArea }));
-  pending.push(drawMap(findFig, { site, rings: [], evidence: evid, labels: findingLabels(record), searchArea }));
+  pending.push(drawMap(siteFig, { site, rings: r.extent === "inside" ? [] : [r.distances.near, r.distances.close, r.distances.wider], evidence: [], labels: null, searchArea: searchArea || approxSite }));
+  pending.push(drawMap(findFig, { site, rings: [], evidence: evid, labels: findingLabels(record), searchArea: searchArea || approxSite }));
   Promise.allSettled(pending).then(() => { window.__report.ready = true; });
 }
 

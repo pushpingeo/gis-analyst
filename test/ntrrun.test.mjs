@@ -648,6 +648,44 @@ await test("a search area (no outline found): nothing is 'on site'; findings ins
   assert.equal(slim.tobler_run.flags.find((f) => /pipelines/.test(f.risk)).relation, SEARCH_BAND);
 });
 
+await test("a point is an approximate site: its middle is on site at full confidence, its outer part is the edge", async () => {
+  const { EDGE_BAND } = await import("../js/siterole.js");
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const run = async (at) => {
+    const model = standardScript();
+    const pt = { name: "Point 1", feature: turf.point(at), origin: { method: "drawn" } };
+    const rec = await runScreening({ host: host(), site: pt, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "offshore oil or gas field" } });
+    return { rec, model, r: rec.tobler_run, flow: rec.features.find((f) => /flowline/.test(f.properties.name)).properties, pipes: rec.tobler_run.flags.find((f) => /pipelines/.test(f.risk)) };
+  };
+  // Centred on the flowline's start: it reaches the middle, so on site and high.
+  const a = await run(FIELD);
+  assert.equal(a.r.site.role, "approximate_site");
+  assert.match(a.r.site.role_why, /5 km radius round the point, the default for an offshore oil or gas field/);
+  assert.match(a.r.site.footprint, /approximate site of .*the centre is known, the boundary is estimated/);
+  assert.deepEqual(a.r.site.centre, FIELD);
+  assert.match(a.r.method, /approximate site/);
+  assert.match(a.model.calls[0].messages[0].content, /The site's centre is known but its boundary is estimated/);
+  assert.equal(a.flow.site_position, "core");
+  assert.equal(a.flow.band, "on site");
+  assert.equal(a.pipes.confidence, "high", "no blanket cap for a centre point");
+  assert.equal(a.pipes.relation, "on site");
+  assert.match(headline(a.rec).site_is, /approximate site/);
+  // Centred 4 km south: the flowline only crosses the outer part (core is 2.5 km), so the edge, capped at medium.
+  const b = await run(turf.destination(FIELD, 4, 180).geometry.coordinates);
+  assert.equal(b.flow.site_position, "edge");
+  assert.equal(b.flow.band, EDGE_BAND);
+  assert.equal(b.pipes.relation, EDGE_BAND);
+  assert.equal(b.pipes.confidence, "medium");
+  assert.match(b.pipes.confidence_capped, /outer part of an approximate site/);
+  assert.doesNotMatch(b.pipes.risk, /on site/);
+  assert.equal(b.pipes.evidence[0].band, EDGE_BAND);
+  // The share link keeps it.
+  const { slimRun } = await import("../js/share.js");
+  const slim = slimRun(b.rec);
+  assert.equal(slim.tobler_run.site.role, "approximate_site");
+  assert.equal(slim.tobler_run.flags.find((f) => /pipelines/.test(f.risk)).relation, EDGE_BAND);
+});
+
 await test("a published outline stays a site: 'on site' and no cap", async () => {
   const rec = await runScreening({ host: host(), site, distances: chooseDistances(table, { asset_type: "oil-gas-field", offshore: true }), skill, callClaude: standardScript(), inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
   assert.equal(rec.tobler_run.site.role, "footprint");
