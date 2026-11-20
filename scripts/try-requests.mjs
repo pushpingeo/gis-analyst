@@ -6,6 +6,7 @@ import * as turf from "@turf/turf";
 import * as R from "../js/reference.js";
 import { createPlaceTools, placeToolDefs, projectSummary } from "../js/placetools.js";
 import { parseSkill, systemPrompt, buildMessages, runTurn } from "../js/converse.js";
+import { coordinateNote } from "../js/coords.js";
 import { chooseIndustry, industryNote } from "../js/industry.js";
 import { atlasCall } from "./atlas-client.mjs";
 import { createScreening, evidenceOf } from "../js/ntrrun.js";
@@ -105,7 +106,7 @@ for (const conv of convs) {
     try {
       const res = await runTurn({
         system: systemPrompt({ skills: convSkills, loaded, comingSoon: ["net developable area and constraints-and-access analysis"], industryRule: profile.other_requests }),
-        messages: buildMessages({ recent, summary: [await projectSummary(ref, list, list.at(-1)?.name), industryNote(profile, industries)].join("\n"), userText: text }),
+        messages: buildMessages({ recent, summary: [await projectSummary(ref, list, list.at(-1)?.name), industryNote(profile, industries)].join("\n"), userText: coordinateNote(text) ? `${text}\n\n${coordinateNote(text)}` : text }),
         tools: placeToolDefs(convSkills),
         maxRounds: 14,
         exec: (name, input) => tools.exec(name, input),

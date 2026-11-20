@@ -42,6 +42,37 @@ function memoryHost() {
   };
 }
 
+await test("typed coordinates are a place: read in code, not searched as a name (Rob's log, 20 Nov)", async () => {
+  const host = memoryHost();
+  const t = createPlaceTools(host);
+  calls.length = 0;
+  const out = await t.exec("find_place", { query: "55.522759, -5.650122" });
+  assert.equal(out.candidates.length, 1);
+  const c = out.candidates[0];
+  assert.equal(c.name, "55.52276° N, 5.65012° W");
+  assert.equal(c.type, "coordinates you typed");
+  assert.deepEqual([c.lat, c.lon], [55.5228, -5.6501]);
+  assert.equal(c.details.read_as, "decimal degrees");
+  assert.match(c.details.other_reading, /other way round/);
+  assert.match(out.note, /not searched for as a name/);
+  assert.ok(!calls.some((u) => /nominatim\.openstreetmap\.org\/search|wikidata/.test(u)), "no name search for coordinates");
+  // A point there, as the person asked: high confidence, exactly what was typed.
+  const p = await t.exec("make_place", { anchor: c.id, shape: "point", words: "a point marker at these coordinates", match: "named_place", reason: "typed" });
+  assert.equal(p.confidence, "high");
+  assert.deepEqual(host.list[0].feature.geometry.coordinates, [-5.650122, 55.522759], "not rounded");
+  assert.equal(host.list[0].origin.role, "point");
+  // Coordinates straight in make_place's anchor work too (the analyst skipping find_place).
+  const q = await t.exec("make_place", { anchor: "NT 002 774", shape: "circle", radius_km: 1, words: "1 km round NT 002 774", match: "named_place", reason: "typed" });
+  const ctr = turf.centroid(host.list[1].feature).geometry.coordinates;
+  assert.ok(Math.abs(ctr[1] - 55.9796) < 0.002 && Math.abs(ctr[0] + 3.6002) < 0.002, `a 1 km circle on Linlithgow Palace's grid square (${ctr})`);
+  assert.ok(q.place);
+  // Mixed with a name: the coordinates come first, and the name is still searched.
+  calls.length = 0;
+  const m = await t.exec("find_place", { query: "Bellochantuy", also: ["55.5167, -5.7"] });
+  assert.equal(m.candidates[0].type, "coordinates you typed");
+  assert.ok(calls.some((u) => /nominatim/.test(u)), "the name was searched");
+});
+
 await test("skill file parses", () => {
   assert.equal(skill.name, "place-finding");
   assert.match(skill.description, /Turn words into a place/);

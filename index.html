@@ -22,7 +22,8 @@
   "./js/confidence.js": "./js/confidence.js?v=ad22f5c6",
   "./js/config.js": "./js/config.js?v=7752ed50",
   "./js/config.js?v=m2b": "./js/config.js?v=7752ed50",
-  "./js/converse.js": "./js/converse.js?v=bdc7fdc3",
+  "./js/converse.js": "./js/converse.js?v=3a786e64",
+  "./js/coords.js": "./js/coords.js?v=66f3eded",
   "./js/datatools.js": "./js/datatools.js?v=4291d91e",
   "./js/disclaimer.js": "./js/disclaimer.js?v=8cfa6424",
   "./js/distances.js": "./js/distances.js?v=8be82f4f",
@@ -36,7 +37,7 @@
   "./js/industry.js": "./js/industry.js?v=46df5282",
   "./js/licence.js": "./js/licence.js?v=cf8fd6ef",
   "./js/ntrrun.js": "./js/ntrrun.js?v=09a06da0",
-  "./js/placetools.js": "./js/placetools.js?v=77c1c37f",
+  "./js/placetools.js": "./js/placetools.js?v=09fd4cd5",
   "./js/reference.js": "./js/reference.js?v=b21a38d8",
   "./js/seavalues.js": "./js/seavalues.js?v=2949ddce",
   "./js/share.js": "./js/share.js?v=132fa6a0",
@@ -46,7 +47,7 @@
   "./js/units.js": "./js/units.js?v=77029a89",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=ec089220",
+  "./js/workspace.js": "./js/workspace.js?v=6dc376c5",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -133,7 +134,7 @@
       <button type="button" class="drawbtn" id="drawbtn" title="Draw on the map" aria-expanded="false" aria-controls="tools">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7l8-3 7 6-3 9-11-2z"/><circle cx="5" cy="7" r="1.6"/><circle cx="13" cy="4" r="1.6"/><circle cx="20" cy="10" r="1.6"/></svg><span class="sr">Draw on the map</span></button>
       <label for="say" class="sr">Message</label>
-      <textarea id="say" rows="1" placeholder="Where should we look?" autocomplete="off"></textarea>
+      <textarea id="say" rows="1" placeholder="Where should we look? A place, an area or coordinates" autocomplete="off"></textarea>
       <button type="button" class="mic" id="mic" title="Speak" hidden>
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span class="sr">Speak</span></button>
       <button type="submit" class="send" title="Send">
@@ -286,6 +287,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=ec089220"></script>
+<script type="module" src="js/workspace.js?v=6dc376c5"></script>
 </body>
 </html>

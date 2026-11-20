@@ -24,6 +24,7 @@ import { placeRole, whereText, searchHeadline, SEARCH_BAND } from "./siterole.js
 import { elevationShort } from "./elevation.js";
 import { createLogSharer } from "./sharelog.js";
 import { settlementNear } from "./gazetteer.js";
+import { coordinateNote } from "./coords.js";
 import { picksFor, pickMessage } from "./assetpicks.js";
 import { shareCode } from "./share.js";
 
@@ -1329,6 +1330,9 @@ function downloadLog() {
 const said = [];
 async function send(text, forModel = text) {
   if (!text || busy || !draw) return;
+  // Coordinates in what the person typed are read in code, and the analyst is told so it uses them as a place
+  // rather than searching for them as a name (Rob, 20 Nov).
+  if (forModel === text) { const note = coordinateNote(text); if (note) forModel = `${text}\n\n${note}`; }
   busy = true;
   said.push(text);
   $("ask").classList.add("busy");

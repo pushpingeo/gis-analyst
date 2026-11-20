@@ -11,7 +11,8 @@ import { DATA_TOOL_DEFS, createDataTools, geometryDistanceKm } from "./datatools
 import { elevationFrom, elevationSignificance } from "./elevation.js";
 import { themeFor, THEME_IDS } from "./findings.js";
 import { ASSET_TYPES } from "./distances.js";
-import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES } from "./gazetteer.js";
+import { searchAnchors, searchNominatim, searchNaturalEarth, searchWikidata, findFeaturesNear, featureOutline, FEATURE_TYPES, candidate, settlementNear } from "./gazetteer.js";
+import { parseCoordinates } from "./coords.js";
 
 // Common names that aren't Natural Earth's own, and seas (energy basins especially) by rough box.
 const COUNTRY_ALIASES = { "united states": "united states of america", us: "usa", america: "united states of america", "u.s.": "usa", "u.s.a.": "usa",
@@ -49,7 +50,7 @@ export function placeToolDefs(skills) {
     },
     {
       name: "find_place",
-      description: "Search for a named place, asset or feature. Always searches OpenStreetMap (Nominatim), Wikidata (good for named mines, dams, power plants and ports), Natural Earth towns and a few fast layers (NSTA offshore installations, fields and UK licensing blocks; Crown Estate and Crown Estate Scotland offshore wind lease areas). Give `kind` and `area` to also search the AI Living World Atlas catalogue: it finds the published layers that hold that kind of thing in that area (any country) and searches them for the name. Do that for things OpenStreetMap rarely holds: licence blocks and concessions, fields, wells, leases, protected areas, official boundaries, numbered roads. The reply lists the layers searched, so you can say what was and wasn't checked. Returns candidates with ids (C1, C2…), type, source, position and size.",
+      description: "Search for a named place, asset or feature. Always searches OpenStreetMap (Nominatim), Wikidata (good for named mines, dams, power plants and ports), Natural Earth towns and a few fast layers (NSTA offshore installations, fields and UK licensing blocks; Crown Estate and Crown Estate Scotland offshore wind lease areas). Give `kind` and `area` to also search the AI Living World Atlas catalogue: it finds the published layers that hold that kind of thing in that area (any country) and searches them for the name. Do that for things OpenStreetMap rarely holds: licence blocks and concessions, fields, wells, leases, protected areas, official boundaries, numbered roads. The reply lists the layers searched, so you can say what was and wasn't checked. Returns candidates with ids (C1, C2…), type, source, position and size. Coordinates in the query (decimal degrees, degrees-minutes-seconds, or a British National Grid reference or eastings and northings) are read in code and returned as a candidate at that position, not searched for as a name.",
       input_schema: {
         type: "object",
         properties: {
@@ -209,8 +210,28 @@ export function createPlaceTools(host) {
       const at = p.feature.geometry.type === "Point" ? p.feature.geometry.coordinates : turf.centroid(p.feature).geometry.coordinates;
       return { feature: p.feature, lonlat: at, label: p.name, place: p };
     }
+    // Coordinates given straight as the anchor are read in code, like find_place does.
+    const typed = typedCandidate(ref);
+    if (typed) return resolve(keep(typed));
     throw new Error(`"${ref}" isn't a candidate id from this conversation or a place name. Use find_place first.`);
   };
+
+  // Coordinates the person typed (decimal degrees, degrees-minutes-seconds, British National Grid), read in code
+  // (js/coords.js) and kept as a candidate like any found feature. Rob, 20 Nov: "55.522759, -5.650122" went to the
+  // place-name search and came back as the county centre 100 km away.
+  function typedCandidate(q) {
+    const c = parseCoordinates(q);
+    if (!c) return null;
+    const cand = candidate({
+      name: c.read, type: "coordinates you typed", geometry: { type: "Point", coordinates: [c.lon, c.lat] },
+      source: { id: "typed", title: "coordinates you typed", publisher: "You", licence: "your own" },
+      extra: { typed: c.input, read_as: c.system, ...(c.order ? { order: c.order } : {}), datum: c.datum,
+        ...(c.easting != null ? { easting: c.easting, northing: c.northing } : {}), ...(c.precision_m ? { grid_square_m: c.precision_m } : {}),
+        ...(c.alternative ? { other_reading: `${c.alternative.read}, if the numbers were the other way round` } : {}) },
+    });
+    cand.lonlat = [c.lon, c.lat]; // exactly as typed, not rounded
+    return cand;
+  }
 
   const compact = (c) => ({
     id: c.id, name: c.name, type: c.type, source: `${c.source.publisher} – ${c.source.title}`, licence: c.source.licence,
@@ -302,7 +323,19 @@ export function createPlaceTools(host) {
       // "near" is a hint: if it isn't a candidate or place yet, search without it rather than fail the call.
       let nearAt = null, nearNote = null;
       if (near) { try { nearAt = resolve(near).lonlat; } catch { nearNote = `"${near}" isn't a candidate id or place yet, so the search wasn't narrowed to it. Find it first if you need it.`; } }
-      const names = [...new Set([query, ...(Array.isArray(also) ? also : [])].map((x) => String(x || "").trim()).filter(Boolean))].slice(0, 4);
+      const asked = [...new Set([query, ...(Array.isArray(also) ? also : [])].map((x) => String(x || "").trim()).filter(Boolean))].slice(0, 4);
+      // Coordinates aren't names: read them in code and keep them out of the name searches.
+      const typed = [];
+      for (const q of asked) { const c = typedCandidate(q); if (c) typed.push(c); }
+      const names = asked.filter((q) => !parseCoordinates(q));
+      if (typed.length && !names.length) {
+        const list = typed.map((c) => cands.get(keep(c)));
+        // Where it is, in words: the settlement it's in or near (Nominatim reverse; skipped if that fails).
+        await Promise.all(list.map(async (c) => { try { const near = await settlementNear(c.lonlat, { fetchFn: host.fetchFn, headers: host.headers }); if (near) c.extra.near = near; } catch { /* no name nearby */ } }));
+        host.onCandidates?.(list);
+        return { searched_for: asked, candidates: list.map(compact),
+          note: "Coordinates, read in code, not searched for as a name. Use the candidate as the anchor (match named_place). If other_reading is given and this one lands somewhere unlikely (at sea, another continent), offer the other reading." };
+      }
       const errors = [];
       // Every source and every spelling at once, the catalogue too; results keep this order (authoritative first).
       const perName = (q) => Promise.allSettled([
@@ -330,7 +363,7 @@ export function createPlaceTools(host) {
         const k = `${c.source?.id}|${c.source?.url || c.source?.atlas_id || ""}|${(c.name || "").toLowerCase()}|${c.lonlat.map((v) => v.toFixed(3))}`;
         if (seen.has(k)) return false; seen.add(k); return true;
       });
-      const list = results.map((c) => {
+      const list = [...typed, ...results].map((c) => {
         if (nearAt) { c.distance_km = round(turf.distance(nearAt, c.lonlat), 1); c.bearing = Math.round((turf.bearing(nearAt, c.lonlat) + 360) % 360); }
         return cands.get(keep(c));
       });
