@@ -21,6 +21,11 @@ export function chooseDistances(table, site = {}, person = {}) {
     reasons.push(entry ? `no ${setting} default for ${entry.label}, so the general ${setting} one` : `${table.fallback[setting].reason}${site.asset_type && site.asset_type !== "other" ? ` (no entry for "${site.asset_type}")` : ""}`);
   } else reasons.push(`default for ${entry.label} ${setting}: ${base.reason}`);
   const d = { near: base.near, close: base.close, wider: base.wider, footprint_km: base.footprint_km };
+  // A general screen of an area: distances follow its size (a 2.3 ha plot shouldn't look 20 km out).
+  if (!entry && site.area_km2 > 0) {
+    const rule = (table.fallback_by_size?.[setting] || []).find((r) => site.area_km2 < r.below_km2);
+    if (rule) { Object.assign(d, pick(rule)); reasons.splice(0, reasons.length, rule.reason); }
+  }
   for (const s of entry?.smaller || []) if (site.capacity_mw != null && s.below_mw != null && site.capacity_mw < s.below_mw) { Object.assign(d, pick(s)); reasons.push(s.reason); }
   for (const s of entry?.larger || []) {
     const hit = (s.mw != null && site.capacity_mw != null && site.capacity_mw >= s.mw) || (s.area_km2 != null && site.area_km2 != null && site.area_km2 >= s.area_km2);

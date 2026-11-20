@@ -7,7 +7,7 @@ import * as R from "../js/reference.js";
 import { createPlaceTools } from "../js/placetools.js";
 import { parseSkill } from "../js/converse.js";
 import { chooseDistances, bandFor, distancesLine } from "../js/distances.js";
-import { runScreening, createScreening, evidenceWithin, nearestByTheme, flagBeyond, reassess, parseResult, traceFlags, footprintOf, headline, RUN_SCHEMA } from "../js/ntrrun.js";
+import { forAnalyst, runScreening, createScreening, evidenceWithin, nearestByTheme, flagBeyond, reassess, parseResult, traceFlags, footprintOf, headline, RUN_SCHEMA } from "../js/ntrrun.js";
 import * as G from "../js/geometry.js";
 
 let passed = 0;
@@ -104,6 +104,19 @@ await test("distances: offshore oil field defaults, with the reason", () => {
   assert.equal(d.set_by, "default");
   assert.match(d.reasons[0], /offshore oil or gas field offshore/);
   assert.match(distancesLine(d), /near 2 km · close 10 km · wider 50 km \(default for offshore oil or gas field offshore\)/);
+});
+
+await test("distances: a general screen of an area follows its size (Rob's 2.3 ha housing plot, 20 Nov)", () => {
+  const plot = chooseDistances(table, { asset_type: null, area_km2: 0.023 });
+  assert.deepEqual([plot.near, plot.close, plot.wider], [0.25, 1, 5]);
+  assert.match(plot.reasons[0], /small site \(under 10 ha\)/);
+  assert.deepEqual([0.5, 2, 10], (({ near, close, wider }) => [near, close, wider])(chooseDistances(table, { area_km2: 0.4 })));
+  assert.equal(chooseDistances(table, { area_km2: 5 }).wider, 20);
+  assert.equal(chooseDistances(table, {}).wider, 20);
+  assert.equal(chooseDistances(table, { area_km2: 0.5, offshore: true }).wider, 25);
+  // An asset type keeps its own table; the person's own distances still win.
+  assert.equal(chooseDistances(table, { asset_type: "solar", area_km2: 0.023 }).wider, 20);
+  assert.equal(chooseDistances(table, { area_km2: 0.023 }, { wider: 15 }).wider, 15);
 });
 
 await test("distances: scale-aware (small solar, wind tip height, large mine) and the person's own, capped at 50 km", () => {
@@ -282,7 +295,7 @@ await test("traceFlags maps PS codes to themes and leaves unknown evidence untra
 });
 
 
-await test("a result cut off at the length cap is asked for again once, as JSON only, from the same history", async () => {
+await test("a result cut off at the length cap is asked for again, as JSON only, from a compact summary first", async () => {
   const cut = { stop_reason: "max_tokens", content: [{ type: "thinking", thinking: "long", signature: "sig" }, { type: "text", text: "Long summary…\n\n```json\n{\"flags\":[{\"risk\":\"x" }], usage: { input_tokens: 10, output_tokens: 8000 } };
   const model = scriptedModel([
     toolTurn(use("a", "find_data", { text: "wreck", area: "Area 1" })),
@@ -294,15 +307,52 @@ await test("a result cut off at the length cap is asked for again once, as JSON 
   const rec = await runScreening({ host: host(), site, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
   assert.equal(model.calls.length, 4);
   const last = model.calls[3].messages;
-  assert.match(last.at(-1).content, /only the JSON block/);
-  assert.equal(last.at(-2).role, "assistant");
-  assert.ok(!JSON.stringify(last).includes('"thinking"'), "signed thinking blocks are dropped");
+  assert.equal(last.length, 1, "one message: the summary, not the whole history");
+  assert.match(last[0].content, /What the tools found/);
+  assert.match(last[0].content, /cut off before its JSON block/);
+  assert.match(last[0].content, /only the JSON block/);
+  assert.equal(model.calls[3].tools, undefined, "no tools for the summary repair");
+  assert.ok(!JSON.stringify(last).includes('"thinking"'));
   assert.equal(rec.tobler_run.flags.length, 3);
   assert.equal(rec.tobler_run.summary, "Long summary…");
   assert.match(rec.tobler_run.note, /cut off/);
   assert.equal(rec.tobler_run.parse_error, undefined);
+  assert.deepEqual(rec.tobler_run.debug.repairs.map((r) => [r.how, r.json]), [["summary", true]]);
+  assert.equal(rec.tobler_run.debug.final_stop, "max_tokens");
 });
 
+await test("if the summary repair fails too, the full history is tried, and both attempts are in the debug", async () => {
+  const cut = { stop_reason: "max_tokens", content: [{ type: "text", text: "Long summary…" }], usage: { input_tokens: 10, output_tokens: 8000 } };
+  const model = scriptedModel([
+    toolTurn(use("a", "find_data", { text: "wreck", area: "Area 1" })),
+    cut,
+    { stop_reason: "max_tokens", content: [{ type: "text", text: "{ half" }], usage: { input_tokens: 5, output_tokens: 8000 } },
+    final(RESULT()),
+  ]);
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const rec = await runScreening({ host: host(), site, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
+  const last = model.calls[3].messages;
+  assert.equal(last.at(-2).role, "assistant");
+  assert.deepEqual(rec.tobler_run.debug.repairs.map((r) => [r.how, r.json]), [["summary", false], ["history", true]]);
+  assert.equal(rec.tobler_run.flags.length, 3);
+});
+
+await test("volume guard: a busy area shows the analyst the count and the nearest 6; details that repeat the name go", () => {
+  const many = Array.from({ length: 15 }, (_, k) => ({ id: `C${k}`, name: `School ${k}`, distance_km: k / 2, details: { name: `School ${k}` } }));
+  const out = forAnalyst("find_features_near", { found: 199, listed: 15, not_listed: "184 more…", candidates: many });
+  assert.equal(out.candidates.length, 6);
+  assert.equal(out.listed, 6);
+  assert.equal(out.not_listed, undefined);
+  assert.match(out.dense, /199 found: a busy area/);
+  assert.equal(out.candidates[0].details, undefined);
+  const few = forAnalyst("get_data", { within_distance: 8, nearest: many.slice(0, 8).map((c) => ({ ...c, details: { name: c.name, date: "2001" } })) });
+  assert.equal(few.nearest.length, 8);
+  assert.equal(few.dense, undefined);
+  assert.deepEqual(few.nearest[0].details, { date: "2001" });
+  const busy = forAnalyst("get_data", { within_distance: 82, nearest: many.slice(0, 12) });
+  assert.equal(busy.nearest.length, 6);
+  assert.equal(forAnalyst("find_data", { datasets: [1, 2] }).datasets.length, 2);
+});
 
 await test("baseline before the analyst: boundaries and the must-check layers, as evidence, in the first message", async () => {
   atlasCalls.length = 0;

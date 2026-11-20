@@ -26,6 +26,27 @@ const round = (v, d = 2) => (v == null || !Number.isFinite(+v) ? null : Math.rou
 const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 // The site as screened: a point gets a footprint circle (radius from the distance table); lines and areas as they are.
+// Volume guard (Rob's housing screen near Liverpool, 20 Nov: ~400 features to 20 km, and the write-up was cut off).
+// Everything found still goes on the map and into the run record; the analyst sees the count and the nearest few,
+// and details that only repeat the name are dropped.
+export const DENSE_AT = 25, DENSE_SHOW = 6;
+export function forAnalyst(name, out) {
+  if (!out || typeof out !== "object") return out;
+  const key = name === "find_features_near" ? "candidates" : name === "get_data" ? "nearest" : null;
+  if (!key || !Array.isArray(out[key])) return out;
+  const total = name === "find_features_near" ? out.found : (out.within_distance ?? out.returned_by_service);
+  const slim = (x) => {
+    const d = x.details && Object.entries(x.details).filter(([k, v]) => !(k === "name" && v === x.name));
+    return { ...x, ...(x.details ? { details: d.length ? Object.fromEntries(d) : undefined } : {}) };
+  };
+  const list = out[key].map(slim);
+  if (!(total > DENSE_AT) || list.length <= DENSE_SHOW) return { ...out, [key]: list };
+  const shown = list.slice(0, DENSE_SHOW);
+  const { not_listed, listed, ...rest } = out;
+  return { ...rest, [key]: shown, listed: shown.length,
+    dense: `${total} found: a busy area. Only the nearest ${shown.length} are shown here (all are on the map and in the run). Report the count and the nearest, say what it means for the site, and don't list more.` };
+}
+
 export function footprintOf(feature, d) {
   if (feature.geometry.type !== "Point") return { feature, note: null };
   const f = turf.circle(feature.geometry.coordinates, d.footprint_km, { units: "kilometers", steps: 48 });
@@ -196,7 +217,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       const out = await tools.exec(name, i);
       calls.push({ tool: name, input: i, ms: Date.now() - t0 });
       const c = checkedFrom(name, i, out); if (c) checked.push(c);
-      return out;
+      return forAnalyst(name, out);
     } catch (e) {
       calls.push({ tool: name, input: i, ms: Date.now() - t0, error: String(e.message || e).slice(0, 200) });
       // A mistyped id (a candidate's C1 passed as a dataset) is the analyst's slip, not a source that wasn't checked.
@@ -281,7 +302,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   const usage = { ...res.usage };
   let repaired = false;
   const lastMsg = res.history.at(-1);
-  const debug = { final_chars: String(res.text || "").length, final_blocks: Array.isArray(lastMsg?.content) ? lastMsg.content.map((b) => b.type).join(",") : typeof lastMsg?.content };
+  const debug = { final_stop: res.stopReason ?? res.stop_reason ?? null, final_chars: String(res.text || "").length, final_blocks: Array.isArray(lastMsg?.content) ? lastMsg.content.map((b) => b.type).join(",") : typeof lastMsg?.content };
   if (!parsed.json) {
     // Cut off (the reply hit the length cap) or no JSON block: ask once for the JSON alone, from the same history.
     // Thinking blocks are signed to the request they came from, so they're dropped (as in the conversation loop);
@@ -294,14 +315,26 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       return { ...m, content: keep.length ? keep : [{ type: "text", text: "…" }] };
     });
     if (history.at(-1)?.role === "user") history.pop();
-    try {
-      const resp = await callClaude({ system: systemFor(skill), tools: defs, messages: [...history, { role: "user", content: "Your result was cut off or had no JSON block. Reply now with only the JSON block, compact: at most 6 flags, at most 3 evidence items each (name, distance_km, dataset only), data_gaps at most 10 short lines, checked as []. Keep any thinking brief." }] });
-      usage.input_tokens += resp.usage?.input_tokens || 0; usage.output_tokens += resp.usage?.output_tokens || 0;
-      const t2 = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
-      debug.repair_stop = resp.stop_reason; debug.repair_chars = t2.length; debug.repair_head = t2.slice(0, 300);
-      const again = parseResult(t2);
-      if (again.json) { parsed = { json: again.json, summary: String(res.text || "").split("```")[0].trim() }; repaired = true; }
-    } catch (e) { debug.repair_error = String(e.message || e).slice(0, 300); }
+    const ASK = "Reply now with only the JSON block, compact: at most 6 flags, at most 3 evidence items each (name, distance_km, dataset only), data_gaps at most 10 short lines, checked as []. Keep any thinking brief.";
+    // First from a compact summary of what the tools found, not the whole history (Rob's housing screen, 20 Nov: the
+    // full history was ~34k tokens and the write-up hit the cap); then, if that fails, from the full history as before.
+    const found = checked.filter((c) => c.result === "features" || c.result === "not checked").map(summarise).join("\n");
+    const tail = String(res.text || "").slice(-3000);
+    const attempts = [
+      { how: "summary", messages: [{ role: "user", content: `${firstMessage({ siteName: site.name, describe, inputs, distances, footprintNote: fp.note, origin, baseline: null, inside })}\n\nWhat the tools found (everything is on the map and in the run):\n${found || "- nothing returned"}\n\n${tail ? `Your write-up was cut off before its JSON block. Its last part:\n${tail}\n\n` : ""}${ASK}` }] },
+      { how: "history", messages: [...history, { role: "user", content: `Your result was cut off or had no JSON block. ${ASK}` }] },
+    ];
+    debug.repairs = [];
+    for (const a of attempts) {
+      try {
+        const resp = await callClaude({ system: systemFor(skill), ...(a.how === "history" ? { tools: defs } : {}), messages: a.messages });
+        usage.input_tokens += resp.usage?.input_tokens || 0; usage.output_tokens += resp.usage?.output_tokens || 0;
+        const t2 = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+        const again = parseResult(t2);
+        debug.repairs.push({ how: a.how, stop: resp.stop_reason, chars: t2.length, tokens_in: resp.usage?.input_tokens, tokens_out: resp.usage?.output_tokens, json: !!again.json, ...(again.json ? {} : { head: t2.slice(0, 300) }) });
+        if (again.json) { parsed = { json: again.json, summary: String(res.text || "").split("```")[0].trim() }; repaired = true; break; }
+      } catch (e) { debug.repairs.push({ how: a.how, error: String(e.message || e).slice(0, 300) }); }
+    }
     debug.raw_tail = String(res.text || "").slice(-1500);
   }
   const flags = traceFlags(parsed.json?.flags, evidence, distances, { ...seaVals, elevation });

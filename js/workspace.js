@@ -620,7 +620,8 @@ host.screening = createScreening({
     const r = record.tobler_run;
     // The log keeps what the card shows, so a downloaded log explains the card on its own.
     runLog?.events.push({ screen_result: { run: r.id, distances: r.distances, baseline: r.baseline, sea: r.sea, flags: r.flags.map((f) => ({ risk: f.risk, theme: f.theme, confidence: f.confidence, nearest_km: f.nearest_km, evidence: f.evidence.map((e) => `${e.name} ${e.distance_km} km${e.traced ? "" : " (not traced)"}`) })),
-      checked: r.checked.map((c) => `${c.dataset}: ${c.result}${c.count ? ` ${c.count}` : ""}${c.why ? ` (${c.why})` : ""}`), gaps: r.data_gaps, ...(r.parse_error ? { problem: r.parse_error } : {}) } });
+      checked: r.checked.map((c) => `${c.dataset}: ${c.result}${c.count ? ` ${c.count}` : ""}${c.why ? ` (${c.why})` : ""}`), gaps: r.data_gaps, ...(r.parse_error ? { problem: r.parse_error } : {}),
+      ...(r.debug ? { debug: r.debug } : {}), ...(r.note ? { note: r.note } : {}), usage: r.usage } });
     stopProgress(record);
     const site = placeByName(r.site?.name || "");
     if (site && r.site.asset_type) site.assetType = r.site.asset_type;

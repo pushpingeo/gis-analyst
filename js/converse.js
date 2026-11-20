@@ -68,7 +68,7 @@ export const READ_ONLY = new Set(["load_skill", "find_place", "find_features_nea
 export async function runTurn({ system, messages, tools, exec, callClaude, onEvent = () => {}, maxRounds = 10 }) {
   const history = messages.map((m) => ({ ...m }));
   const usage = { input_tokens: 0, output_tokens: 0 };
-  let text = "";
+  let text = "", stopReason = null;
   for (let round = 0; round < maxRounds; round++) {
     const t0 = Date.now();
     const resp = await callClaude({ system, messages: compact(history), tools });
@@ -76,6 +76,7 @@ export async function runTurn({ system, messages, tools, exec, callClaude, onEve
     usage.input_tokens += resp.usage?.input_tokens || 0;
     usage.output_tokens += resp.usage?.output_tokens || 0;
     history.push({ role: "assistant", content: resp.content });
+    stopReason = resp.stop_reason;
     const said = resp.content.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
     if (said) { text = said; onEvent({ type: "text", text: said, final: resp.stop_reason !== "tool_use" }); }
     if (resp.stop_reason === "max_tokens") { onEvent({ type: "warning", message: "The reply hit the length limit." }); break; }
@@ -102,7 +103,7 @@ export async function runTurn({ system, messages, tools, exec, callClaude, onEve
     history.push({ role: "user", content: results });
     if (round === maxRounds - 1) onEvent({ type: "warning", message: "Stopped after the maximum number of steps." });
   }
-  return { text, usage, history };
+  return { text, usage, history, stopReason };
 }
 
 // What the activity line says while a tool runs.
