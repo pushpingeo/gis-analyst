@@ -7,6 +7,10 @@
 //                      binding (a Worker can't fetch another Worker on the account by workers.dev: 1042).
 //   POST /firms        NASA FIRMS active fire / thermal hotspot detections (VIIRS, MODIS) for a box, with the
 //                      FIRMS MAP_KEY added here. Returns GeoJSON. Open data under NASA's open data policy.
+//   POST /logs         A trimmed log of one conversation turn, sent by the page while "Share my sessions" is on
+//                      (on by default; the welcome card says so). Stored for 90 days, one store per day.
+//   GET  /logs?day=    Reads a day's logs back, for the weekly digest (scripts/log-digest.mjs). Needs the read key:
+//                      sha256("tobler-logs:" + ATLAS_MCP_KEY) in hex, so no new secret is needed in the repo.
 //   GET  /health       Liveness check, no counters.
 //
 // Only allowed origins are served. Counters live in a Durable Object (one per visitor per day, one for
@@ -63,6 +67,38 @@ export class Counter extends DurableObject {
   }
 }
 
+// Session logs: one object per day. SQLite-backed, so a day's logs can be listed in order and paged.
+// The whole day is deleted 90 days after its first log (LOG_RETENTION_DAYS).
+export class LogStore extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, visitor TEXT, session TEXT, seq INTEGER, page TEXT, body TEXT)");
+  }
+
+  async add(rec, retentionDays) {
+    this.ctx.storage.sql.exec("INSERT INTO logs (at, visitor, session, seq, page, body) VALUES (?, ?, ?, ?, ?, ?)",
+      rec.at, rec.visitor, rec.session, rec.seq, rec.page, rec.body);
+    if ((await this.ctx.storage.getAlarm()) == null) await this.ctx.storage.setAlarm(Date.now() + retentionDays * DAY_MS);
+    return { ok: true };
+  }
+
+  // Oldest first, `limit` at a time after id `after`.
+  async list(after = 0, limit = 200) {
+    return this.ctx.storage.sql.exec("SELECT id, at, visitor, session, seq, page, body FROM logs WHERE id > ? ORDER BY id LIMIT ?", after, limit)
+      .toArray().map((r) => ({ ...r, log: JSON.parse(r.body), body: undefined }));
+  }
+
+  async alarm() {
+    await this.ctx.storage.deleteAll();
+  }
+}
+
+async function sha256hex(text) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+export const logReadKey = (atlasKey) => sha256hex(`tobler-logs:${atlasKey}`);
+
 async function visitorId(request) {
   // Counters are keyed by a hash of the visitor's IP, so no IP is stored.
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
@@ -93,7 +129,19 @@ export default {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") return reply(200, { ok: true, service: "tobler-api" });
 
-    const route = request.method === "POST" && ["/v1/messages", "/atlas", "/firms"].includes(url.pathname) ? url.pathname : null;
+    // Reading logs back: for the digest Action, not the page, so no origin; the read key instead.
+    if (request.method === "GET" && url.pathname === "/logs") {
+      const auth = request.headers.get("authorization") || "";
+      if (!env.ATLAS_MCP_KEY || auth !== `Bearer ${await logReadKey(env.ATLAS_MCP_KEY)}`) return reply(401, { message: "Not allowed" });
+      const day = url.searchParams.get("day") || "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return reply(400, { message: "day must be YYYY-MM-DD" });
+      const after = Math.max(0, Math.floor(+url.searchParams.get("after") || 0));
+      const limit = Math.min(500, Math.max(1, Math.floor(+url.searchParams.get("limit") || 200)));
+      const entries = await env.LOGS.get(env.LOGS.idFromName(`logs:${day}`)).list(after, limit);
+      return reply(200, { day, entries, more: entries.length === limit });
+    }
+
+    const route = request.method === "POST" && ["/v1/messages", "/atlas", "/firms", "/logs"].includes(url.pathname) ? url.pathname : null;
     if (!route) return reply(404, { message: "Not found" });
     if (!okOrigin) return reply(403, { message: "This endpoint only serves Tobler." });
 
@@ -104,6 +152,22 @@ export default {
 
     const day = new Date().toISOString().slice(0, 10);
     const visitor = counter(env, `${day}:${await visitorId(request)}`);
+
+    if (route === "/logs") {
+      if (env.LOGS_ENABLED !== "yes") return reply(200, { ok: false, message: "Session logging is off." });
+      const { session, seq, page, log } = body || {};
+      if (!/^[a-z0-9-]{8,64}$/i.test(String(session || ""))) return reply(400, { message: "session id missing" });
+      if (!Number.isInteger(seq) || seq < 0 || seq > 10000) return reply(400, { message: "seq must be a whole number" });
+      if (!log || typeof log !== "object") return reply(400, { message: "log missing" });
+      const vid = await visitorId(request);
+      const used = await visitor.hit("logs", +env.LOGS_PER_VISITOR_DAILY || 300);
+      if (!used.ok) return reply(429, { message: "Log limit reached for today." });
+      await env.LOGS.get(env.LOGS.idFromName(`logs:${day}`)).add({
+        at: new Date().toISOString(), visitor: vid, session, seq,
+        page: String(page || "").slice(0, 200), body: JSON.stringify(log),
+      }, +env.LOG_RETENTION_DAYS || 90);
+      return reply(200, { ok: true });
+    }
 
     if (route === "/firms") {
       const { source, bbox, days = 5, date } = body || {};

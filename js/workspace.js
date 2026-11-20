@@ -20,6 +20,7 @@ import { distancesLine, bandFor } from "./distances.js";
 import { DISCLAIMER } from "./disclaimer.js";
 import { seaShort } from "./seavalues.js";
 import { elevationShort } from "./elevation.js";
+import { createLogSharer } from "./sharelog.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
@@ -905,7 +906,9 @@ function showRun(record) {
     const t0 = Date.now();
     try {
       await reassess({ record, km: entry.km, skill: skills["ntr-screening"], callClaude });
-      sessionLog.push({ at: new Date().toISOString(), reassess: r.id, within_km: entry.km, ms: Date.now() - t0, flags: r.flags.length });
+      const done = { at: new Date().toISOString(), reassess: r.id, within_km: entry.km, ms: Date.now() - t0, flags: r.flags.length };
+      sessionLog.push(done);
+      sharer.share(done);
       paintRun(entry);
       if (shownRun === r.id) showRunOnMap(record, { fit: false });
     } catch (err) {
@@ -1158,6 +1161,10 @@ document.querySelectorAll("[data-example]").forEach((b) => b.addEventListener("c
 // "Download the log" in any "How I worked this out" saves it as JSON, and window.toblerLog holds it for tests.
 const sessionLog = [];
 window.toblerLog = sessionLog;
+// Each finished turn also goes, trimmed, to Tobler's Worker while "Share my sessions" is on (on unless turned off
+// in settings; the welcome card says so). Read weekly to see what people ask and where the analyst goes wrong.
+const sharer = createLogSharer({ url: CONFIG.proxyUrl && `${CONFIG.proxyUrl}/logs`, enabled: () => store.get("shareSessions") !== "no" });
+window.toblerSharer = sharer; // for tests
 function downloadLog() {
   const blob = new Blob([JSON.stringify({ page: location.href, saved: new Date().toISOString(), turns: sessionLog }, null, 1)], { type: "application/json" });
   const a = document.createElement("a");
@@ -1230,6 +1237,8 @@ async function send(text, forModel = text) {
     turnLog.error = String(err.message || err);
     activity("");
   } finally {
+    turnLog.ms = Date.now() - Date.parse(turnLog.at);
+    sharer.share(turnLog);
     stopProgress(null);
     busy = false;
     pendingReply = null;
@@ -1307,6 +1316,7 @@ const form = dlg.querySelector("form");
 function paintSettings() {
   form.esri.checked = host.esriLicence();
   form.nonCommercial.checked = host.nonCommercial();
+  form.shareSessions.checked = store.get("shareSessions") !== "no";
   form.querySelectorAll('input[name="units"]').forEach((r) => { r.checked = r.value === U.getUnits(); });
   const preset = [...form.querySelectorAll("[data-colour]")].find((b) => b.dataset.colour.toLowerCase() === C.pole.toLowerCase());
   form.querySelectorAll("[data-colour]").forEach((b) => b.setAttribute("aria-checked", String(b === preset)));
@@ -1324,6 +1334,13 @@ $("gear").addEventListener("click", () => { paintSettings(); dlg.showModal(); })
 dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
 form.esri.addEventListener("change", () => store.set("esriLicence", form.esri.checked ? "yes" : null));
 form.nonCommercial.addEventListener("change", () => store.set("nonCommercial", form.nonCommercial.checked ? "yes" : null));
+form.shareSessions.addEventListener("change", () => store.set("shareSessions", form.shareSessions.checked ? null : "no"));
+// "settings" in the welcome card's note opens the dialog at the sharing switch.
+document.querySelectorAll("[data-open-settings]").forEach((b) => b.addEventListener("click", () => {
+  paintSettings(); dlg.showModal();
+  form.shareSessions.closest("fieldset").scrollIntoView({ block: "nearest" });
+  form.shareSessions.focus();
+}));
 form.querySelectorAll('input[name="units"]').forEach((r) => r.addEventListener("change", () => {
   if (!r.checked) return;
   store.set("units", U.setUnits(r.value));

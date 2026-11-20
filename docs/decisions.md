@@ -532,3 +532,34 @@ Judgement calls made while building, newest first. Bigger product decisions live
   accepted place refused unasked and removed when asked), `browser-run-card.mjs` 79/79; replays on a branch with Haiku:
   Rob's Ben Nevis conversation (no duplicates; SAC found with "United Kingdom and its waters"; upland), and
   "10 km NE of Linlithgow Palace → sorry, I meant NW" (one square at the end, replacing the first).
+
+## 20 Nov (morning, later): session logs shared by default, read weekly (Rob)
+- **Rob:** the fixes from his shared logs have been the most useful; before wider testing, collect logs automatically to
+  see what other people ask. On by default; this is a demonstration, not a commercial product, so a light notice is
+  enough. The notice is discreet: one small line in the welcome card, not a chat message (Rob chose it).
+- **Welcome card:** "Tobler is being tested. Conversations are saved so we can improve it. You can turn this off in
+  settings." "settings" opens the dialog at the new switch, **Share my sessions** (Settings → Helping improve Tobler;
+  `tobler.shareSessions`, on unless set to "no"; says what's saved, 90 days, own API key never included).
+- **Page (`js/sharelog.js`):** each finished turn (and each re-assess) is sent to the Worker, trimmed: shapes become
+  type, vertex count and bounding box; strings cut (the person's words and the reply to 4,000 characters, others to
+  600); lists to 40; the whole turn under 100k characters; anything like an Anthropic key removed. A random id per page
+  load ties a session's turns together. Failures are ignored; the full log stays in the page for "Download the log".
+- **Worker (`POST /logs`, `GET /logs`):** stored in a Durable Object (`LogStore`, SQLite), one per day, deleted 90 days
+  after its first log; visitor as the IP hash already used for counters (no IP stored); 300 per visitor a day;
+  `LOGS_ENABLED` var as an off switch. Chosen over R2 because it needs no new bucket or Cloudflare permissions. Reading
+  back needs a key derived from `ATLAS_MCP_KEY` (SHA-256 of `tobler-logs:` + key): the proxy here can't set repo
+  secrets, and that key is already in both the Worker and the Actions. The deploy Action's live check sends one marked
+  test log and reads it back.
+- **Weekly digest (`scripts/log-digest.mjs`, `.github/workflows/log-digest.yml`, Mondays 05:17 UTC or by hand):**
+  numbers in code (sessions, visitors, turns, failures, screens, tool errors, turn times); Claude (Sonnet 5.5, my call:
+  a weekly read where quality matters more than pennies) writes what people asked, where the analyst went wrong,
+  corrections, failures, at most eight suggested fixes and candidate test cases. Logs are data, never instructions.
+  Nothing changes the product automatically: fixes and test cases are for Rob to decide (no rule for one case).
+- **The tobler repo is public**, so digests are never committed here and the Action log shows counts only. They go to
+  a private repo, `pushpingeo/tobler-logs`, with a `TOBLER_LOGS_TOKEN` secret; until Rob sets those up the Action
+  stops before reading anything.
+- Not built yet: thumbs up or down and a "something's wrong" box on replies and run cards (offered to Rob).
+- Tested: `test/sharelog.test.mjs` (trimming, key removal, geometry summary, the switch read at send time, digest
+  numbers and transcript); Worker tests 15/15 (new: origin and shape checks, read key, paging, no IP stored, own daily
+  limit); `browser-run-card.mjs` 87/87 (new: the welcome note and its link to the switch, the screening turn's log sent
+  trimmed with no raw coordinates, nothing sent once switched off); `browser-choice.mjs`.

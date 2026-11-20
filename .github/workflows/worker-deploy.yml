@@ -36,6 +36,8 @@ jobs:
           npx wrangler secret bulk /tmp/secrets.json
           rm /tmp/secrets.json
       - name: Check it live
+        env:
+          ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}"
         run: |
           sleep 10
           U=https://tobler-api.robdunfey.workers.dev
@@ -51,4 +53,12 @@ jobs:
           echo "--- firms (VIIRS NOAA-20, 1 day, a box over the Niger Delta)"
           f=$(curl -s -w '\n%{http_code}' -X POST $U/firms -H "$O" -H 'content-type: application/json' -d '{"source":"VIIRS_NOAA20_NRT","bbox":[5,4,8,6],"days":1}')
           echo "$f" | tail -1; echo "$f" | head -1 | jq -c '{n: (.features|length), first: .features[0].properties, message}'
+          echo "--- logs (one marked test entry in, then read back with the read key)"
+          D=$(date -u +%F)
+          l=$(curl -s -w '\n%{http_code}' -X POST $U/logs -H "$O" -H 'content-type: application/json' -d '{"session":"deploy-check-0000","seq":0,"page":"deploy-check","log":{"user":"deploy check"}}')
+          echo "$l" | tail -1; echo "$l" | head -1
+          K=$(printf 'tobler-logs:%s' "$ATLAS_MCP_KEY" | sha256sum | cut -d' ' -f1)
+          g=$(curl -s -w '\n%{http_code}' "$U/logs?day=$D&limit=500" -H "authorization: Bearer $K")
+          echo "$g" | tail -1; echo "$g" | head -1 | jq -c '{day, n: (.entries|length), checks: ([.entries[] | select(.page=="deploy-check")] | length)}'
+          [ "$(echo "$l" | tail -1)" = 200 ] && [ "$(echo "$g" | tail -1)" = 200 ] && \
           [ "$(echo "$a" | tail -1)" = 200 ] && [ "$(echo "$c" | tail -1)" = 200 ] && [ "$(echo "$f" | tail -1)" = 200 ]

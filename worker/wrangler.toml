@@ -15,6 +15,10 @@ TOTAL_DAILY = "5000"
 ATLAS_PER_VISITOR_DAILY = "2000"
 # NASA FIRMS calls (open data; FIRMS allows 5,000 transactions per 10 minutes per key).
 FIRMS_PER_VISITOR_DAILY = "300"
+# Session logs (POST /logs): "no" stops storing at once; the page keeps working either way.
+LOGS_ENABLED = "yes"
+LOGS_PER_VISITOR_DAILY = "300"
+LOG_RETENTION_DAYS = "90"
 
 # Secrets (set by .github/workflows/worker-deploy.yml, never pasted):
 #   ANTHROPIC_API_KEY, ATLAS_MCP_KEY, FIRMS_MAP_KEY
@@ -27,6 +31,15 @@ class_name = "Counter"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Counter"]
+
+# Session logs: one object per day (SQLite), cleared 90 days after its first log.
+[[durable_objects.bindings]]
+name = "LOGS"
+class_name = "LogStore"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["LogStore"]
 
 # The atlas, reached directly (workers.dev fetches between Workers on one account fail with 1042).
 [[services]]

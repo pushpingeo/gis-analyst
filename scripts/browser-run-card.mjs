@@ -75,9 +75,19 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   await page.route(/gis\.ngdc\.noaa\.gov/, (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ samples: [-110, -120, -130].map((v) => ({ value: String(v), resolution: 0.004 })) }) }));
   await page.route(/emodnet-humanactivities/, (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ features: [{ properties: { GRAY_INDEX: /allavg/.test(r.request().url()) ? 0.3 : 0.1 } }] }) }));
   await page.route(/tobler-api.*\/atlas/, async (r) => { const b = JSON.parse(r.request().postData()); r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: { structuredContent: atlas(b.params.name, b.params.arguments) } }) }); });
+  // Session logs the page sends while sharing is on.
+  const logs = [];
+  await page.route(/tobler-api.*\/logs/, (r) => { logs.push({ raw: r.request().postData(), body: JSON.parse(r.request().postData()) }); r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }); });
   await page.goto("http://localhost:8000/");
   await page.waitForFunction(() => window.__ws?.draw, null, { timeout: 40000 });
   if (label === "phone") await page.evaluate(() => document.getElementById("panel").classList.remove("collapsed"));
+  // The welcome card's note about saving sessions, and its link into settings at the switch.
+  const note = await page.evaluate(() => document.querySelector(".welcome .note")?.textContent || "");
+  check(/Conversations are saved so we can improve it\. You can turn this off in settings\./.test(note), `${label}: welcome card says sessions are saved, with a way to turn it off`);
+  await page.click(".welcome [data-open-settings]");
+  await page.waitForSelector("#settings[open]");
+  check(await page.evaluate(() => document.activeElement?.name === "shareSessions" && document.activeElement.checked), `${label}: "settings" in the note opens the dialog at the switch, on by default`);
+  await page.click("#settings .close");
   // Drawing tools: a tray by the input; the hint has Cancel while drawing and stays clear of the panel.
   const rect = (sel) => page.evaluate((q) => { const e = document.querySelector(q); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; }, sel);
   const overlap = (a, b) => !!(a && b && a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b);
@@ -134,6 +144,10 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   await page.screenshot({ path: `/tmp/ux-${label}-progress.png` });
   await page.waitForSelector(".run .flag", { timeout: 30000 });
   check(await page.evaluate(() => !document.querySelector(".progress") && /took \d+ s/.test(document.querySelector(".run .meta").textContent)), `${label}: progress gone, card says how long it took`);
+  await page.waitForTimeout(300);
+  const lg = logs.find((l) => /Screen/.test(l.body.log?.user || ""));
+  check(!!lg && lg.body.seq >= 0 && /^[0-9a-f-]{36}$/.test(lg.body.session) && lg.body.log.events.some((e) => e.tool === "screen_site") && lg.raw.length < 120_000 && !/"coordinates"/.test(lg.raw),
+    `${label}: the screening turn's log was sent, trimmed (${lg ? Math.round(lg.raw.length / 1000) : 0} KB, ${lg?.body.log.events.length} events, no raw coordinates)`);
   await page.waitForTimeout(800);
   const st = () => page.evaluate(() => ({
     flags: [...document.querySelectorAll(".run .flag .risk")].map((e) => e.textContent),
@@ -212,6 +226,7 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   await page.check('#settings input[name="units"][value="imperial"]');
   await page.click('#settings [data-colour="#00a0b0"]');
   await page.check('#settings input[name="esri"]');
+  await page.uncheck('#settings input[name="shareSessions"]');
   const set = await page.evaluate(() => ({
     out: document.querySelector(".run .reach output").textContent, dists: document.querySelector(".run .dists").textContent,
     unit: document.querySelector(".shape .unit").textContent, facts: document.querySelector(".shape .facts").textContent,
@@ -222,6 +237,10 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   check(set.out === "31.1 mi" && /31.1 mi/.test(set.dists) && !/ km/.test(set.dists) && set.unit === "sq mi" && /sq mi/.test(set.facts) && /mi/.test(set.rings), `${label}: miles on the card, shape card and rings (${set.out}; ${set.unit}; ${set.rings})`);
   check(set.line === "#00a0b0" && set.css === "#00a0b0", `${label}: shape colour applied to the map and the page`);
   check(set.esri === "yes" && set.host === true && set.units === "imperial", `${label}: Esri switch and units saved`);
+  const before = logs.length;
+  await page.evaluate(() => window.toblerSharer.share({ user: "after switching off" }));
+  await page.waitForTimeout(200);
+  check(await page.evaluate(() => localStorage.getItem("tobler.shareSessions")) === "no" && logs.length === before, `${label}: sharing switched off is saved and nothing more is sent`);
   await page.click("#settings .close");
   check(await page.evaluate(() => !document.getElementById("settings").open), `${label}: settings close`);
   await page.evaluate(() => localStorage.clear());

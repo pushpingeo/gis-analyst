@@ -3,19 +3,21 @@
 //   cd worker && npm install && npm test
 import { Miniflare } from "miniflare";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 
 const upstreamCalls = { claude: [], atlas: [] };
 const mf = new Miniflare({
   scriptPath: new URL("./worker.js", import.meta.url).pathname,
   modules: true,
   compatibilityDate: "2026-08-01",
-  durableObjects: { COUNTER: "Counter" },
+  durableObjects: { COUNTER: "Counter", LOGS: { className: "LogStore", useSQLite: true } },
   bindings: {
     MODEL: "claude-haiku-5-5", MAX_TOKENS: "8000",
     ALLOWED_ORIGINS: "https://asktobler.com,https://pushpingeo.github.io,http://localhost:8000",
     // Small limits so they can be reached in a test.
     PER_VISITOR_DAILY: "5", TOTAL_DAILY: "8", ATLAS_PER_VISITOR_DAILY: "25",
     ANTHROPIC_API_KEY: "sk-test", ATLAS_MCP_KEY: "atlas-test", FIRMS_MAP_KEY: "firmskey123", FIRMS_PER_VISITOR_DAILY: "3",
+    LOGS_ENABLED: "yes", LOGS_PER_VISITOR_DAILY: "4", LOG_RETENTION_DAYS: "90",
   },
   // Fake atlas, behind the service binding.
   serviceBindings: {
@@ -167,6 +169,46 @@ try {
     assert.equal((await post("/firms", { source: "MODIS_NRT", bbox: [0, 0, 1, 1], date: "17/11/2026" }, { ip: "8.8.8.8" })).status, 400);
     // 7.7.7.7 has used 3 (two OK, one NASA error): the next is refused.
     assert.equal((await post("/firms", { source: "VIIRS_NOAA20_NRT", bbox: [0, 0, 1, 1] }, { ip: "7.7.7.7" })).status, 429);
+  });
+
+  const readKey = createHash("sha256").update("tobler-logs:atlas-test").digest("hex");
+  const today = new Date().toISOString().slice(0, 10);
+  const getLogs = (q, key = readKey) => mf.dispatchFetch(`https://tobler-api.example/logs?${q}`, { headers: key ? { authorization: `Bearer ${key}` } : {} });
+  const turn = (seq, extra = {}) => ({ session: "abc12345-0001", seq, page: "/", log: { user: `turn ${seq}`, events: [] }, ...extra });
+
+  await t("Logs: stored from Tobler's pages only, with checks on the shape", async () => {
+    assert.equal((await post("/logs", turn(0), { origin: "https://evil.example" })).status, 403);
+    assert.equal((await post("/logs", turn(0, { session: "x" }))).status, 400);
+    assert.equal((await post("/logs", turn(-1))).status, 400);
+    assert.equal((await post("/logs", turn(0, { log: null }))).status, 400);
+    const r = await post("/logs", turn(0), { ip: "9.9.9.9" });
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get("access-control-allow-origin"), ORIGIN);
+    assert.equal((await r.json()).ok, true);
+  });
+
+  await t("Logs: read back only with the read key, oldest first, paged; no IP stored", async () => {
+    assert.equal((await getLogs(`day=${today}`, null)).status, 401);
+    assert.equal((await getLogs(`day=${today}`, "atlas-test")).status, 401);
+    assert.equal((await getLogs("day=yesterday")).status, 400);
+    await post("/logs", turn(1), { ip: "9.9.9.9" });
+    await post("/logs", turn(2), { ip: "9.9.9.9" });
+    const j = await (await getLogs(`day=${today}`)).json();
+    assert.deepEqual(j.entries.map((e) => e.seq), [0, 1, 2]);
+    assert.equal(j.entries[0].log.user, "turn 0");
+    assert.equal(j.entries[0].session, "abc12345-0001");
+    assert.match(j.entries[0].visitor, /^[0-9a-f]{24}$/);
+    assert.doesNotMatch(JSON.stringify(j), /9\.9\.9\.9/);
+    const page = await (await getLogs(`day=${today}&after=${j.entries[0].id}&limit=1`)).json();
+    assert.deepEqual(page.entries.map((e) => e.seq), [1]);
+    assert.equal(page.more, true);
+    assert.equal((await (await getLogs("day=2020-01-01")).json()).entries.length, 0);
+  });
+
+  await t("Logs: own daily limit (4), separate from Claude's", async () => {
+    // 9.9.9.9 has sent 3.
+    assert.equal((await post("/logs", turn(3), { ip: "9.9.9.9" })).status, 200);
+    assert.equal((await post("/logs", turn(4), { ip: "9.9.9.9" })).status, 429);
   });
 
   console.log(`\n${passed} passed`);

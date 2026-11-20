@@ -1,0 +1,45 @@
+name: Log digest
+# Weekly reading of shared session logs (scripts/log-digest.mjs). This repo is public, so the digest is never
+# committed here and the log shows counts only: the files go to the private repo pushpingeo/tobler-logs,
+# using the TOBLER_LOGS_TOKEN secret (a fine-grained token with Contents read and write on that repo only).
+on:
+  schedule:
+    - cron: '17 5 * * 1'   # Mondays, 05:17 UTC
+  workflow_dispatch:
+    inputs:
+      days: { description: 'Days to read, ending yesterday', required: false, default: '7' }
+      dry: { description: 'Skip the Claude call (counts only)', required: false, default: '' }
+concurrency: { group: log-digest, cancel-in-progress: false }
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check the private repo is set up
+        env: { TOKEN: "${{ secrets.TOBLER_LOGS_TOKEN }}" }
+        run: |
+          if [ -z "$TOKEN" ]; then echo "TOBLER_LOGS_TOKEN isn't set, so there's nowhere private to put the digest. Stopping."; exit 1; fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Read the logs and write the digest
+        run: node scripts/log-digest.mjs
+        env:
+          ATLAS_MCP_KEY: "${{ secrets.ATLAS_MCP_KEY }}"
+          ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}"
+          DAYS: "${{ inputs.days || '7' }}"
+          DRY: "${{ inputs.dry }}"
+          OUT_DIR: /tmp/digest
+      - name: Commit to the private repo
+        env: { TOKEN: "${{ secrets.TOBLER_LOGS_TOKEN }}" }
+        run: |
+          git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/pushpingeo/tobler-logs.git" /tmp/logs-repo
+          mkdir -p /tmp/logs-repo/digests
+          cp /tmp/digest/* /tmp/logs-repo/digests/
+          cd /tmp/logs-repo
+          git config user.name "tobler-digest"; git config user.email "actions@users.noreply.github.com"
+          git add digests
+          git diff --cached --quiet && { echo "Nothing new."; exit 0; }
+          git commit -q -m "Digest $(date -u +%F)"
+          git push -q
+          echo "Digest committed to pushpingeo/tobler-logs."

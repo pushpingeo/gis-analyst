@@ -9,7 +9,7 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=5dd43c92">
+<link rel="stylesheet" href="css/workspace.css?v=d2c35ca4">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
@@ -37,11 +37,12 @@
   "./js/placetools.js": "./js/placetools.js?v=82c293e8",
   "./js/reference.js": "./js/reference.js?v=b21a38d8",
   "./js/seavalues.js": "./js/seavalues.js?v=5477290d",
+  "./js/sharelog.js": "./js/sharelog.js?v=c41ca9c5",
   "./js/tools.js": "./js/tools.js?v=e01d1756",
   "./js/units.js": "./js/units.js?v=77029a89",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=cabfe78d",
+  "./js/workspace.js": "./js/workspace.js?v=cd816db6",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -96,6 +97,7 @@
         <li><button data-example>Draw a 2 km square around the Kinderdijk windmills</button></li>
         <li><button data-example>Screen a 1 km² wind farm site 3 km south-east of Lemvig, Denmark</button></li>
       </ul>
+      <p class="note">Tobler is being tested. Conversations are saved so we can improve it. You can turn this off in <button type="button" class="inline-link" data-open-settings>settings</button>.</p>
     </div>
   </div>
 
@@ -167,6 +169,10 @@
       <legend>Your own Anthropic key</legend>
       <div class="keyrow"><label for="own-key" class="sr">Anthropic API key</label><input id="own-key" name="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"><button type="button" data-op="key-save">Use</button><button type="button" data-op="key-clear">Clear</button></div>
       <p class="hint-line" id="key-status">Optional. Without one, Tobler's shared daily allowance is used. A key is kept for this tab only and sent straight to Anthropic.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Helping improve Tobler</legend>
+      <label class="switch"><input type="checkbox" name="shareSessions"> <span><b>Share my sessions</b>Saves what you type, what the analyst did and the places you look at, so we can see what people ask and where it goes wrong. Kept for 90 days. Your own API key is never included.</span></label>
     </fieldset>
     <fieldset>
       <legend>About</legend>
@@ -264,6 +270,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=cabfe78d"></script>
+<script type="module" src="js/workspace.js?v=cd816db6"></script>
 </body>
 </html>
