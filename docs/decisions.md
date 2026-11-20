@@ -702,3 +702,13 @@ Judgement calls made while building, newest first. Bigger product decisions live
   again after a re-assessment), copying happens inside the click, and if the clipboard is still refused it falls back
   to the older copy command, then to showing the link selected for Ctrl+C. The report page's Copy link does the same.
   Browser check 109/109 (new: copying with the clipboard permission cleared). Not tested: Rob's desktop app itself.
+
+## 20 Nov (evening): the summary no longer disagrees with the result (Rob's Kelso report)
+- **What happened:** Kelso's write-up hit the 8,000-token cap. The repair asked for the JSON only and got a good
+  result (decision "progress with targeted investigation", six flags), but the run kept the summary from the cut-off
+  first draft, which said "major issue" and listed flags (Kelso town, schools) the result didn't have. The report
+  showed both.
+- **Fix:** after a repair, the summary is written in code from the repaired result (`summaryFromResult`: decision and
+  why, flags most serious first with next steps, the number of gaps, and a line saying the write-up was cut off). The
+  cut-off draft is kept in `debug.cut_off_summary` for the log. Not a model rewrite: a second call could disagree too.
+- Tested: the cut-off test now checks the summary names every flag and doesn't repeat the draft.

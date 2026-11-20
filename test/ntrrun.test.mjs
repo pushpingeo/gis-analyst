@@ -335,7 +335,11 @@ await test("a result cut off at the length cap is asked for again, as JSON only,
   assert.equal(model.calls[3].tools, undefined, "no tools for the summary repair");
   assert.ok(!JSON.stringify(last).includes('"thinking"'));
   assert.equal(rec.tobler_run.flags.length, 3);
-  assert.equal(rec.tobler_run.summary, "Long summary…");
+  // The summary comes from the repaired result, not the cut-off draft, so it can't disagree with the flags (Kelso, 20 Nov).
+  assert.doesNotMatch(rec.tobler_run.summary, /Long summary/);
+  for (const f of rec.tobler_run.flags) assert.ok(rec.tobler_run.summary.includes(f.risk), `summary names "${f.risk}"`);
+  assert.match(rec.tobler_run.summary, /put together from its result/);
+  assert.equal(rec.tobler_run.debug.cut_off_summary, "Long summary…");
   assert.match(rec.tobler_run.note, /cut off/);
   assert.equal(rec.tobler_run.parse_error, undefined);
   assert.deepEqual(rec.tobler_run.debug.repairs.map((r) => [r.how, r.json]), [["summary", true]]);

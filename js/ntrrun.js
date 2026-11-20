@@ -27,6 +27,22 @@ const CONF_ORDER = { high: 0, medium: 1, low: 2 };
 // analyst didn't rate sorts after the rated ones of the same confidence; nothing is guessed for it.
 const SEV_ORDER = { high: 0, medium: 1, low: 2 };
 const sevRank = (f) => SEV_ORDER[f.severity] ?? 3;
+// A plain summary written in code from a result's decision, flags and gaps, for when the analyst's own write-up was
+// cut off and only the result could be recovered. It says only what the result says.
+export function summaryFromResult(json) {
+  const lines = [];
+  if (json?.decision) lines.push(`Decision: ${String(json.decision).trim()}.${json.decision_why ? ` ${String(json.decision_why).trim()}` : ""}`);
+  const flags = Array.isArray(json?.flags) ? json.flags : [];
+  if (flags.length) {
+    lines.push("", "Flags, most serious first:");
+    const rank = (f) => (SEV_ORDER[f.severity] ?? 3) * 3 + (CONF_ORDER[f.confidence] ?? 2);
+    for (const f of [...flags].sort((a, b) => rank(a) - rank(b))) lines.push(`- ${f.risk}${f.next_step ? `. Next step: ${f.next_step}` : ""}`);
+  } else lines.push("", "No flags raised.");
+  const gaps = Array.isArray(json?.data_gaps) ? json.data_gaps.length : 0;
+  if (gaps) lines.push("", `${gaps} gap${gaps === 1 ? "" : "s"} noted: see the gaps.`);
+  lines.push("", "(The analyst's write-up was cut off, so this summary was put together from its result.)");
+  return lines.join("\n");
+}
 export const findingId = (i) => `F-${String(i + 1).padStart(2, "0")}`;
 const round = (v, d = 2) => (v == null || !Number.isFinite(+v) ? null : Math.round(+v * 10 ** d) / 10 ** d);
 const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -342,7 +358,10 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
         const t2 = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
         const again = parseResult(t2);
         debug.repairs.push({ how: a.how, stop: resp.stop_reason, chars: t2.length, tokens_in: resp.usage?.input_tokens, tokens_out: resp.usage?.output_tokens, json: !!again.json, ...(again.json ? {} : { head: t2.slice(0, 300) }) });
-        if (again.json) { parsed = { json: again.json, summary: String(res.text || "").split("```")[0].trim() }; repaired = true; break; }
+        // The summary is written from the repaired result, never kept from the cut-off write-up: that draft can
+        // disagree with the flags and decision the repair returned (Rob's Kelso report, 20 Nov: "major issue" in
+        // the summary, "progress with targeted investigation" in the decision, flags the result didn't have).
+        if (again.json) { parsed = { json: again.json, summary: summaryFromResult(again.json) }; debug.cut_off_summary = String(res.text || "").split("```")[0].trim().slice(0, 3000); repaired = true; break; }
       } catch (e) { debug.repairs.push({ how: a.how, error: String(e.message || e).slice(0, 300) }); }
     }
     debug.raw_tail = String(res.text || "").slice(-1500);
