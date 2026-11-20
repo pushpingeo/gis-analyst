@@ -2,6 +2,31 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 20 Nov 2026 (late evening): coordinates typed into the chat are a place (Rob)
+- **Why:** Rob typed "55.522759, -5.650122". `find_place` sent it to the name searches, Nominatim returned the Argyll
+  and Bute county centre about 100 km away, `make_place` was refused, and the analyst told him to drop the pin himself.
+  Rob wanted the chat to be the way in.
+- **Built:** `js/coords.js` reads coordinates in code: decimal degrees (with or without hemisphere letters; labelled
+  "lat … lon …" or "x= y="), degrees-minutes-seconds and degrees with decimal minutes, British National Grid
+  references (letters, 2–10 digits, the centre of the square they describe) and eastings and northings (six figures, or
+  labelled E/N). Grid positions go OSGB36 → WGS84 by inverse Transverse Mercator and the Helmert transformation EPSG:1314
+  (OSGB36 to WGS 84 (6), stated accuracy 2 m); the OS worked example (TG 51409 13177) comes out within centimetres of
+  the published WGS84 position. Plain numbers with a unit ("1.5, 2.5 km") or short unlabelled numbers aren't read.
+- `find_place` returns typed coordinates as a candidate ("coordinates you typed", exactly as typed, not rounded), with
+  how they were read and the settlement nearby (Nominatim reverse), and doesn't name-search them. `make_place` takes
+  coordinates as an anchor too. The page (and `try-requests`) adds a line for the analyst saying how it read them.
+- **Order:** two numbers that could both be latitudes are read latitude first, unless land and sea tell them apart (read
+  the usual way it's at sea, the other way on land: the land one, said); if both are plausible, both go back and the
+  analyst offers them as choices on the map.
+- Analyst rule: coordinates are a place; a message that is only coordinates is a point there, then "what's planned?";
+  never tell the person to drop the pin themselves. Input hint: "Where should we look? A place, an area or coordinates".
+- Tested: `test/coords.test.mjs` (new), places tests (find_place, make_place, order), `scripts/browser-coords.mjs` 12/12
+  (new, desktop and phone), existing browser checks no failures; Haiku replays on branch `coords`: bare decimal → point
+  at once, high; a 2 km² square centred on coordinates screened for onshore wind; "1 km circle round NR 6853 2836";
+  DMS then "what is it near?" (11 km NNW of Campbeltown); longitude-first → Kintyre; "12.5, 13.5" → two pins offered.
+- **Not done:** other datums typed as latitude and longitude (ED50, OSGB36 lat/lon, NAD27) are assumed WGS84 and say
+  so; that, and grid systems beyond the British National Grid, wait for the coordinate reference skill and its EPSG tools.
+
 ## 20 Nov 2026 (evening): site footprint vs search area (Rob: "please action")
 - **Why:** Rob's Cnoc Buidhe screen. No outline was found, so `make_place` built a 19.6 km² circle 2.5 km east of
   Bellochantuy; the screen treated it as the site, and a goose-roost SPA clipping its edge became "SPA on site, high
