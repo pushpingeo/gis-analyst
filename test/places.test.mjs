@@ -66,6 +66,17 @@ await test("typed coordinates are a place: read in code, not searched as a name 
   const ctr = turf.centroid(host.list[1].feature).geometry.coordinates;
   assert.ok(Math.abs(ctr[1] - 55.9796) < 0.002 && Math.abs(ctr[0] + 3.6002) < 0.002, `a 1 km circle on Linlithgow Palace's grid square (${ctr})`);
   assert.ok(q.place);
+  // Typed longitude first: read the usual way it's in the Indian Ocean, so the land reading is taken, and said.
+  const lf = await t.exec("find_place", { query: "-5.650122, 55.522759" });
+  assert.equal(lf.candidates.length, 1);
+  assert.equal(lf.candidates[0].name, "55.52276° N, 5.65012° W");
+  assert.match(lf.note, /Read longitude first/);
+  // Nairobi read the other way round would be in the Mediterranean: just Nairobi.
+  assert.equal((await t.exec("find_place", { query: "-1.2921, 36.8219" })).candidates.length, 1);
+  // Both readings on land (Nigeria and Niger): both offered.
+  const both = await t.exec("find_place", { query: "12.5, 13.5" });
+  assert.equal(both.candidates.length, 2);
+  assert.match(both.note, /offer_choices/);
   // Mixed with a name: the coordinates come first, and the name is still searched.
   calls.length = 0;
   const m = await t.exec("find_place", { query: "Bellochantuy", also: ["55.5167, -5.7"] });

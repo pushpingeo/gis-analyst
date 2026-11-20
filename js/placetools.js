@@ -329,12 +329,26 @@ export function createPlaceTools(host) {
       for (const q of asked) { const c = typedCandidate(q); if (c) typed.push(c); }
       const names = asked.filter((q) => !parseCoordinates(q));
       if (typed.length && !names.length) {
+        // Two numbers that could be either way round: decided in code where land and sea tell them apart (a site
+        // typed longitude first lands in the ocean read the usual way); otherwise both go back for the person to pick.
+        let orderNote = null;
+        for (let i = 0; i < typed.length; i++) {
+          const c = typed[i], alt = c.extra.other_reading && parseCoordinates(c.extra.typed)?.alternative;
+          if (!alt) continue;
+          const other = typedCandidate(`${alt.lat}, ${alt.lon}`);
+          if (!other) continue;
+          other.extra = { ...c.extra, other_reading: `${c.name}, read the other way round`, order: c.extra.order === "lat, lon" ? "lon, lat" : "lat, lon" };
+          let seaA = null, seaB = null;
+          try { seaA = (await R.describe(host.ref, { type: "Feature", properties: {}, geometry: c.geometry })).offshore; seaB = (await R.describe(host.ref, { type: "Feature", properties: {}, geometry: other.geometry })).offshore; } catch { /* reference not loaded */ }
+          if (seaA && seaB === false) { typed[i] = other; orderNote = `Read longitude first: as typed the other way it would be at sea (${c.name}), this way it's on land.`; }
+          else if (seaA === seaB) { typed.splice(i + 1, 0, other); i++; orderNote = "Both readings are plausible (both on land or both at sea): show both with offer_choices and let the person pick."; }
+        }
         const list = typed.map((c) => cands.get(keep(c)));
         // Where it is, in words: the settlement it's in or near (Nominatim reverse; skipped if that fails).
         await Promise.all(list.map(async (c) => { try { const near = await settlementNear(c.lonlat, { fetchFn: host.fetchFn, headers: host.headers }); if (near) c.extra.near = near; } catch { /* no name nearby */ } }));
         host.onCandidates?.(list);
         return { searched_for: asked, candidates: list.map(compact),
-          note: "Coordinates, read in code, not searched for as a name. Use the candidate as the anchor (match named_place). If other_reading is given and this one lands somewhere unlikely (at sea, another continent), offer the other reading." };
+          note: `Coordinates, read in code, not searched for as a name. Use the candidate as the anchor (match named_place).${orderNote ? ` ${orderNote}` : ""}` };
       }
       const errors = [];
       // Every source and every spelling at once, the catalogue too; results keep this order (authoritative first).
