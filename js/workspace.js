@@ -574,7 +574,9 @@ const host = {
   firms: firmsViaWorker,
   epsg: epsgViaWorker,
   // Settings (the gear): pick datum transformations for the person ("choose", default) or offer them ("ask").
-  transformationChoice: () => (store.get("transformationChoice") === "ask" ? "ask" : "choose"),
+  // Datum transformations are chosen for the person (Rob, 20 Nov late night: simple and largely hidden). The tools still
+  // ask when the best option is worse than 25 m. The old "Ask me" setting is gone.
+  transformationChoice: () => "choose",
   get trusted() { return trusted; },
   // Settings (the gear): whether the person holds an Esri licence, so Esri-licensed layers can be used.
   esriLicence: () => store.get("esriLicence") === "yes",
@@ -1536,7 +1538,6 @@ function paintSettings() {
   form.nonCommercial.checked = host.nonCommercial();
   form.shareSessions.checked = store.get("shareSessions") !== "no";
   form.querySelectorAll('input[name="units"]').forEach((r) => { r.checked = r.value === U.getUnits(); });
-  form.querySelectorAll('input[name="tfm"]').forEach((r) => { r.checked = r.value === host.transformationChoice(); });
   const preset = [...form.querySelectorAll("[data-colour]")].find((b) => b.dataset.colour.toLowerCase() === C.pole.toLowerCase());
   form.querySelectorAll("[data-colour]").forEach((b) => b.setAttribute("aria-checked", String(b === preset)));
   form.colour.value = C.pole;
@@ -1554,7 +1555,6 @@ dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
 form.esri.addEventListener("change", () => store.set("esriLicence", form.esri.checked ? "yes" : null));
 form.nonCommercial.addEventListener("change", () => store.set("nonCommercial", form.nonCommercial.checked ? "yes" : null));
 form.shareSessions.addEventListener("change", () => store.set("shareSessions", form.shareSessions.checked ? null : "no"));
-form.querySelectorAll('input[name="tfm"]').forEach((r) => r.addEventListener("change", () => { if (r.checked) store.set("transformationChoice", r.value === "ask" ? "ask" : null); }));
 // "settings" in the welcome card's note opens the dialog at the sharing switch.
 document.querySelectorAll("[data-open-settings]").forEach((b) => b.addEventListener("click", () => {
   paintSettings(); dlg.showModal();

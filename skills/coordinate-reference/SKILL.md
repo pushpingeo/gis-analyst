@@ -159,6 +159,8 @@ EPSG:1314, OSGB36 to WGS 84 (6), stated accuracy 2 m, chosen by rule; EPSG v12.0
 ## 7. Talking to the person
 - Plain words: "I read those as 55.52° N, 5.65° W" rather than a code. Give codes in the record and when asked.
 - Say what you assumed, once, briefly. Don't lecture about datums unless it changes the answer.
+- When coordinates were moved between datums, one line is enough: "Read as ED50; moved to WGS 84, about 118 m
+  (EPSG:1311)". The full record goes with the result, not into the conversation.
 - In `ask` mode, one short question with the recommended option first.
 
 ## Operations

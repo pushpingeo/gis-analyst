@@ -262,7 +262,7 @@ export function createEpsgTools(host, locate, typedAt = () => null) {
         ...(domain === "geog2D" ? { heights: "A 2D method: heights aren't carried through." } : {}),
         ...(outside ? { warning: `${outside} of ${rows.length} point${rows.length > 1 ? "s lie" : " lies"} outside the operation's area of use (${operationRec.area_of_use}): its stated accuracy doesn't hold there. Say so; don't rely on those positions.` } : {}),
         record: { operation: `EPSG:${op}`, name: rec.Name, accuracy_m: operationRec.accuracy_m, direction: operationRec.direction, epsg_version: version?.version ?? null, applied_in: "Tobler (js/transform.js), from the EPSG record's parameters" },
-        note: `Applied in code with EPSG:${op} (${rec.Name}), stated accuracy ${operationRec.accuracy_m ?? "unknown"} m. Say it was applied, give the shift and the accuracy, and that the positions are no better than that accuracy.`,
+        note: `Applied in code with EPSG:${op} (${rec.Name}), stated accuracy ${operationRec.accuracy_m ?? "unknown"} m. Tell the person in one line: what it was read as, that it was moved to ${toCrs.Name}, about how far, and the code. More only if they ask.`,
       };
     },
 

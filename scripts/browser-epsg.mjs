@@ -1,5 +1,5 @@
-// Headless browser check of the coordinate reference tools: the skill loads, the settings switch is saved and read,
-// transformation_options answers through the page's Worker client with "choose" and with "ask", and transform applies
+// Headless browser check of the coordinate reference tools: the skill loads, there is no datum setting,
+// transformation_options chooses through the page's Worker client, and transform applies
 // EPSG:1311 to an ED50 well typed in the chat and puts the moved point on the map with its record. The model and
 // the EPSG registry are faked (test/fake-epsg.mjs), so this checks the page and tools, not the model or EPSG.
 // Run: python3 -m http.server 8000 (in the repo), then node scripts/browser-epsg.mjs [chrome path].
@@ -51,12 +51,10 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   await page.waitForFunction(() => window.__ws?.draw, null, { timeout: 40000 });
   if (label === "phone") await page.evaluate(() => document.getElementById("panel").classList.remove("collapsed"));
 
-  // Settings: default is "choose"; switching to "ask" is saved.
+  // No datum setting any more (Rob, 20 Nov late night): transformations are chosen for the person.
   await page.click("#gear");
-  const def = await page.$eval('input[name="tfm"]:checked', (r) => r.value);
-  check(def === "choose", `${label}: the datum setting defaults to "Choose for me"`);
-  const visible = await page.isVisible('input[name="tfm"][value="ask"]').catch(() => false) || await page.$eval('input[name="tfm"][value="ask"]', (r) => !!r.closest("label").getClientRects().length);
-  check(visible, `${label}: the "Ask me" option is in the dialog`);
+  check(!(await page.$('input[name="tfm"]')), `${label}: the settings have no datum transformation choice`);
+  await page.keyboard.press("Escape");
 
   const ask = async (q) => {
     const before = outputs.length;
@@ -66,23 +64,10 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
     for (let i = 0; i < 60 && outputs.length < before + 2; i++) await page.waitForTimeout(250);
     return outputs.slice(before);
   };
-  await page.keyboard.press("Escape");
   let [sk, tfm] = await ask("Which transformation should I use from British National Grid at Linlithgow?");
   check((sk?.method || "").length > 5000 && /Choosing a transformation/i.test(sk.method), `${label}: the coordinate-reference skill loads with its method`);
   check(toolNames.includes("crs_lookup") && toolNames.includes("transformation_options"), `${label}: the analyst has crs_lookup and transformation_options`);
-  check(tfm?.chosen === 1314 && tfm?.recommended === 7710 && tfm?.ask === false, `${label}: "choose" picks 1314 at Linlithgow (7710 recommended, needs a grid)`);
-
-  await page.click("#gear");
-  await page.check('input[name="tfm"][value="ask"]');
-  const saved = await page.evaluate(() => localStorage.getItem("tobler.transformationChoice"));
-  check(saved === "ask", `${label}: "Ask me" is saved`);
-  await page.keyboard.press("Escape");
-  [, tfm] = await ask("And again, please?");
-  check(tfm?.chosen === null && tfm?.ask === true && tfm?.options?.length === 5, `${label}: "ask" offers 5 options and chooses none`);
-
-  await page.click("#gear");
-  await page.check('input[name="tfm"][value="choose"]');
-  await page.keyboard.press("Escape");
+  check(tfm?.chosen === 1314 && tfm?.recommended === 7710 && tfm?.ask === false, `${label}: chosen for the person: 1314 at Linlithgow (7710 recommended, needs a grid)`);
 
   // An ED50 well typed in the chat: read, transformed by 1311 in the page, and placed where WGS 84 puts it.
   wellMode = true;
@@ -99,8 +84,6 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   const well = await page.evaluate(() => { const p = window.__ws.host.places().find((x) => x.name === "Well"); return p && { c: p.feature.geometry.coordinates, t: p.origin?.anchor?.extra?.transformation }; });
   check(well && Math.abs(well.c[1] - 57.49936045) < 1e-7 && Math.abs(well.c[0] - 1.74843851) < 1e-7, `${label}: the well is placed at the transformed position${well ? ` (${well.c})` : ": not placed"}`);
   check(well?.t?.operation === "EPSG:1311", `${label}: the place keeps the transformation it was built from`);
-  await page.click("#gear");
-  check(await page.evaluate(() => localStorage.getItem("tobler.transformationChoice")) === null, `${label}: back to "Choose for me" clears the saved value`);
   await page.screenshot({ path: `/tmp/epsg-${label}.png` });
   check(!errors.length, `${label}: no page errors${errors.length ? `: ${errors.slice(0, 3).join(" | ")}` : ""}`);
   await page.close();

@@ -22,13 +22,13 @@
   "./js/confidence.js": "./js/confidence.js?v=ad22f5c6",
   "./js/config.js": "./js/config.js?v=7752ed50",
   "./js/config.js?v=m2b": "./js/config.js?v=7752ed50",
-  "./js/converse.js": "./js/converse.js?v=e3f0dce9",
+  "./js/converse.js": "./js/converse.js?v=f3b86e88",
   "./js/coords.js": "./js/coords.js?v=66f3eded",
   "./js/datatools.js": "./js/datatools.js?v=4291d91e",
   "./js/disclaimer.js": "./js/disclaimer.js?v=8cfa6424",
   "./js/distances.js": "./js/distances.js?v=8be82f4f",
   "./js/elevation.js": "./js/elevation.js?v=a05f52e1",
-  "./js/epsgtools.js": "./js/epsgtools.js?v=c8dcc17f",
+  "./js/epsgtools.js": "./js/epsgtools.js?v=bb657846",
   "./js/examples.js": "./js/examples.js?v=7400f8d2",
   "./js/fence.js": "./js/fence.js?v=eee6e5f0",
   "./js/findings.js": "./js/findings.js?v=b71c96c8",
@@ -49,7 +49,7 @@
   "./js/units.js": "./js/units.js?v=77029a89",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=9288e627",
+  "./js/workspace.js": "./js/workspace.js?v=0d9c6421",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -57,7 +57,7 @@
 </script>
 <script type="application/json" id="asset-versions">
 {
- "skills/coordinate-reference/SKILL.md": "skills/coordinate-reference/SKILL.md?v=09510449",
+ "skills/coordinate-reference/SKILL.md": "skills/coordinate-reference/SKILL.md?v=97f17a7e",
  "skills/coordinate-reference/datums.md": "skills/coordinate-reference/datums.md?v=d513687d",
  "skills/coordinate-reference/operations.md": "skills/coordinate-reference/operations.md?v=c2d3f852",
  "skills/ntr-screening/SKILL.md": "skills/ntr-screening/SKILL.md?v=33ea446a",
@@ -170,14 +170,6 @@
         <label><input type="radio" name="units" value="nautical"> Nautical miles</label>
       </div>
       <p class="hint-line">For display. The analyst still measures in kilometres and says both.</p>
-    </fieldset>
-    <fieldset>
-      <legend>Datum transformations</legend>
-      <div class="unit-choices" role="radiogroup" aria-label="Datum transformations">
-        <label><input type="radio" name="tfm" value="choose"> Choose for me</label>
-        <label><input type="radio" name="tfm" value="ask"> Ask me</label>
-      </div>
-      <p class="hint-line">When coordinates come in another datum (OSGB36, ED50…), the right transformation depends on where the site is. "Choose for me" picks the best one in the EPSG registry for that spot and records it; it still asks if the best is worse than 25&nbsp;m. "Ask me" shows the options first.</p>
     </fieldset>
     <fieldset>
       <legend>Colour of your shapes</legend>
@@ -300,6 +292,6 @@
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=9288e627"></script>
+<script type="module" src="js/workspace.js?v=0d9c6421"></script>
 </body>
 </html>

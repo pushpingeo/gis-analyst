@@ -2,6 +2,20 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 20 Nov 2026 (late night, later): datum transformations simple and largely hidden (Rob)
+- Rob: for Tobler, transformations should be simple and mostly out of sight; reasonable accuracy is enough. The GIGS
+  work moves to its own workstream.
+- **Removed:** the "Ask me" / "Choose for me" setting. Transformations are always chosen for the person
+  (`transformationChoice` returns "choose"); the tools still ask when the best option that can be applied is worse
+  than 25 m. The tools keep their "ask" path (the skill is portable), but nothing in the page selects it.
+- **Quieter:** the analyst moves coordinates in another datum quietly and says it in one line ("Read as ED50; moved to
+  WGS 84, about 118 m (EPSG:1311)"); no option lists or datum explanations unless asked. The full record stays in the
+  tool result, the place and the log. Prompt, `transform`'s note and the skill's "Talking to the person" say so.
+- **Dropped from Tobler's plan:** grid transformations (OSTN15, NTv2), other projected grids, Molodensky against GIGS.
+  Kept: the GIGS check Action as a cheap regression test (GIGS data stays out of the repo).
+- Tested: `npm test`; `browser-epsg.mjs` 20/20 (no datum setting, 1314 chosen, the ED50 well moved and placed),
+  `browser-run-card.mjs` 109/109, `browser-coords.mjs` no failures.
+
 ## 20 Nov 2026 (late night): the `transform` tool applies the chosen transformation (Rob)
 - **Why:** `transformation_options` could choose an operation but nothing could apply it, so the analyst couldn't say
   how far a point moved, and once said 1314 "was applied" when it had only been chosen.
