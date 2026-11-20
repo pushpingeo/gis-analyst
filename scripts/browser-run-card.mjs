@@ -181,6 +181,34 @@ for (const [label, viewport] of [["desktop", { width: 1280, height: 820 }], ["ph
   check(/^Progress with targeted investigation\. Live pipelines/.test(s.decision), `${label}: decision line first on the card (${s.decision.slice(0, 50)})`);
   check(/^F-01/.test(s.flags[0]) && /F-03/.test(s.flags[2]), `${label}: findings numbered F-01 to F-03`);
   check(/^Next step: Agree crossing/.test(s.next), `${label}: a flag shows its next step (${s.next.slice(0, 40)})`);
+  // The report (and share link): opens in a new tab from the run's link, draws both maps, prints to A4.
+  await page.context().route(/openfreemap/, (r) => r.abort());
+  const [rp] = await Promise.all([page.waitForEvent("popup"), page.click('.run [data-op="report"]')]);
+  const repErrors = [];
+  rp.on("pageerror", (e) => repErrors.push(e.message));
+  await rp.waitForFunction(() => window.__report?.ready, null, { timeout: 45000 }).catch(() => {});
+  const rep = await rp.evaluate(() => ({
+    url: location.href.length, h1: document.querySelector("h1")?.textContent, error: window.__report?.error || "",
+    decision: document.querySelector(".decision")?.textContent || "",
+    rows: [...document.querySelectorAll(".findings tbody tr")].map((tr) => tr.querySelector(".id").textContent),
+    next: document.querySelector(".findings .next")?.textContent || "",
+    imgs: [...document.querySelectorAll("figure img")].map((i) => i.src.length),
+    failed: document.querySelectorAll(".checked tr.failed").length, sources: document.querySelectorAll(".sources li").length,
+    disclaimer: document.querySelector(".disclaimer")?.textContent || "",
+  }));
+  check(!rep.error && rep.h1 === "Area 1" && /^Progress with targeted investigation\./.test(rep.decision), `${label}: report opens from the link with the site and decision (${rep.error || rep.h1}; ${rep.url} chars)`);
+  check(rep.rows.join(",") === "F-01,F-02,F-03" && /^Next step: Agree crossing/.test(rep.next), `${label}: report has one row per finding with its next step (${rep.rows.join(",")})`);
+  check(rep.imgs.length === 2 && rep.imgs.every((n) => n > 5000), `${label}: both maps drawn and copied as pictures for print (${rep.imgs.join(", ")})`);
+  check(rep.sources > 0 && /Indicative desk screening/.test(rep.disclaimer), `${label}: sources and disclaimer in the report (${rep.sources} sources)`);
+  check(!repErrors.length, `${label}: no errors on the report page${repErrors.length ? `: ${repErrors.join(" | ").slice(0, 200)}` : ""}`);
+  await rp.screenshot({ path: `/tmp/report-${label}.png`, fullPage: true });
+  if (label === "desktop") { await rp.emulateMedia({ media: "print" }); await rp.pdf({ path: "/tmp/report.pdf", format: "A4", printBackground: true, preferCSSPageSize: true }); }
+  await rp.close();
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:8000" });
+  await page.click('.run [data-op="share"]');
+  await page.waitForFunction(() => /Link copied|couldn't/.test(document.querySelector(".run .share-note")?.textContent || ""), null, { timeout: 10000 }).catch(() => {});
+  const copied = await page.evaluate(async () => ({ note: document.querySelector(".run .share-note").textContent, clip: await navigator.clipboard.readText().catch(() => "") }));
+  check(/^Link copied/.test(copied.note) && /\/report\.html#v1\./.test(copied.clip), `${label}: Copy share link copies the report's link (${copied.note.slice(0, 40)})`);
   check(s.out === "50 km" && s.onMap === 6, `${label}: slider at 50 km, 5 findings and the wide area on the map (${s.out}, ${s.onMap})`);
   check(/near 2 km · close 10 km · wider 50 km/.test(s.dists), `${label}: distances and reason shown`);
   check(s.sea === "Water depth about 120 m, 110–130 m across the site (NOAA). Vessel traffic: light on the site (0.3 h/km² a month) (AIS 2023, EMODnet).", `${label}: water depth and vessel traffic on the card (${s.sea.slice(0, 80)})`);

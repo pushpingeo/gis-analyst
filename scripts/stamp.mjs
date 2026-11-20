@@ -13,8 +13,11 @@ import { join, dirname, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const PAGE = "index.html";
-const ENTRY = "js/workspace.js";
+// Each page with its entry module and stylesheet (the report page since 20 Nov).
+const PAGES = [
+  { page: "index.html", entry: "js/workspace.js", css: "css/workspace.css" },
+  { page: "report.html", entry: "js/reportpage.js", css: "css/report.css" },
+];
 const FETCHED_DIRS = ["skills", "catalogue", "data/ref"];
 const FETCHED_EXT = /\.(json|md)$/;
 
@@ -42,7 +45,7 @@ function moduleGraph(entry) {
   return { files: [...seen], keys };
 }
 
-function build() {
+function build({ page: PAGE, entry: ENTRY, css: CSS }) {
   const html = readFileSync(join(root, PAGE), "utf8");
   const { files, keys } = moduleGraph(ENTRY);
   const imports = {
@@ -69,16 +72,20 @@ function build() {
     .replace(/<script type="application\/json" id="asset-versions">[\s\S]*?<\/script>\n?/, "")
     .replace(/(<script type="importmap">[\s\S]*?<\/script>\n)/,
       `$1<script type="application/json" id="asset-versions">\n${JSON.stringify(assets, null, 1)}\n</script>\n`)
-    .replace(/href="css\/workspace\.css(\?v=[^"]*)?"/, `href="${stamped("css/workspace.css").slice(2)}"`)
-    .replace(/src="js\/workspace\.js(\?v=[^"]*)?"/, `src="${stamped(ENTRY).slice(2)}"`);
+    .replace(new RegExp(`href="${CSS.replace(/[./]/g, "\\$&")}(\\?v=[^"]*)?"`), `href="${stamped(CSS).slice(2)}"`)
+    .replace(new RegExp(`src="${ENTRY.replace(/[./]/g, "\\$&")}(\\?v=[^"]*)?"`), `src="${stamped(ENTRY).slice(2)}"`);
   return { html, out };
 }
 
-const { html, out } = build();
-if (process.argv.includes("--check")) {
-  if (html !== out) { console.error(`${PAGE} has stale version stamps: run node scripts/stamp.mjs`); process.exit(1); }
-  console.log(`ok ${PAGE} version stamps are current`);
-} else {
-  writeFileSync(join(root, PAGE), out);
-  console.log(html === out ? `${PAGE} already current` : `${PAGE} restamped`);
+let stale = false;
+for (const p of PAGES) {
+  const { html, out } = build(p);
+  if (process.argv.includes("--check")) {
+    if (html !== out) { console.error(`${p.page} has stale version stamps: run node scripts/stamp.mjs`); stale = true; }
+    else console.log(`ok ${p.page} version stamps are current`);
+  } else {
+    writeFileSync(join(root, p.page), out);
+    console.log(html === out ? `${p.page} already current` : `${p.page} restamped`);
+  }
 }
+if (stale) process.exit(1);

@@ -24,6 +24,7 @@ import { elevationShort } from "./elevation.js";
 import { createLogSharer } from "./sharelog.js";
 import { settlementNear } from "./gazetteer.js";
 import { picksFor, pickMessage } from "./assetpicks.js";
+import { shareCode } from "./share.js";
 
 const $ = (id) => document.getElementById(id);
 // Version-stamped URLs for fetched files (written into the page by scripts/stamp.mjs).
@@ -987,6 +988,30 @@ function showRun(record) {
     } finally { btn.disabled = false; activity(""); }
   });
   card.querySelector('[data-op="show"]').addEventListener("click", () => { slider.value = String(entry.km); showRunOnMap(record); });
+  // The report and the share link are the same page: the run, slimmed and compressed into the link (js/share.js).
+  // Nothing is stored. The report opens in a new tab, where "Save as PDF" prints it.
+  const shareNote = card.querySelector(".share-note");
+  const reportUrl = async () => {
+    const s = await shareCode(record);
+    return { url: new URL(`report.html#${s.code}`, location.href).href, ...s };
+  };
+  card.querySelector('[data-op="report"]').addEventListener("click", async () => {
+    const w = window.open("about:blank", "_blank"); // opened now, while it's still a click, so it isn't blocked
+    try {
+      const s = await reportUrl();
+      if (w) w.location.href = s.url; else location.assign(s.url);
+      sessionLog.push({ at: new Date().toISOString(), report: r.id, chars: s.chars });
+    } catch (e) { w?.close(); shareNote.hidden = false; shareNote.textContent = `The report couldn't be made: ${e.message}`; }
+  });
+  card.querySelector('[data-op="share"]').addEventListener("click", async () => {
+    shareNote.hidden = false;
+    try {
+      const s = await reportUrl();
+      if (s.tooLong) { shareNote.textContent = "This run is too big to share as a link. Use Report and save it as a PDF instead."; return; }
+      await navigator.clipboard.writeText(s.url);
+      shareNote.textContent = `Link copied. It opens this run's report and holds the run itself, so nothing is stored online.${s.long ? " It's a long link: email is safer than some chat apps, which cut long links." : ""}`;
+    } catch (e) { shareNote.textContent = `The link couldn't be copied (${e.message}). Open the report and copy its address instead.`; }
+  });
   card.querySelector('[data-op="download"]').addEventListener("click", () => {
     // The disclaimer travels with the data: first in the file, as well as in the run's record.
     const blob = new Blob([JSON.stringify({ type: record.type, disclaimer: DISCLAIMER, ...record }, null, 1)], { type: "application/geo+json" });

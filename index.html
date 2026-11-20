@@ -9,7 +9,7 @@
 <link rel="icon" href="img/tobler.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="js/vendor/maplibre-gl.css">
-<link rel="stylesheet" href="css/workspace.css?v=9e897dae">
+<link rel="stylesheet" href="css/workspace.css?v=b6bc2e2b">
 <script src="js/vendor/maplibre-gl.js"></script>
 <script type="importmap">
 {
@@ -39,12 +39,13 @@
   "./js/placetools.js": "./js/placetools.js?v=232333b6",
   "./js/reference.js": "./js/reference.js?v=b21a38d8",
   "./js/seavalues.js": "./js/seavalues.js?v=5477290d",
+  "./js/share.js": "./js/share.js?v=41d9dae7",
   "./js/sharelog.js": "./js/sharelog.js?v=c41ca9c5",
   "./js/tools.js": "./js/tools.js?v=e01d1756",
   "./js/units.js": "./js/units.js?v=77029a89",
   "./js/vendor/draw.js": "./js/vendor/draw.js?v=d46ad546",
   "./js/vendor/turf.js": "./js/vendor/turf.js?v=bae079f8",
-  "./js/workspace.js": "./js/workspace.js?v=324e4edd",
+  "./js/workspace.js": "./js/workspace.js?v=7cafe500",
   "@turf/turf": "./js/vendor/turf.js?v=bae079f8",
   "osmtogeojson": "./js/vendor/osmtogeojson.js?v=75ffea00"
  }
@@ -273,13 +274,16 @@
     <details class="checked"><summary></summary><ul></ul></details>
     <details class="gaps"><summary></summary><ul></ul></details>
     <div class="edit">
+      <button type="button" data-op="report" class="primary">Report (PDF)</button>
+      <button type="button" data-op="share">Copy share link</button>
       <button type="button" data-op="show">Show on map</button>
       <button type="button" data-op="download">Download run (GeoJSON)</button>
     </div>
+    <p class="share-note" hidden></p>
     <p class="disclaimer"></p>
   </article>
 </template>
 
-<script type="module" src="js/workspace.js?v=324e4edd"></script>
+<script type="module" src="js/workspace.js?v=7cafe500"></script>
 </body>
 </html>
