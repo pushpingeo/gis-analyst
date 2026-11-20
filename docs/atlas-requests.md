@@ -4,6 +4,22 @@ Tobler and the atlas are worked on in separate chats (decided 17 Nov). Tobler do
 What Tobler can rely on is written down in the atlas repo's `docs/mcp-tools.md`. When Tobler needs something
 new from the atlas, add it here (newest first), tell Rob, and he passes it to the atlas chat.
 
+- **20 Nov (evening): finding a project's own outline.** Tobler screened the Cnoc Buidhe Wind Energy Hub (Kintyre,
+  ECU00004767) against a stand-in circle because no outline was found; it now calls such a shape a search area and
+  says so (see `docs/site-vs-search-area.md`), but screening needs the project's own outline. Asks: (1) named search
+  by kind should reach NatureScot's Onshore Wind Farm Proposals (`renewables:windfarm`; ArcGIS item
+  f8655816b2154565a56f157aa843cfb4): `find_place` with kind "wind farm or lease" in Kintyre asked 39 layers and found
+  nothing, though the same layer came back from the feature search near the site (24 records within 20 km); record
+  its name field (`NAME`) and status field (`STATUS`: Scoping, Application, Approved, Installed). (2) The data's own
+  date per record (revision or last updated), apart from when the atlas checked the service: that layer's revision is
+  20 Sept 2024, so it misses schemes submitted since, including Cnoc Buidhe (2025); Tobler should be able to say "this
+  layer predates applications after Sept 2024" rather than "not found". (3) Any published GIS layer of current
+  application boundaries: Section 36 and planning applications in Scotland (Energy Consents Unit, Scottish Government
+  spatial data, council portals such as Argyll and Bute's), England's Planning Data platform and NSIP boundaries,
+  Wales's DNS; licence first. (4) Name fields for project layers generally (the queued name index): wind, solar,
+  mines, licence blocks, where a project's own outline lives; Tobler will use them to catch a project matching
+  itself in a screen. Nothing waits on this.
+
 - **20 Nov: a higher-resolution land elevation model (Rob is asking).** Tobler's land elevation today is ETOPO 2022 at
   15 arc-seconds (about 460 m) through NOAA's DEM Global Mosaic: fine for altitude and "low-lying", too coarse for slope
   (area discounting) or flood work. What Tobler needs is a service that returns **values**, not pictures (the `sample`

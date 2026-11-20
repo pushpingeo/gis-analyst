@@ -96,7 +96,7 @@ const standardScript = () => scriptedModel([
   toolTurn(use("c", "get_data", { dataset: "D1", place: "Area 1", within_km: 5, theme: "community" }), use("d", "get_data", { dataset: "D2", place: "Area 1", within_km: 10, theme: "heritage" }), use("e", "get_data", { dataset: "D3", place: "Area 1", theme: "heritage" })),
   final(RESULT()),
 ]);
-const site = { name: "Area 1", feature: square, origin: { method: "words", words: "Rosebank", confidence: "high", anchor: { name: "Rosebank", source: { title: "UKCS offshore hydrocarbon fields (WGS84)", publisher: "North Sea Transition Authority", licence: "not stated" } } } };
+const site = { name: "Area 1", feature: square, origin: { method: "words", words: "Rosebank", confidence: "high", match: "name_and_type", shape: "feature", anchor: { name: "Rosebank", source: { title: "UKCS offshore hydrocarbon fields (WGS84)", publisher: "North Sea Transition Authority", licence: "not stated" } } } };
 
 await test("distances: offshore oil field defaults, with the reason", () => {
   const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
@@ -614,6 +614,44 @@ await test("re-assess inside the area (the card's switch): only inside evidence,
   assert.equal(rec.tobler_run.assessed_within_km, 0);
   assert.equal(rec.tobler_run.fetched_to_km, 50, "can switch back out");
   assert.equal(rec.tobler_run.flags[0].traced, 1);
+});
+
+await test("a search area (no outline found): nothing is 'on site'; findings inside say where, confidence capped, words changed", async () => {
+  const { SEARCH_BAND } = await import("../js/siterole.js");
+  const model = standardScript();
+  const d = chooseDistances(table, { asset_type: "oil-gas-field", offshore: true });
+  const searchSite = { ...site, origin: { ...site.origin, match: "type_near_clues", shape: "square", offset: true, anchor: { name: "Shetland" } } };
+  const rec = await runScreening({ host: host(), site: searchSite, distances: d, skill, callClaude: model, inputs: { asset_type: "oil-gas-field", asset_label: "offshore oil or gas field" } });
+  const r = rec.tobler_run;
+  assert.equal(r.site.role, "search_area");
+  assert.match(r.site.footprint, /search area of .* \(built from clues round Shetland\), standing in for an outline that wasn't found/);
+  assert.match(r.method, /search area/);
+  assert.match(model.calls[0].messages[0].content, /This is a search area, not the site's outline/);
+  const flow = rec.features.find((f) => /flowline/.test(f.properties.name)).properties;
+  assert.equal(flow.band, SEARCH_BAND);
+  assert.equal(flow.in_search_area, true);
+  const pipes = r.flags.find((f) => /pipelines/.test(f.risk));
+  assert.equal(pipes.relation, SEARCH_BAND);
+  assert.equal(pipes.confidence, "medium", "high capped to medium inside a search area");
+  assert.match(pipes.confidence_capped, /high → medium/);
+  assert.match(pipes.risk, /in and near the search area/, "'on and near site' reworded");
+  assert.doesNotMatch(pipes.risk, /on site/);
+  assert.equal(pipes.evidence[0].band, SEARCH_BAND);
+  const wreck = r.flags.find((f) => /Wreck/.test(f.risk));
+  assert.equal(wreck.confidence, "medium");
+  assert.equal(wreck.relation, "outside the search area");
+  assert.match(headline(rec).site_is, /search area/);
+  // The share link keeps it.
+  const { slimRun } = await import("../js/share.js");
+  const slim = slimRun(rec);
+  assert.equal(slim.tobler_run.site.role, "search_area");
+  assert.equal(slim.tobler_run.flags.find((f) => /pipelines/.test(f.risk)).relation, SEARCH_BAND);
+});
+
+await test("a published outline stays a site: 'on site' and no cap", async () => {
+  const rec = await runScreening({ host: host(), site, distances: chooseDistances(table, { asset_type: "oil-gas-field", offshore: true }), skill, callClaude: standardScript(), inputs: { asset_type: "oil-gas-field", asset_label: "x" } });
+  assert.equal(rec.tobler_run.site.role, "footprint");
+  assert.equal(rec.tobler_run.flags.find((f) => /pipelines/.test(f.risk)).confidence, "high");
 });
 
 await test("display units: conversions, text in km shown in miles or nautical miles, metric untouched", async () => {

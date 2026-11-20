@@ -2,6 +2,32 @@
 
 Judgement calls made while building, newest first. Bigger product decisions live in the plan doc (`tobler-workspace-plan.md` in the claude.ai project).
 
+## 20 Nov 2026 (evening): site footprint vs search area (Rob: "please action")
+- **Why:** Rob's Cnoc Buidhe screen. No outline was found, so `make_place` built a 19.6 km² circle 2.5 km east of
+  Bellochantuy; the screen treated it as the site, and a goose-roost SPA clipping its edge became "SPA on site, high
+  confidence". The reply said "placeholder"; the card, flags and report didn't.
+- **Built:** `js/siterole.js`. Every place gets a role, set in code from how it was built (`make_place` records
+  `origin.shape`, `origin.offset`, `origin.role`, `origin.role_why`): `footprint` (a published outline, or drawn),
+  `area` (a shape the person asked for round a found place: `named_place`), `search_area` (built from clues round an
+  anchor that isn't the asset, or a region or namesake's outline), `point`. A point site's default footprint circle
+  is a search area too (my call: it stands in for an outline nobody has; one line to change in `js/ntrrun.js`).
+- **Screens of a search area:** each feature inside gets `in_search_area`, `coverage` (share of the area, overlay in a
+  Lambert azimuthal equal-area projection centred on it) and `side`; band "in the search area", never "on site".
+  Flags resting on such evidence get `relation` and a confidence cap: medium, or low when every area inside covers
+  under 10% (threshold for Rob); severity unchanged; the cap is recorded (`confidence_capped`). The analyst is told
+  in its first message and sees the share in tool output; its "on site"/"across the footprint" wording is changed in
+  code. Re-assess does the same. The headline tells the conversation to say so.
+- **Shown:** the map draws a search area thin and dashed (no ranging pole) and labels it "· search area"; its card
+  says what it is; the run card and report lead with "Screened a 19.6 km² search area (built from clues round
+  Bellochantuy), because the site's outline wasn't found…"; evidence reads "in the search area (covers 3.9% of it, on
+  its eastern side)"; the report draws and keys it dashed. The share link carries it.
+- **Also:** the "At sea" line (card and report) shows onshore only when a flag rests on vessel traffic (`seaMatters`).
+- **Not done:** the self-match check (a feature of the asset's own type with a similar name overlapping the search
+  area, offered as the footprint) waits on the atlas request of the same day; the evaluation (known footprints rebuilt
+  as search areas); "nearest town Ayr, 66 km" (Natural Earth's town list) at site scale.
+- Tested: `npm test` (new `test/siterole.test.mjs`; new ntrrun and places tests), new `scripts/browser-search-area.mjs`
+  30/30 (desktop and phone), `browser-run-card.mjs` 109 pass, `browser-ux.mjs` and `browser-choice.mjs` no failures.
+
 ## 18 Nov 2026 (22:30): welcome examples: global, calm, rotating (Rob)
 - The examples (Jackdaw, block 30/2, Linlithgow) were UK and oil-and-gas. Now one of each kind (find, shape, screen)
   is picked at random on every load from a small pool (`js/examples.js`): find: Linlithgow Palace and 5 km around

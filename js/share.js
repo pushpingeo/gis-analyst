@@ -44,7 +44,7 @@ export function simplifyGeometry(g, tol) {
   }
 }
 
-const KEEP_PROPS = ["role", "fid", "name", "type", "theme", "distance_km", "band", "dataset", "publisher", "licence", "checked_at", "surrounds"];
+const KEEP_PROPS = ["role", "fid", "name", "type", "theme", "distance_km", "band", "dataset", "publisher", "licence", "checked_at", "surrounds", "in_search_area", "coverage", "side"];
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] != null).map((k) => [k, o[k]]));
 
 // The run, slimmed for a link. tol: simplification in degrees (0.0002 ≈ 20 m).
@@ -59,8 +59,8 @@ export function slimRun(record, { tol = 0.0002, now = () => new Date().toISOStri
     site: r.site, ...(r.sea ? { sea: r.sea } : {}), ...(r.elevation ? { elevation: r.elevation } : {}),
     extent: r.extent, distances: r.distances, fetched_to_km: r.fetched_to_km, assessed_within_km: r.assessed_within_km, method: r.method,
     flags: r.flags.map((f) => ({ id: f.id, risk: f.risk, theme: f.theme, severity: f.severity ?? null, confidence: f.confidence, why: f.why, next_step: f.next_step || "",
-      nearest_km: f.nearest_km, fids: f.fids || [],
-      evidence: f.evidence.map((e) => pick(e, ["name", "distance_km", "band", "dataset", "publisher", "licence", "checked", "traced", "fid", "from_values"])) })),
+      nearest_km: f.nearest_km, fids: f.fids || [], ...pick(f, ["relation", "coverage", "confidence_capped"]),
+      evidence: f.evidence.map((e) => pick(e, ["name", "distance_km", "band", "dataset", "publisher", "licence", "checked", "traced", "fid", "from_values", "in_search_area", "coverage", "side"])) })),
     checked: r.checked.map((c) => ({ ...pick(c, ["evidence", "dataset", "publisher", "licence", "checked_at", "result", "count"]), ...(c.why ? { why: String(c.why).slice(0, 160) } : {}) })),
     data_gaps: r.data_gaps, summary: r.summary, disclaimer: r.disclaimer,
     assessments: (r.assessments || []).map((a) => ({ at: a.at, within_km: a.within_km, flags: a.flags?.length ?? 0, decision: a.decision?.value ?? null })),

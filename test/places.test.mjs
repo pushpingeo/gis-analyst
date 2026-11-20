@@ -73,6 +73,14 @@ await test("make_place builds a 3 km² square on the anchor and records how", as
   near(turf.distance(turf.centroid(host.list[0].feature), [2.37924, 56.90038]), 0, 0.01, "centred on the platform (km)");
   assert.equal(host.list[0].origin.anchor.source.publisher, "North Sea Transition Authority");
   assert.equal(out.offshore, true);
+  // The person asked for this square round the platform: their area, not a search area.
+  assert.equal(host.list[0].origin.role, "area");
+  assert.equal(out.what_it_is, undefined);
+  // The same square standing in for something the clues only point at is a search area, and the tool says so.
+  const s2 = await t.exec("make_place", { anchor: id, shape: "circle", radius_km: 2, offset_km: 2, bearing_deg: 90, words: "a wind farm east of Jackdaw", match: "type_near_clues", reason: "x" });
+  assert.equal(host.list[1].origin.role, "search_area");
+  assert.match(s2.what_it_is, /^A search area \(built from clues round JACKDAW\)/);
+  assert.match(await projectSummary(host.ref, host.list, null), /a search area \(the site's outline wasn't found\)/);
 });
 
 await test("feature shape uses the block outline; edits resize and rotate on the ground", async () => {

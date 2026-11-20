@@ -13,10 +13,12 @@ import { aroundSiteKm2 } from "./datatools.js";
 import { waterDepth, vesselTraffic, seaLines } from "./seavalues.js";
 import { elevationFrom, elevationSignificance, elevationLine } from "./elevation.js";
 import { baselineFor, readDecision } from "./industry.js";
+import { placeRole, coverageIn, whereText, applySearchArea, reword, SEARCH_BAND, SEARCH_NOTE } from "./siterole.js";
 
 // The band for a piece of evidence: a wide area the site lies within is "around the site", not "on site".
 export const AROUND = "around the site";
-const bandOf = (p, d) => (p.surrounds ? AROUND : bandFor(p.distance_km, d));
+// Inside a search area (a stand-in for an outline nobody found), distance 0 is "in the search area", not "on site".
+const bandOf = (p, d) => (p.surrounds ? AROUND : p.in_search_area && !(p.distance_km > 0) ? SEARCH_BAND : bandFor(p.distance_km, d));
 
 export const RUN_SCHEMA = "tobler-run/1";
 export const SCREEN_TOOLS = ["get_place", "find_data", "get_data", "find_features_near", "get_elevation"];
@@ -69,6 +71,16 @@ export function forAnalyst(name, out) {
     dense: `${total} found: a busy area. Only the nearest ${shown.length} are shown here (all are on the map and in the run). Report the count and the nearest, say what it means for the site, and don't list more.` };
 }
 
+// The analyst's view of a tool's output on a search area: items inside it say where, and how much of it they cover.
+export function markInArea(name, out, inArea) {
+  const key = name === "find_features_near" ? "candidates" : name === "get_data" ? "nearest" : null;
+  if (!key || !out || !Array.isArray(out[key])) return out;
+  return { ...out, [key]: out[key].map((x) => {
+    const w = !(x.distance_km > 0) && !x.around_site ? inArea.get(`${norm(x.name)}|${round(x.distance_km, 2)}`) : null;
+    return w ? { ...x, in_search_area: w } : x;
+  }) };
+}
+
 export function footprintOf(feature, d) {
   if (feature.geometry.type !== "Point") return { feature, note: null };
   const f = turf.circle(feature.geometry.coordinates, d.footprint_km, { units: "kilometers", steps: 48 });
@@ -94,12 +106,13 @@ ${skill.body}
 
 export const isArea = (feature) => /Polygon/.test(feature?.geometry?.type || "");
 
-export function firstMessage({ siteName, describe, inputs, distances, footprintNote, origin, baseline = null, inside = false }) {
+export function firstMessage({ siteName, describe, inputs, distances, footprintNote, origin, baseline = null, inside = false, searchArea = null }) {
   const reach = inside ? 0 : distances.wider;
   const lines = [
     `Screen ${siteName}.`,
     `Site: ${R.summaryLine(describe)}${footprintNote ? `; ${footprintNote}` : ""}.`,
     origin ? `How the site was found: ${origin}.` : null,
+    searchArea ? `This is a search area, not the site's outline: ${searchArea}. Nobody knows where on it the ${inputs.asset_label} would go. So nothing is "on site": a feature with distance 0 is "in the search area", and the tools say how much of the area it covers (in_search_area). Say "in the search area" and give that share; a small share on the edge is something a layout could avoid. Severity is how much it would matter if it is on the site; the run caps the confidence of findings inside a search area. Put one line in data_gaps saying the site's outline wasn't found.` : null,
     `Setting: ${describe.offshore ? "offshore" : "onshore"}${describe.coast_km != null && describe.coast_km < 10 ? " (coastal: screen both ways)" : ""}.`,
     `Asset type: ${inputs.asset_label}${inputs.asset_assumed ? " (assumed: say so)" : ""}. Stage: ${inputs.stage || "greenfield (assumed: say so)"}.`,
     inputs.capacity_mw ? `Capacity: ${inputs.capacity_mw} MW.` : null,
@@ -154,7 +167,8 @@ export function traceFlags(flags, evidence, d, sea = null) {
       const hit = named.find((x) => near(x.f) && ds && x.ds && (x.ds.includes(ds) || ds.includes(x.ds))) || named.find((x) => near(x.f)) || null;
       if (!hit) return traceToSea(e, sea, d) || { ...e, distance_km: round(e.distance_km), traced: false };
       const p = hit.f.properties;
-      return { ...e, name: p.name, distance_km: p.distance_km, band: bandOf(p, d), dataset: p.dataset, publisher: p.publisher, licence: p.licence, checked: p.checked_at, fid: p.fid, traced: true };
+      return { ...e, name: p.name, distance_km: p.distance_km, band: bandOf(p, d), dataset: p.dataset, publisher: p.publisher, licence: p.licence, checked: p.checked_at, fid: p.fid, traced: true,
+        ...(p.in_search_area ? { in_search_area: true, ...(p.coverage != null ? { coverage: p.coverage } : {}), ...(p.side ? { side: p.side } : {}) } : {}) };
     });
     const traced = ev.filter((e) => e.traced);
     const dists = (traced.length ? traced : ev).map((e) => e.distance_km).filter((v) => v != null);
@@ -205,6 +219,14 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
   const evidence = [];
   const seen = new Map();
   const siteKm2 = isArea(fp.feature) ? turf.area(fp.feature) / 1e6 : 0;
+  // What the site is: a point is screened on a default footprint, which stands in for an outline nobody has, so it's a
+  // search area too; an area is whatever make_place recorded (js/siterole.js).
+  const role = site.feature.geometry.type === "Point"
+    ? { role: "search_area", why: `a default ${distances.footprint_km} km footprint round a point` }
+    : placeRole(site.origin, site.feature.geometry);
+  const searchArea = role.role === "search_area" && isArea(fp.feature);
+  const searchNote = searchArea ? SEARCH_NOTE(siteKm2, role.why) : null;
+  const inArea = new Map(); // name|distance → where in the search area, for the analyst's view of the tool output
   const capture = (list, meta = {}) => {
     for (const c of list) {
       const around = c.around_site ? c.area_km2 : aroundSiteKm2(siteKm2, c.geometry, c.distance_km);
@@ -213,9 +235,17 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       if (seen.has(key)) continue;
       const fid = `E${evidence.length + 1}`;
       seen.set(key, fid);
+      // Inside a search area: how much of it the feature covers, and where (equal-area, js/siterole.js).
+      let where = null;
+      if (searchArea && !around && c.geometry && !(c.distance_km > 0)) {
+        try { where = coverageIn(fp.feature, c.geometry); } catch { where = null; }
+        if (!where) where = { coverage: null, side: null };
+        inArea.set(`${norm(c.name)}|${round(c.distance_km, 2)}`, whereText(where));
+      }
       evidence.push({ type: "Feature", geometry: c.geometry, properties: {
         role: "evidence", fid, run: runId, name: c.name || c.type || "Unnamed feature", type: c.type || "", theme: meta.theme || "context",
-        distance_km: round(c.distance_km, 2), band: around ? AROUND : bandFor(c.distance_km, distances), area_km2: c.area_km2 ?? (around ? Math.round(around) : null),
+        distance_km: round(c.distance_km, 2), band: around ? AROUND : where ? SEARCH_BAND : bandFor(c.distance_km, distances), area_km2: c.area_km2 ?? (around ? Math.round(around) : null),
+        ...(where ? { in_search_area: true, ...(where.coverage != null ? { coverage: Math.round(where.coverage * 1000) / 1000 } : {}), ...(where.side ? { side: where.side } : {}) } : {}),
         ...(around ? { surrounds: true } : {}),
         dataset, publisher: meta.publisher || c.source?.publisher || "", licence: c.source?.licence || "",
         checked_at: now(), ...(c.extra && Object.keys(c.extra).length ? { details: c.extra } : {}),
@@ -248,7 +278,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       const out = await tools.exec(name, i);
       calls.push({ tool: name, input: i, ms: Date.now() - t0 });
       const c = checkedFrom(name, i, out); if (c) checked.push(c);
-      return forAnalyst(name, out);
+      return forAnalyst(name, searchArea ? markInArea(name, out, inArea) : out);
     } catch (e) {
       calls.push({ tool: name, input: i, ms: Date.now() - t0, error: String(e.message || e).slice(0, 200) });
       // A mistyped id (a candidate's C1 passed as a dataset) is the analyst's slip, not a source that wasn't checked.
@@ -325,7 +355,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     : "drawn on the map by the person";
   const res = await runTurn({
     system: systemFor(skill),
-    messages: [{ role: "user", content: firstMessage({ siteName: site.name, describe, inputs, distances, footprintNote: fp.note, origin, baseline: baselineLines.join("\n") || null, inside }) }],
+    messages: [{ role: "user", content: firstMessage({ siteName: site.name, describe, inputs, distances, footprintNote: fp.note, origin, baseline: baselineLines.join("\n") || null, inside, searchArea: searchNote }) }],
     tools: defs, exec, callClaude, maxRounds,
     onEvent: (ev) => { if (ev.type === "tool_start") onEvent({ type: "tool_start", name: ev.name, input: ev.input }); if (ev.type === "tool" || ev.type === "round" || ev.type === "warning") onEvent(ev); },
   });
@@ -352,7 +382,7 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     const found = checked.filter((c) => c.result === "features" || c.result === "not checked").map(summarise).join("\n");
     const tail = String(res.text || "").slice(-3000);
     const attempts = [
-      { how: "summary", messages: [{ role: "user", content: `${firstMessage({ siteName: site.name, describe, inputs, distances, footprintNote: fp.note, origin, baseline: null, inside })}\n\nWhat the tools found (everything is on the map and in the run):\n${found || "- nothing returned"}\n\n${tail ? `Your write-up was cut off before its JSON block. Its last part:\n${tail}\n\n` : ""}${ASK}` }] },
+      { how: "summary", messages: [{ role: "user", content: `${firstMessage({ siteName: site.name, describe, inputs, distances, footprintNote: fp.note, origin, baseline: null, inside, searchArea: searchNote })}\n\nWhat the tools found (everything is on the map and in the run):\n${found || "- nothing returned"}\n\n${tail ? `Your write-up was cut off before its JSON block. Its last part:\n${tail}\n\n` : ""}${ASK}` }] },
       { how: "history", messages: [...history, { role: "user", content: `Your result was cut off or had no JSON block. ${ASK}` }] },
     ];
     debug.repairs = [];
@@ -371,19 +401,24 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
     }
     debug.raw_tail = String(res.text || "").slice(-1500);
   }
-  const flags = traceFlags(parsed.json?.flags, evidence, distances, { ...seaVals, elevation });
+  let flags = traceFlags(parsed.json?.flags, evidence, distances, { ...seaVals, elevation });
+  if (searchArea) {
+    flags = applySearchArea(flags, new Map(evidence.map((f) => [f.properties.fid, f.properties])));
+    parsed.summary = reword(parsed.summary);
+  }
   const siteFeature = { type: "Feature", geometry: fp.feature.geometry, properties: { role: "site", name: site.name, run: runId } };
   return {
     type: "FeatureCollection",
     tobler_run: {
       schema: RUN_SCHEMA, id: runId, kind: "ntr-screen", skill: { name: skill.name, version: skill.version }, model,
       industry: host.profile?.()?.id || null,
-      decision: readDecision(parsed.json?.decision, parsed.json?.decision_why, host.profile?.()?.decisions),
+      decision: readDecision(parsed.json?.decision, searchArea ? reword(parsed.json?.decision_why) : parsed.json?.decision_why, host.profile?.()?.decisions),
       started_at: started, finished_at: now(),
       site: {
         name: site.name, how_found: origin, confidence: site.origin?.method === "words" ? site.origin.confidence : "drawn",
         anchor_source: site.origin?.anchor?.source ? { title: site.origin.anchor.source.title, publisher: site.origin.anchor.source.publisher, licence: site.origin.anchor.source.licence } : null,
-        footprint: inside ? "inside the area only (the surroundings weren't screened)" : fp.note || `screened on the ${/Line/.test(site.feature.geometry.type) ? "line" : "area"} itself`,
+        footprint: inside ? "inside the area only (the surroundings weren't screened)" : searchArea ? searchNote : fp.note || `screened on the ${/Line/.test(site.feature.geometry.type) ? "line" : "area"} itself`,
+        role: searchArea ? "search_area" : role.role, role_why: role.why, ...(siteKm2 ? { area_km2: round(siteKm2, 3) } : {}),
         setting: offshore ? "offshore" : "onshore", summary: R.summaryLine(describe),
         asset_type: inputs.asset_type, asset_label: inputs.asset_label, asset_assumed: !!inputs.asset_assumed,
         stage: inputs.stage || "greenfield (assumed)", capacity_mw: inputs.capacity_mw ?? null, tip_height_m: inputs.tip_height_m ?? null,
@@ -393,7 +428,9 @@ export async function runScreening({ host, site, inputs, distances, skill, callC
       extent: inside ? "inside" : "around", distances, fetched_to_km: reach, assessed_within_km: reach,
       method: inside
         ? "Inside the area only, at the person's request: features inside the area or touching its edge (distance 0), geodesic on WGS84; the surroundings weren't fetched. Coordinates WGS84 (EPSG:4326)."
-        : "Distances geodesic on WGS84, measured from the footprint edge (0 = on site); features fetched once out to the wider band. Coordinates WGS84 (EPSG:4326).",
+        : searchArea
+          ? "The site's outline wasn't found, so it was screened as a search area: features inside it are reported by the share of it they cover (overlay in a Lambert azimuthal equal-area projection centred on it), not as on site, and their confidence is capped. Distances outside it geodesic on WGS84, measured from its edge; features fetched once out to the wider band. Coordinates WGS84 (EPSG:4326)."
+          : "Distances geodesic on WGS84, measured from the footprint edge (0 = on site); features fetched once out to the wider band. Coordinates WGS84 (EPSG:4326).",
       flags, checked, data_gaps: Array.isArray(parsed.json?.data_gaps) ? parsed.json.data_gaps.map(String) : [],
       model_checked: Array.isArray(parsed.json?.checked) ? parsed.json.checked : [],
       summary: parsed.summary, ...(parsed.json ? {} : { parse_error: "The analyst's result had no readable JSON block, so there are no structured flags. The summary is kept as written." }),
@@ -433,13 +470,14 @@ export async function reassess({ record, km, skill, callClaude: call, now = () =
     reasons: [`re-assessed from the stored evidence within ${km} km (fetched to ${run.fetched_to_km} km)`, ...run.distances.reasons] };
   const ev = evidenceWithin(record, km).map((f) => {
     const p = f.properties;
-    return { name: p.name, type: p.type, theme: THEME_CODE[p.theme] || p.theme, distance_km: p.distance_km, band: bandOf(p, d), dataset: p.dataset, publisher: p.publisher, licence: p.licence, checked: p.checked_at, ...(p.details ? { details: p.details } : {}) };
+    return { name: p.name, type: p.type, theme: THEME_CODE[p.theme] || p.theme, distance_km: p.distance_km, band: bandOf(p, d), ...(p.in_search_area ? { in_search_area: whereText(p) } : {}), dataset: p.dataset, publisher: p.publisher, licence: p.licence, checked: p.checked_at, ...(p.details ? { details: p.details } : {}) };
   });
   const insideOnly = km === 0 && isArea(record.features.find((f) => f.properties.role === "site"));
   const where = insideOnly ? "inside the area (inside it or touching its edge)" : `within ${km} km of the footprint edge`;
   const message = [
     `Re-assess the screen of ${run.site.name} for findings ${where}.${insideOnly ? " The person chose to look inside the area only." : ""} No tools: use only the evidence below, which was fetched in the original run.`,
     `Site: ${run.site.summary}; ${run.site.footprint}. Setting: ${run.site.setting}. Asset type: ${run.site.asset_label}. Stage: ${run.site.stage}.`,
+    run.site.role === "search_area" ? "The site's outline wasn't found, so this is a search area: evidence marked \"in the search area\" may or may not be on the site. Say \"in the search area\" with the share it covers (coverage), never \"on site\"." : null,
     `Distances now: ${distancesLine(d)}.`,
     `Evidence ${insideOnly ? "inside the area" : `within ${km} km`} (${ev.length} features):\n${JSON.stringify(ev)}`,
     `What the original run checked:\n${JSON.stringify(run.checked.map((c) => ({ dataset: c.dataset, publisher: c.publisher, result: c.result, ...(c.why ? { why: c.why } : {}) })))}`,
@@ -447,16 +485,18 @@ export async function reassess({ record, km, skill, callClaude: call, now = () =
     insideOnly
       ? "Write the short summary and the JSON block as the method says. Features outside the area are out of scope for this view (they were found and stay in the run); gaps still stand."
       : "Write the short summary and the JSON block as the method says. Features beyond the new distance are out of scope; gaps still stand.",
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
   const resp = await callClaude({ system: systemFor(skill), messages: [{ role: "user", content: message }] });
   const text = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
   const parsed = parseResult(text);
   if (!parsed.json) throw new Error("The re-assessment came back without a readable result. The earlier flags are unchanged.");
   run.assessments.push({ at: now(), within_km: run.assessed_within_km, flags: run.flags, decision: run.decision ?? null, summary: run.summary, distances: run.distances });
   run.flags = traceFlags(parsed.json.flags, evidenceOf(record), d, { ...(run.sea || {}), elevation: run.elevation });
-  run.decision = readDecision(parsed.json.decision, parsed.json.decision_why); // a decision written for the old distance no longer stands
+  const searchArea = run.site.role === "search_area";
+  if (searchArea) run.flags = applySearchArea(run.flags, new Map(evidenceOf(record).map((f) => [f.properties.fid, f.properties])));
+  run.decision = readDecision(parsed.json.decision, searchArea ? reword(parsed.json.decision_why) : parsed.json.decision_why); // a decision written for the old distance no longer stands
   run.data_gaps = Array.isArray(parsed.json.data_gaps) ? parsed.json.data_gaps.map(String) : run.data_gaps;
-  run.summary = parsed.summary;
+  run.summary = searchArea ? reword(parsed.summary) : parsed.summary;
   run.distances = d;
   run.assessed_within_km = km;
   for (const f of evidenceOf(record)) f.properties.band = bandOf(f.properties, d);
@@ -477,6 +517,7 @@ export function headline(record) {
     top_flags: r.flags.slice(0, 5).map((f) => ({ id: f.id, risk: f.risk, ...(f.severity ? { severity: f.severity } : {}), confidence: f.confidence, theme: f.theme, nearest_km: f.nearest_km })),
     evidence_features: evidenceOf(record).length, sources_checked: r.checked.length, not_checked: notChecked.map((c) => c.dataset).slice(0, 6), gaps: r.data_gaps.length,
     ...(r.parse_error ? { problem: r.parse_error } : {}),
+    ...(r.site.role === "search_area" ? { site_is: `a search area: ${r.site.role_why}. Findings inside it are "in the search area" with the share they cover, not "on site". Say this in your reply, and that the real outline (drawn, or from the application) would sharpen the screen.` } : {}),
     note: "The run card under your reply shows the decision, the flags (F-01…), evidence, next steps, distances (with a slider) and gaps, and the map shows the evidence. Reply in two or three sentences: the most serious flags and the main gaps. Don't repeat the card.",
   };
 }

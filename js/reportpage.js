@@ -6,7 +6,8 @@ import { THEMES } from "./findings.js";
 import { decodeRun } from "./share.js";
 import { distancesLine } from "./distances.js";
 import { DISCLAIMER } from "./disclaimer.js";
-import { seaLines } from "./seavalues.js";
+import { seaLines, seaMatters } from "./seavalues.js";
+import { whereText, searchHeadline, SEARCH_BAND } from "./siterole.js";
 import { elevationLine } from "./elevation.js";
 import { findingLabels, findingRows, evidenceRows, sourcesOf, gapsOf, decisionText, summaryBlocks, changeLog } from "./report.js";
 
@@ -70,6 +71,8 @@ function render(record) {
   const decision = el("p", null, "decision");
   if (dec) decision.append(el("b", dec.head), document.createTextNode(dec.why ? ` ${dec.why}` : ""));
   else decision.append(el("span", "No overall decision was recorded for this run.", "none"));
+  const searchArea = s.role === "search_area";
+  const searchNote = searchArea ? el("p", U.localise(searchHeadline(s)), "search-note") : null;
   const summary = el("section", null, "summary");
   summary.append(el("h2", "Summary"));
   for (const b of summaryBlocks(r.summary)) {
@@ -87,12 +90,14 @@ function render(record) {
   fact("Planned", `${s.asset_label}${s.asset_assumed ? " (assumed)" : ""}; stage ${s.stage}`);
   fact("Screened", r.extent === "inside" ? "Inside the area only (the surroundings weren't screened)." : U.localise(`${s.footprint}; distances from the site's edge: ${distancesLine(r.distances)}.`));
   fact("Why these distances", (r.distances?.reasons || []).slice(0, 3).join("; "));
-  if (r.sea) fact("At sea", U.localise(seaLines(r.sea).join(" ")));
+  if (seaMatters(r)) fact("At sea", U.localise(seaLines(r.sea).join(" ")));
   if (r.elevation?.significance) fact("Elevation", U.localise(elevationLine(r.elevation, r.elevation.significance)));
   fact("Data as of", when(r.finished_at));
   siteSec.append(facts);
-  const siteFig = figure("site-map", "The site and the distances screened. The site is outlined; dashed rings are the near, close and wider bands.",
-    [["site", "The site"], ["ring", "Distance bands"]]);
+  const siteFig = figure("site-map", searchArea
+    ? "The search area and the distances screened. The site's outline wasn't found, so the dashed outline is where it probably is, not its boundary; dashed rings are the near, close and wider bands."
+    : "The site and the distances screened. The site is outlined; dashed rings are the near, close and wider bands.",
+    [["site", searchArea ? "The search area" : "The site"], ["ring", "Distance bands"]]);
   siteSec.append(siteFig.fig);
 
   // 3. Findings: the numbered map and one row per finding.
@@ -101,7 +106,7 @@ function render(record) {
   findSec.append(el("h2", `Findings (${rows.length})`));
   const themesUsed = [...new Set(r.flags.map((f) => f.theme))];
   const findFig = figure("findings-map", "The evidence behind each finding, labelled with its number. Shapes are simplified for display.",
-    [["site", "The site"], ...themesUsed.map((t) => [t, THEMES[t]?.label || "Operating context"])]);
+    [["site", searchArea ? "The search area" : "The site"], ...themesUsed.map((t) => [t, THEMES[t]?.label || "Operating context"])]);
   findSec.append(findFig.fig);
   if (!rows.length) findSec.append(el("p", "No findings were raised. See what was checked and the gaps below."));
   else {
@@ -118,7 +123,7 @@ function render(record) {
       if (f.evidence.length) {
         const ul = el("ul", null, "ev");
         for (const e of f.evidence) {
-          const li = el("li", `${e.name} · ${e.band === "around the site" ? "around the site" : km(e.distance_km)}${e.dataset ? ` · ${e.dataset}` : ""}${e.publisher ? ` (${e.publisher})` : ""}${e.checked ? `, ${e.checked}` : ""}`);
+          const li = el("li", `${e.name} · ${e.band === "around the site" ? "around the site" : e.band === SEARCH_BAND ? whereText(e) : km(e.distance_km)}${e.dataset ? ` · ${e.dataset}` : ""}${e.publisher ? ` (${e.publisher})` : ""}${e.checked ? `, ${e.checked}` : ""}`);
           if (!e.traced) li.append(el("span", " · not traced to fetched data", "untraced"));
           ul.append(li);
         }
@@ -126,8 +131,9 @@ function render(record) {
       }
       if (f.next_step) { const nx = el("p", null, "next"); nx.append(el("b", "Next step: "), document.createTextNode(f.next_step)); what.append(nx); }
       const rating = el("td", null, "rating");
-      rating.append(el("span", `Severity ${f.severity}`), el("span", `Confidence ${f.confidence}`));
-      tr.append(el("td", f.id, "id"), what, rating, el("td", km(f.nearest_km), "dist"));
+      rating.append(el("span", `Severity ${f.severity}`), el("span", `Confidence ${f.confidence}${f.confidence_capped ? " (capped)" : ""}`));
+      if (f.confidence_capped) rating.title = `Confidence ${f.confidence_capped}`;
+      tr.append(el("td", f.id, "id"), what, rating, el("td", f.relation === SEARCH_BAND ? "in the search area" : km(f.nearest_km), "dist"));
       t.tBodies[0].append(tr);
     }
     findSec.append(t);
@@ -176,11 +182,11 @@ function render(record) {
   const foot = el("footer");
   foot.append(el("p", r.disclaimer || DISCLAIMER, "disclaimer"), el("p", `Made with Tobler (asktobler.com) from run ${r.id}, ${when(r.finished_at)}.`, "made"));
 
-  main.replaceChildren(...head, decision, summary, siteSec, findSec, evSec, meth, src, foot);
+  main.replaceChildren(...head, decision, ...(searchNote ? [searchNote] : []), summary, siteSec, findSec, evSec, meth, src, foot);
   const site = record.features.find((f) => f.properties.role === "site");
   const evid = record.features.filter((f) => f.properties.role === "evidence");
-  pending.push(drawMap(siteFig, { site, rings: r.extent === "inside" ? [] : [r.distances.near, r.distances.close, r.distances.wider], evidence: [], labels: null }));
-  pending.push(drawMap(findFig, { site, rings: [], evidence: evid, labels: findingLabels(record) }));
+  pending.push(drawMap(siteFig, { site, rings: r.extent === "inside" ? [] : [r.distances.near, r.distances.close, r.distances.wider], evidence: [], labels: null, searchArea }));
+  pending.push(drawMap(findFig, { site, rings: [], evidence: evid, labels: findingLabels(record), searchArea }));
   Promise.allSettled(pending).then(() => { window.__report.ready = true; });
 }
 
@@ -201,7 +207,7 @@ function figure(id, caption, key) {
 
 // A map that stays still enough to print: drawn once, fitted to what it shows, then copied into a picture with the
 // labels painted on, for the PDF. Falls back to a plain outline map if the basemap can't be reached.
-function drawMap(f, { site, rings, evidence, labels }) {
+function drawMap(f, { site, rings, evidence, labels, searchArea = false }) {
   return new Promise((resolve) => {
     const map = new maplibregl.Map({ container: f.box, style: BASEMAP, attributionControl: false, preserveDrawingBuffer: true, interactive: true, cooperativeGestures: true, fadeDuration: 0 });
     window.__report.maps.push(map);
@@ -221,8 +227,8 @@ function drawMap(f, { site, rings, evidence, labels }) {
       map.addSource("rings", { type: "geojson", data: turf.featureCollection(ringFs) });
       map.addLayer({ id: "rings", type: "line", source: "rings", paint: { "line-color": INK, "line-width": 1, "line-opacity": 0.5, "line-dasharray": [3, 3] } });
       map.addSource("site", { type: "geojson", data: site || turf.featureCollection([]) });
-      map.addLayer({ id: "site-fill", type: "fill", source: "site", filter: ["!=", ["geometry-type"], "Point"], paint: { "fill-color": SITE, "fill-opacity": 0.12 } });
-      map.addLayer({ id: "site-line", type: "line", source: "site", paint: { "line-color": SITE, "line-width": 2.5 } });
+      map.addLayer({ id: "site-fill", type: "fill", source: "site", filter: ["!=", ["geometry-type"], "Point"], paint: { "fill-color": SITE, "fill-opacity": searchArea ? 0.05 : 0.12 } });
+      map.addLayer({ id: "site-line", type: "line", source: "site", paint: { "line-color": SITE, "line-width": searchArea ? 2 : 2.5, ...(searchArea ? { "line-dasharray": [3, 2] } : {}) } });
       map.addLayer({ id: "site-pt", type: "circle", source: "site", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 6, "circle-color": SITE, "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
       // Fit: the outer ring, or the site and the labelled evidence (wide areas the site lies within don't count).
       const near = evidence.filter((e) => !e.properties.surrounds);

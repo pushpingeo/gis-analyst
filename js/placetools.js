@@ -1,6 +1,7 @@
 // Tools the conversation agent uses to find places and build areas from words.
 // The model works with ids (C3 for a found candidate, "Area 1" for a place); geometry stays here.
 // A host object supplies the project's places and reference data, so the same code runs in the page and in the evaluation.
+import { placeRole } from "./siterole.js";
 import * as turf from "./vendor/turf.js";
 import * as G from "./geometry.js";
 import * as R from "./reference.js";
@@ -475,8 +476,12 @@ export function createPlaceTools(host) {
       const origin = {
         method: "words", words: i.words, steps, confidence: rated.confidence, confidence_rules: rated.rules, match: i.match, checks, reason: i.reason,
         anchor: a.cand ? { name: a.cand.name, type: a.cand.type, source: a.cand.source, lonlat: a.cand.lonlat, extra: a.cand.extra } : { place: a.label },
+        shape: i.shape, offset: !!i.offset_km,
         at: new Date().toISOString(),
       };
+      // What the place stands for, set in code from how it was built (js/siterole.js): a published outline, an area
+      // the person asked for, or a search area standing in for an outline nobody found (Cnoc Buidhe, 20 Nov).
+      { const r = placeRole(origin, f.geometry); origin.role = r.role; origin.role_why = r.why; }
       // Replacing: the old proposal goes first, so the new one can take its name.
       // Replacing: add the new place first (so a failure leaves the old one), then remove the old one and let the new
       // one take its name unless a new name was given.
@@ -487,6 +492,7 @@ export function createPlaceTools(host) {
         if (!i.name && p.name !== oldName) host.renamePlace?.(p.name, oldName);
       }
       return { ...(await placeSummary(p)), ...(old ? { replaced: old.name } : {}), how: steps.join(", then "), confidence: rated.confidence, why: rated.rules,
+        ...(origin.role === "search_area" ? { what_it_is: `A search area (${origin.role_why}), standing in for an outline that wasn't found. Say so when you show it, and that a screen of it reports findings by how much of the area they cover, not as "on site". If the person has the real outline, they can draw it.` } : {}),
         ...(checks.length ? { checks } : {}),
         ...(dropped.length ? { failed_checks_left_out: dropped, about_them: "These clues failed on the place this one replaces and aren't checked now. Tell the person, unless they corrected the clue themselves; never drop one to raise the confidence." } : {}),
         next: rated.confidence === "low" && checks.some((c) => c.pass === false)
@@ -541,6 +547,7 @@ export function createPlaceTools(host) {
       return {
         place: p.name, status: p.status, summary: R.summaryLine(d), ...pickD(d),
         how_made: p.origin?.method === "words" ? { words: p.origin.words, anchor: p.origin.anchor?.name || p.origin.anchor?.place, source: p.origin.anchor?.source?.title, steps: p.origin.steps, confidence: p.origin.confidence } : { method: "drawn on the map" },
+        what_it_is: (({ role, why }) => `${role === "search_area" ? "search area" : role}: ${why}`)(placeRole(p.origin, p.feature.geometry)),
         edits: (p.edits || []).map((e) => e.change),
       };
     },
@@ -643,8 +650,9 @@ export async function projectSummary(ref, places, focus, view = null) {
   for (const p of places) {
     const d = await R.describe(ref, p.feature);
     const how = p.origin?.method === "words" ? `from words "${p.origin.words}" (anchor: ${p.origin.anchor?.name || p.origin.anchor?.place}, ${p.origin.confidence} confidence)` : "drawn on the map";
+    const role = placeRole(p.origin, p.feature.geometry).role === "search_area" ? "; a search area (the site's outline wasn't found)" : "";
     const edits = p.edits?.length ? `; edited: ${p.edits.slice(-3).map((e) => e.change).join("; ")}` : "";
-    lines.push(`- ${p.name}${p.name === focus ? " [in focus]" : ""} (${p.status}): ${R.summaryLine(d)}; scale ${p.scale || d.scale}${p.scaleFrom && p.scaleFrom !== "size" ? ` (from ${p.scaleFrom === "you" ? "the person" : p.scaleFrom})` : ""}; ${how}${edits}`);
+    lines.push(`- ${p.name}${p.name === focus ? " [in focus]" : ""} (${p.status}): ${R.summaryLine(d)}; scale ${p.scale || d.scale}${p.scaleFrom && p.scaleFrom !== "size" ? ` (from ${p.scaleFrom === "you" ? "the person" : p.scaleFrom})` : ""}; ${how}${role}${edits}`);
   }
   if (viewLine) lines.push(viewLine);
   return lines.join("\n");

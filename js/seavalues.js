@@ -135,3 +135,11 @@ export function seaLines(sea, { units = (km) => `${km} km` } = {}) {
   }
   return out;
 }
+
+// Whether the sea belongs in a run's write-up: offshore always; onshore only when a flag rests on vessel traffic
+// (Cnoc Buidhe, 20 Nov: an "At sea" traffic row on the report of an onshore wind farm 3.7 km from the coast).
+export function seaMatters(run) {
+  if (!run?.sea) return false;
+  if (run.site?.setting === "offshore") return true;
+  return (run.flags || []).some((f) => (f.evidence || []).some((e) => e.from_values === "vessel traffic"));
+}
