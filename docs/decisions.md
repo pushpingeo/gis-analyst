@@ -468,3 +468,37 @@ Judgement calls made while building, newest first. Bigger product decisions live
 - Tested: `npm test` (new `test/seavalues.test.mjs`; two new ntrrun tests: values in the record, the first message and
   the evidence; services down → not checked and the analyst told), `browser-run-card.mjs` 79/79 with depth and traffic
   faked (card line checked at desktop and phone sizes).
+
+## 20 Nov (early): elevation for every skill; one sign convention (Rob)
+- **Rob:** do topography as well as bathymetry; make it a tool other skills can use; manage the sign, since services
+  disagree (some give depth as positive). NTR should mention elevation only when it matters (near sea level or
+  flood-prone; high altitude: oxygen, etc.), so results aren't crowded. Slope: my call.
+- **One convention inside Tobler: elevation in metres, positive up, relative to sea level.** Land positive, seabed
+  negative; records and tools store only that. Each source in `catalogue/trusted.json` "values" → "elevation" (a list,
+  finest first) declares `sign` ("up" = elevations, "down" = depths positive down), `units` and `vertical_datum`;
+  `toElevation` converts as values are read and refuses a source that doesn't say. Water depth is a way of showing
+  elevation at sea (depth = -elevation, from the below-sea-level points only), decided by whether the site is at sea,
+  never by the sign: land can lie below sea level (polders). Tested with a depth-positive source giving the same
+  seabed as an elevation source.
+- **Shared tool `get_elevation`** (`js/elevation.js`, in the conversation and the screening run, read-only): typical,
+  lowest and highest of up to 25 points over a place or candidate; water depth at sea; "notable" on land when
+  low-lying or high; cell size, datum, source, licence. Listed in `skills/README.md` as a shared operation and in the
+  NTR `operations.md` ("Elevation over a place").
+- **Source:** NOAA NCEI DEM Global Mosaic (already used for depth). On land and in open ocean it's ETOPO 2022 at
+  15 arc-seconds (about 460 m; checked 20 Nov: Linlithgow 109 m, Zermatt area 3,553 m, Bolivian altiplano 3,776 m),
+  finer coastal and survey DEMs where NOAA holds them (mostly US); mostly EGM2008, some tidal datums. Fine for
+  "high altitude" or "low-lying"; too coarse for slope or real flood work.
+- **NTR (skill 3.6-draft):** the baseline reads elevation on every site; on land it's recorded (`tobler_run.elevation`)
+  and in "What was checked", but shown on the card and given to the analyst only when significant
+  (`elevationSignificance`, thresholds for Rob: typical 10 m or less low-lying; under 0 below sea level; 2,500 m or
+  more high altitude; 3,500 m very high). The skill says what each means and to pair low-lying with flood-zone data.
+  A failed read is told to the analyst. Flags citing elevation trace to the value read.
+- **Slope: later, with area discounting (my call).** Done the GIS way: fetch an elevation grid over the area and work
+  out slope cell by cell (Horn's method) in a local projection, summarised as share steeper than a threshold and the
+  steepest place. Needs a finer land model: Copernicus GLO-30 (open, commercial use with attribution) sits on AWS as
+  Cloud-Optimised GeoTIFFs, but the bucket sends no CORS header (checked 20 Nov), so it needs a Worker route that
+  passes range requests through, and a GeoTIFF reader in the page. `get_elevation` is shaped to take a grid source
+  then.
+- Tested: `npm test` (new `test/elevation.test.mjs`: signs, units, a depth-positive source, sea points only for depth,
+  fallbacks, significance, the tool at sea, high and mixed; a new ntrrun test: recorded always, reported only when
+  significant, failure said, tracing), `browser-run-card.mjs` 79/79, `browser-choice.mjs`.
