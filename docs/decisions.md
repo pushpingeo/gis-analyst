@@ -35,6 +35,15 @@ Judgement calls made while building, newest first. Bigger product decisions live
   everywhere; unscaled, PROJ misses it at ±70° too.
 - **GIGS licence:** the dataset is cloned into the runner's temp folder by the Action; nothing from it is in this
   repo, and only differences are printed. IOGP acknowledged in the script.
+- **Live checks (branch `transform`):** the branch's own `transform.js` and `epsgtools.js`, run in a browser against
+  the live registry (EPSG 13.106) and IOGP's GIGS files: all 28 2D points of 5203 and 5204 within tolerance (worst
+  2.1 and 2.7 cm against 3.3 cm), every one rightly flagged outside the operation's area of use (GIGS points are
+  synthetic and global). Haiku replays (`try-requests`, registry read directly where the deployed Worker doesn't yet
+  serve the new paths): the ED50 well question → 1311 chosen, applied, "moves about 118 m (117.6 m)", 1 m, EPSG 13.106;
+  "put it on the map" → placed from the transformed candidate. Linlithgow: 1314 described as chosen, "I haven't
+  applied it to any data yet". **Seen, not fixed:** on the second turn the analyst didn't know the first turn had run
+  `transform` (tool results aren't replayed) and wrongly apologised for quoting figures before running it; the
+  project summary could list transformed candidates.
 
 ## 20 Nov 2026 (late evening): coordinates typed into the chat are a place (Rob)
 - **Why:** Rob typed "55.522759, -5.650122". `find_place` sent it to the name searches, Nominatim returned the Argyll
