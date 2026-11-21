@@ -860,3 +860,17 @@ Judgement calls made while building, newest first. Bigger product decisions live
   "Ask me"). At Berwick the Scotland-only transformation was rightly left out; the ED50 well got EPSG:1311 (1 m).
 - **Not done:** a `transform` tool that applies the chosen transformation (the analyst says honestly it can't give the
   exact shift yet); grid-based transformations in the page; checking EPSG's terms of use for commercial serving.
+
+## 20 Nov (late night): approximate sites, graded by position (Rob: "lets fix before building")
+- **Why:** before recording the Cnoc Buidhe demo from a centre point (169700 E, 630800 N), Rob: "it shouldn't be low
+  confidence just because it's a centre point; surely a user could be prompted". My earlier call (a point's default
+  footprint counts as a search area) was too blunt: it capped everything, middle and edge alike.
+- **Built:** a new role, `approximate_site` (`js/siterole.js`): a known centre with an estimated size. Points screened on
+  their default footprint, and circles or squares built round the site centre the person gave (`make_place`
+  `site_centre`, `size_from`). Findings reaching the core (half the radius, `CORE_SHARE`, for Rob) are on site at full
+  confidence; those only in the outer part are "at the site's edge", capped at medium. Search areas are unchanged and
+  now only for places built from clues.
+- **The ask:** the conversation asks once before screening a point for an asset that covers ground: the outline, or a
+  size it names with a reason. Not when there's an outline, or the person says go ahead.
+- **Checkpoint for Rob:** `CORE_SHARE` 0.5 (the core is a quarter of the area).
+

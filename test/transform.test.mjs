@@ -107,6 +107,9 @@ await t("transform: refuses what it can't do honestly (grid, wrong pair, places 
   assert.match((await T().transform({ operation: "1613", source: "4230", points: [[57, 2]] })).error, /can't be applied here/);
   assert.match((await T().transform({ operation: "1311", source: "4277", points: [[57, 2]] })).error, /runs between EPSG:4230/);
   assert.match((await T().transform({ operation: "1311", source: "4230", at: "C9" })).error, /isn't coordinates the person typed/);
+  // British National Grid numbers are already WGS 84 when read (Cnoc Buidhe replay, 20 Nov: moved 69 m a second time).
+  const conv = createEpsgTools({ epsg: fakeEpsg(), transformationChoice: () => "choose" }, () => null, () => ({ converted: "OSGB36, converted to WGS84 (Helmert, about 5 m)" }));
+  assert.match((await conv.transform({ operation: "1314", source: "4277", at: "C5" })).error, /already in WGS 84.*Don't transform it again/);
   assert.match((await T().transform({ operation: "1311", source: "4230", points: [[6400000, 450000]] })).error, /Projected coordinates/);
   assert.match((await T().transform({ operation: "1311", source: "4230" })).error, /No coordinates/);
   assert.match((await T().transform({ operation: "99999", source: "4230", points: [[57, 2]] })).hint, /transformation code/);

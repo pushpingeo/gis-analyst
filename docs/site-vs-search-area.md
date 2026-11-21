@@ -14,8 +14,27 @@ statement about where the site might be, not the site.
 |---|---|---|
 | `footprint` | a published outline (`shape: "feature"`, not moved, not a namesake or region), or drawn by the person | the site: "on site" |
 | `area` | a shape the person asked for round a found place (`match: named_place`: "3 km² round Jackdaw") | the site: "on site" |
-| `search_area` | built from clues round an anchor that isn't the asset; a region or namesake outline; the default footprint round a point | "in the search area", share covered, confidence capped |
-| `point` | a point | (screened on its default footprint: a search area) |
+| `approximate_site` | a known centre with an estimated size: a point screened on its default footprint, or a circle or square `make_place` built round the site centre the person gave (`site_centre: true`, `size_from`) | middle "on site"; outer part "at the site's edge", capped at medium |
+| `search_area` | built from clues round an anchor that isn't the asset; a region or namesake outline | "in the search area", share covered, confidence capped |
+| `point` | a point | (screened on its default footprint: an approximate site) |
+
+## Approximate sites (20 Nov, late night; Rob: "it shouldn't be low confidence just because it's a centre point")
+A point the person gives is the site's centre, not a guess at where the site is. The only uncertainty is where the
+boundary runs, so it shouldn't touch findings near the middle.
+- **Ask once:** before screening a point for an asset that covers ground, the analyst asks for the outline or a size,
+  naming one sensible size and why, then builds a circle round the point with `make_place` (`site_centre: true`,
+  `size_from`). If the person would rather not say, the point is screened on its default footprint
+  (`catalogue/distances.json`), which is also an approximate site.
+- **Graded by position (`positionIn`):** a feature at distance 0 that reaches the core, a disc of `CORE_SHARE` (0.5,
+  for Rob) × the site's radius round the known centre, is `site_position: "core"`, band "on site". One only in the
+  outer part is `"edge"`, band "at the site's edge" with its side. Measured in an equal-area projection centred on
+  the centre (point, segment or polygon distance; a polygon containing the centre is core).
+- **Flags (`applyApproximateSite`):** a flag with any core evidence stays "on site" at its own confidence. A flag
+  whose on-site evidence is all edge is "at the site's edge", capped at medium (`confidence_capped`), worded so in
+  code. Severity unchanged. Off-site flags untouched.
+- **Shown:** dashed outline labelled "· approximate site"; place card "What it is"; run card and report lead with
+  "Screened an approximate site of 28.3 km² (…), because the site's outline wasn't available…"; evidence and the
+  nearest line say "at the site's edge (its eastern side)". The share link keeps `site_position`.
 
 ## A screen of a search area
 - Each feature inside: `in_search_area`, `coverage` (share of the area, overlay in a Lambert azimuthal equal-area

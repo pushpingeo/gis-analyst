@@ -74,6 +74,11 @@ export function rateConfidence({ cand, match = "none", checks = [], offset = fal
     rules.push(inherit.drawn ? `built on ${inherit.name}, which the person drew: high` : `built on ${inherit.name}, which is ${LEVELS[level]} confidence`);
     return finish(level, rules, { checks, offset, shape: null, cand: null, match: "inherited" });
   }
+  // The person's own coordinates (typed, or typed and moved to WGS 84 by transform): they said where it is.
+  if (cand && ["typed", "transformed"].includes(cand.source?.id)) {
+    rules.push("built on coordinates the person gave: high");
+    return finish(2, rules, { checks, offset, shape, cand, match });
+  }
   // An asset "found" as a town or village is the town, not the asset (Sierra Rutile in v3: a town sharing the project area's name).
   if (match === "name_and_type" && looksLikeSettlement(cand)) { match = "settlement_or_region"; rules.push("the match is a settlement, not the asset"); }
   if (match === "named_place") {

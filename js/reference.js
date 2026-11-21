@@ -199,8 +199,11 @@ export function summaryLine(d) {
   const edge = d.touches_at_edge?.length ? `touching ${listOf(d.touches_at_edge)} at its edge` : "";
   const p = d.nearest_places[0];
   const big = d.places_inside?.largest[0];
-  const near = p ? `nearest town ${p.name}${p.country && (d.offshore || d.countries.length !== 1 || p.country !== d.countries[0]) ? ` (${p.country})` : ""}, ${fmtNum(p.km)} km`
-    : big ? `largest city ${big.name}` : "";
+  // Natural Earth lists only towns of note, so on land at site scale its "nearest town" can be 60 km off while a real
+  // town sits 7 km away (Cnoc Buidhe: Ayr at 66 km, Campbeltown at 7). Beyond 30 km there, say nothing rather than mislead.
+  const misleading = p && !d.offshore && d.scale === "local" && p.km > 30;
+  const near = p && !misleading ? `nearest town ${p.name}${p.country && (d.offshore || d.countries.length !== 1 || p.country !== d.countries[0]) ? ` (${p.country})` : ""}, ${fmtNum(p.km)} km`
+    : big && !misleading ? `largest city ${big.name}` : "";
   return [size, where, edge, near].filter(Boolean).join(", ");
 }
 

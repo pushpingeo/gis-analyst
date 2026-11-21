@@ -352,7 +352,7 @@ export function createPlaceTools(host) {
         await Promise.all(list.map(async (c) => { try { const near = await settlementNear(c.lonlat, { fetchFn: host.fetchFn, headers: host.headers }); if (near) c.extra.near = near; } catch { /* no name nearby */ } }));
         host.onCandidates?.(list);
         return { searched_for: asked, candidates: list.map(compact),
-          note: `Coordinates, read in code, not searched for as a name. Use the candidate as the anchor (match named_place).${orderNote ? ` ${orderNote}` : ""}` };
+          note: `Coordinates, read in code, not searched for as a name. Use the candidate as the anchor (match named_place).${typed.some((c) => /converted to WGS ?84/i.test(c.extra?.datum || "")) ? " British National Grid numbers are already converted to WGS 84 here: no transformation needed." : ""}${orderNote ? ` ${orderNote}` : ""}` };
       }
       const errors = [];
       // Every source and every spelling at once, the catalogue too; results keep this order (authoritative first).
@@ -655,7 +655,8 @@ export function createPlaceTools(host) {
   };
   // Coordinate reference (EPSG registry via the Worker): js/epsgtools.js.
   // transform takes the person's own numbers only: a typed-coordinates candidate, never a place already in WGS 84.
-  const typedAt = (ref) => { try { const r = resolve(ref); return r.cand?.source?.id === "typed" ? r.cand.lonlat : null; } catch { return null; } };
+  // Grid references and eastings/northings are already in WGS 84 (converted from OSGB36 when read): never again.
+  const typedAt = (ref) => { try { const r = resolve(ref); if (r.cand?.source?.id !== "typed") return null; return /converted to WGS ?84/i.test(r.cand.extra?.datum || "") ? { converted: r.cand.extra.datum } : r.cand.lonlat; } catch { return null; } };
   Object.assign(run, createEpsgTools(host, (ref) => resolve(ref).lonlat, typedAt));
   // Each transformed point becomes a candidate, so make_place can use it and the place keeps how it was transformed.
   const transformTool = run.transform;

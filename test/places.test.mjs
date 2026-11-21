@@ -104,6 +104,18 @@ await test("find_place finds Jackdaw in the NSTA layer", async () => {
   assert.ok(calls.some((u) => u.includes("nominatim")), "OpenStreetMap searched too");
 });
 
+await test("BNG eastings and northings: read in code, already WGS 84, high confidence; no far 'nearest town' at site scale", async () => {
+  const host = memoryHost();
+  const t = createPlaceTools(host);
+  const r = await t.exec("find_place", { query: "169700 E, 630800 N" });
+  assert.match(r.note, /already converted to WGS 84 here: no transformation needed/);
+  const c = r.candidates[0];
+  const out = await t.exec("make_place", { anchor: c.id, shape: "circle", area_km2: 14.5, site_centre: true, size_from: "about 0.5 km² per turbine", words: "Cnoc Buidhe, centred at 169700 E, 630800 N", match: "none", reason: "the person's coordinates" });
+  assert.equal(out.confidence, "high");
+  assert.equal(host.list[0].origin.role, "approximate_site");
+  assert.doesNotMatch(out.summary || JSON.stringify(out), /nearest town Ayr/);
+});
+
 await test("make_place builds a 3 km² square on the anchor and records how", async () => {
   const host = memoryHost();
   const t = createPlaceTools(host);
@@ -227,6 +239,9 @@ await test("confidence is worked out from the evidence, not chosen", async () =>
   const ok = { pass: true, tight: true, direction: "E" }, ring = { pass: true, tight: true }, far = { pass: true, tight: false, direction: "SE" }, bad = { pass: false };
   assert.equal(rateConfidence({ cand: nsta, match: "name_and_type", shape: "point" }).confidence, "high");
   assert.equal(rateConfidence({ cand: wd, match: "name_and_type", shape: "point" }).confidence, "medium", "a gazetteer point on its own");
+  // The person's own coordinates: high whatever match the analyst picks (Cnoc Buidhe replay: "none" gave low).
+  for (const id of ["typed", "transformed"]) assert.equal(rateConfidence({ cand: { source: { id }, type: "coordinates you typed" }, match: "none", shape: "circle" }).confidence, "high");
+  assert.equal(rateConfidence({ cand: { source: { id: "typed" } }, match: "none", shape: "circle", offset: true }).confidence, "medium", "moved off them: at most medium");
   assert.equal(rateConfidence({ cand: wd, match: "name_and_type", checks: [ok], shape: "point" }).confidence, "high", "confirmed by a check");
   assert.equal(rateConfidence({ cand: wd, match: "name_and_type", checks: [ok, bad], shape: "point" }).confidence, "low", "Reko Diq: a failed check");
   assert.equal(rateConfidence({ cand: nsta, match: "name_and_type", checks: [bad], shape: "point" }).confidence, "low", "even authoritative");

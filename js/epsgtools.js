@@ -200,6 +200,7 @@ export function createEpsgTools(host, locate, typedAt = () => null) {
       let pts = [];
       if (at) {
         const ll = typedAt(at);
+        if (ll?.converted) return { error: `"${at}" was read from British National Grid eastings and northings and is already in WGS 84 (${ll.converted}). Don't transform it again: build the place from this candidate as it is.` };
         if (!ll) return { error: `"${at}" isn't coordinates the person typed. transform takes the person's own numbers (their find_place candidate, or points), never a place already on the map.` };
         pts = [[ll[1], ll[0]]];
       } else if (Array.isArray(points)) {

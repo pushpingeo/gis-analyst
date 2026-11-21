@@ -54,6 +54,12 @@ test("British National Grid: the Ordnance Survey's own worked example, letters a
   assert.equal(en.system, "British National Grid eastings and northings");
   near(en.lat, 55.979, 2e-3, "eastings and northings");
   assert.equal(at("168530, 628360").system, "British National Grid eastings and northings");
+  // Letters after the numbers (Rob's Cnoc Buidhe message, 20 Nov), in a sentence too.
+  for (const q of ["169700 E, 630800 N", "169700E 630800N", "169700mE 630800mN", "centred at 169700 E, 630800 N on the British National Grid"]) {
+    const c = at(q);
+    assert.equal(c?.system, "British National Grid eastings and northings", q);
+    assert.ok(Math.abs(c.lat - 55.51648) < 1e-4 && Math.abs(c.lon + 5.64954) < 1e-4, q);
+  }
 });
 
 test("ordinary text isn't read as coordinates", () => {

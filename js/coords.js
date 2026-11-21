@@ -78,6 +78,9 @@ const GRID = /\b([HJNOST][A-HJ-Z])\s*(\d{2,5})\s+(\d{2,5})\b|\b([HJNOST][A-HJ-Z]
 // Eastings and northings: 168530, 628360 · E 168530 N 628360.
 const EN = /(?:\b[Ee](?:asting)?:?\s*)?\b(\d{5,6}(?:\.\d+)?)\s*(?:m\b)?\s*[,;/\s]\s*(?:[Nn](?:orthing)?:?\s*)?(\d{5,7}(?:\.\d+)?)\b/;
 
+// The same with the letters after the numbers: 169700 E, 630800 N · 169700mE 630800mN (Rob, 20 Nov).
+const EN_AFTER = /\b(\d{5,6}(?:\.\d+)?)\s*m?\s*[Ee](?:asting)?s?\b\s*[,;/]?\s*(\d{5,7}(?:\.\d+)?)\s*m?\s*[Nn](?:orthing)?s?\b/;
+
 function hemiSign(v, h) { return h && /[SWsw]/.test(h) ? -Math.abs(v) : h ? Math.abs(v) : v; }
 const isLat = (h) => h && /[NSns]/.test(h);
 const isLon = (h) => h && /[EWew]/.test(h);
@@ -135,10 +138,10 @@ export function parseCoordinates(text) {
       }
     }
   }
-  if ((m = EN.exec(t))) {
+  if ((m = EN_AFTER.exec(t) || EN.exec(t))) {
     const e = num(m[1]), n = num(m[2]);
     // Unlabelled, both must look like grid metres (six figures or more); "E … N …" may be shorter (the far west).
-    const labelled = /^[Ee]/.test(m[0].trim());
+    const labelled = /^[Ee]/.test(m[0].trim()) || /[Nn](orthing)?s?$/.test(m[0].trim());
     if (e <= 700000 && n <= 1300000 && (labelled || (Math.floor(e) >= 100000 && Math.floor(n) >= 100000))) {
       const [lon, lat] = osgbToWgs84(e, n);
       if (inGB(lon, lat)) return { lon, lat, input: m[0].trim(), system: "British National Grid eastings and northings", easting: e, northing: n,
